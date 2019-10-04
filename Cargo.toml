@@ -1,0 +1,13 @@
+[package]
+name = "zerocopy-lmdb"
+version = "0.1.0"
+authors = ["Clément Renault <clement@meilisearch.com>"]
+edition = "2018"
+
+[dependencies]
+lmdb-rkv-sys = "0.9.5"
+
+# Do not forget to patch zerocopy to make it support str
+# by using the `trivial_bounds` feature
+[dependencies.zerocopy]
+path = "../fuchsia/garnet/public/rust/zerocopy"
