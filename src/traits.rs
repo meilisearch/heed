@@ -1,18 +1,15 @@
 use std::borrow::Cow;
-use zerocopy::AsBytes;
+use zerocopy::{LayoutVerified, AsBytes, FromBytes};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
 
-pub trait EPAsBytes {
-    fn as_bytes(&self) -> Cow<[u8]>;
+pub trait BytesEncode {
+    type Item: ?Sized;
+
+    fn bytes_encode(item: &Self::Item) -> Option<Cow<[u8]>>;
 }
 
-pub trait EPFromBytes {
-    type Output: ToOwned + ?Sized;
+pub trait BytesDecode {
+    type Item: ToOwned + ?Sized;
 
-    fn from_bytes(bytes: &[u8]) -> Option<Cow<Self::Output>>;
-}
-
-impl<T: AsBytes + ?Sized> EPAsBytes for T {
-    fn as_bytes(&self) -> Cow<[u8]> {
-        Cow::Borrowed(<T as AsBytes>::as_bytes(self))
-    }
+    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>>;
 }
