@@ -47,6 +47,10 @@ impl TxnRead {
 
         TxnRead { txn }
     }
+
+    pub fn abort(self) {
+        drop(self)
+    }
 }
 
 impl Drop for TxnRead {
@@ -86,17 +90,8 @@ impl TxnWrite {
         self.txn.txn = ptr::null_mut();
     }
 
-    pub fn abort(mut self) {
-        unsafe { ffi::mdb_txn_abort(self.txn.txn) }
-        self.txn.txn = ptr::null_mut();
-    }
-}
-
-impl Drop for TxnWrite {
-    fn drop(&mut self) {
-        if !self.txn.txn.is_null() {
-            eprintln!("you must commit or abort the transaction")
-        }
+    pub fn abort(self) {
+        drop(self)
     }
 }
 
