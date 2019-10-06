@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::{mem, ptr};
 
 use zerocopy::{LayoutVerified, AsBytes, FromBytes};
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
-
 use crate::{BytesEncode, BytesDecode};
 
 fn aligned_to(bytes: &[u8], align: usize) -> bool {
@@ -118,7 +116,7 @@ pub struct Ignore;
 impl BytesEncode for Ignore {
     type Item = ();
 
-    fn bytes_encode(item: &Self::Item) -> Option<Cow<[u8]>> {
+    fn bytes_encode(_item: &Self::Item) -> Option<Cow<[u8]>> {
         Some(Cow::Borrowed(&[]))
     }
 }
@@ -126,15 +124,21 @@ impl BytesEncode for Ignore {
 impl BytesDecode for Ignore {
     type Item = ();
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>> {
+    fn bytes_decode(_bytes: &[u8]) -> Option<Cow<Self::Item>> {
         Some(Cow::Owned(()))
     }
 }
 
 
 
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
+
+
+#[cfg(feature = "serde")]
 pub struct Serde<T>(std::marker::PhantomData<T>);
 
+#[cfg(feature = "serde")]
 impl<T> BytesEncode for Serde<T> where T: Serialize {
     type Item = T;
 
@@ -143,6 +147,7 @@ impl<T> BytesEncode for Serde<T> where T: Serialize {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<T> BytesDecode for Serde<T> where T: DeserializeOwned + Clone {
     type Item = T;
 

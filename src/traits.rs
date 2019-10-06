@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use zerocopy::{LayoutVerified, AsBytes, FromBytes};
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
 
 pub trait BytesEncode {
     type Item: ?Sized;

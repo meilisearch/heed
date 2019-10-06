@@ -1,7 +1,4 @@
-use std::{io, marker, mem, ptr, slice, str};
-use std::borrow::Cow;
-use zerocopy::{LayoutVerified, AsBytes, FromBytes};
-use lmdb_sys as ffi;
+use std::io;
 
 mod db;
 mod env;
@@ -13,7 +10,10 @@ pub use self::db::Database;
 pub use self::env::{EnvBuilder, Env};
 pub use self::traits::{BytesEncode, BytesDecode};
 pub use self::txn::{TxnRead, TxnWrite};
-pub use self::types::{Type, Slice, Str, Ignore, Serde};
+pub use self::types::{Type, Slice, Str, Ignore};
+
+#[cfg(feature = "serde")]
+pub use self::types::Serde;
 
 #[derive(Debug)]
 pub enum Error {

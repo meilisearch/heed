@@ -5,9 +5,15 @@ authors = ["Clément Renault <clement@meilisearch.com>"]
 edition = "2018"
 
 [dependencies]
-bincode = "1.2.0"
+bincode = { version = "1.2.0", optional = true }
 libc = "0.2.62"
 lmdb-rkv-sys = "0.9.5"
 page_size = "0.4.1"
-serde = { version = "1.0.101", features = ["derive"] }
+serde = { version = "1.0.101", optional = true }
 zerocopy = "0.2.8"
+
+[dev-dependencies]
+serde = { version = "1.0.101", features = ["derive"] }
+
+[features]
+default = ["serde", "bincode"]
