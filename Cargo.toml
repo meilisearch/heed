@@ -8,5 +8,6 @@ edition = "2018"
 bincode = "1.2.0"
 libc = "0.2.62"
 lmdb-rkv-sys = "0.9.5"
+page_size = "0.4.1"
 serde = { version = "1.0.101", features = ["derive"] }
 zerocopy = "0.2.8"

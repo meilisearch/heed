@@ -1,17 +1,21 @@
 use std::borrow::Cow;
 use std::ptr;
-use zerocopy_lmdb::{Env, Database, TxnRead, TxnWrite, Type, Slice, Str, Ignore, Serde};
+use zerocopy_lmdb::{EnvBuilder, Database, TxnRead, TxnWrite, Type, Slice, Str, Ignore, Serde};
 use serde::{Serialize, Deserialize};
 use lmdb_sys as ffi;
 
 fn main() {
-    let env = Env::open("zerocopy.mdb");
+    let env = EnvBuilder::new()
+        .map_size(10 * 1024 * 1024 * 1024) // 10GB
+        .max_dbs(3000)
+        .open("zerocopy.mdb")
+        .unwrap();
 
     // you can specify that a database will support some typed key/data
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an unsized array of u64
-    let db: Database<Type<[i32; 2]>, Str> = env.open_database(None);
+    let db: Database<Type<[i32; 2]>, Str> = env.create_database(Some("kikou"));
 
     let mut wtxn = env.write_txn();
     let ret                   = db.put(&mut wtxn, &[2, 3], "what's up?").unwrap();
@@ -24,7 +28,7 @@ fn main() {
 
     // even str are supported,
     // here the key will be an str and the data will be an array of two i32
-    let db: Database<Str, Slice<i32>> = env.open_database(None);
+    let db: Database<Str, Slice<i32>> = env.create_database(Some("kiki"));
 
     let mut wtxn = env.write_txn();
     let ret                     = db.put(&mut wtxn, "hello", &[2, 3][..]).unwrap();
@@ -39,7 +43,7 @@ fn main() {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct Hello { string: String }
 
-    let db: Database<Str, Serde<Hello>> = env.open_database(None);
+    let db: Database<Str, Serde<Hello>> = env.create_database(None);
 
     let mut wtxn = env.write_txn();
     let hello = Hello { string: String::from("hi") };
@@ -52,7 +56,7 @@ fn main() {
 
 
     // you can also ignore the key or the data
-    let db: Database<Str, Ignore> = env.open_database(None);
+    let db: Database<Str, Ignore> = env.create_database(None);
 
     let mut wtxn = env.write_txn();
     let ret                  = db.put(&mut wtxn, "hello", &()).unwrap();
