@@ -19,7 +19,7 @@ impl<T> BytesEncode for Type<T> where T: AsBytes {
     }
 }
 
-impl<T> BytesDecode for Type<T> where T: FromBytes + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for Type<T> where T: FromBytes + Copy {
     type Item = T;
 
     fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>> {
@@ -59,7 +59,7 @@ impl<T> BytesEncode for Slice<T> where T: AsBytes {
     }
 }
 
-impl<T> BytesDecode for Slice<T> where T: FromBytes + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for Slice<T> where T: FromBytes + Copy {
     type Item = [T];
 
     fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>> {
@@ -101,7 +101,7 @@ impl BytesEncode for Str {
     }
 }
 
-impl BytesDecode for Str {
+impl BytesDecode<'_> for Str {
     type Item = str;
 
     fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>> {
@@ -121,7 +121,7 @@ impl BytesEncode for Ignore {
     }
 }
 
-impl BytesDecode for Ignore {
+impl BytesDecode<'_> for Ignore {
     type Item = ();
 
     fn bytes_decode(_bytes: &[u8]) -> Option<Cow<Self::Item>> {
@@ -132,7 +132,7 @@ impl BytesDecode for Ignore {
 
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde::{Serialize, Deserialize};
 
 
 #[cfg(feature = "serde")]
@@ -148,10 +148,10 @@ impl<T> BytesEncode for Serde<T> where T: Serialize {
 }
 
 #[cfg(feature = "serde")]
-impl<T> BytesDecode for Serde<T> where T: DeserializeOwned + Clone {
+impl<'a, T: 'a> BytesDecode<'a> for Serde<T> where T: Deserialize<'a> + Clone {
     type Item = T;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Cow<'a, Self::Item>> {
         bincode::deserialize(bytes).map(Cow::Owned).ok()
     }
 }

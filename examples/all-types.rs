@@ -1,8 +1,6 @@
 use std::borrow::Cow;
-use std::ptr;
-use zerocopy_lmdb::{EnvBuilder, Database, TxnRead, TxnWrite, Type, Slice, Str, Ignore, Serde};
+use zerocopy_lmdb::{EnvBuilder, Database, Type, Slice, Str, Ignore, Serde};
 use serde::{Serialize, Deserialize};
-use lmdb_sys as ffi;
 
 fn main() {
     let env = EnvBuilder::new()
@@ -18,7 +16,7 @@ fn main() {
     let db: Database<Type<[i32; 2]>, Str> = env.create_database(Some("kikou"));
 
     let mut wtxn = env.write_txn();
-    let ret                   = db.put(&mut wtxn, &[2, 3], "what's up?").unwrap();
+    let _ret                  = db.put(&mut wtxn, &[2, 3], "what's up?").unwrap();
     let ret: Option<Cow<str>> = db.get(&wtxn, &[2, 3]).unwrap();
 
     println!("{:?}", ret);
@@ -31,7 +29,7 @@ fn main() {
     let db: Database<Str, Slice<i32>> = env.create_database(Some("kiki"));
 
     let mut wtxn = env.write_txn();
-    let ret                     = db.put(&mut wtxn, "hello", &[2, 3][..]).unwrap();
+    let _ret                    = db.put(&mut wtxn, "hello", &[2, 3][..]).unwrap();
     let ret: Option<Cow<[i32]>> = db.get(&wtxn, "hello").unwrap();
 
     println!("{:?}", ret);
@@ -41,13 +39,13 @@ fn main() {
 
     // // serde types are also supported but this could be improved a little bit...
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct Hello { string: String }
+    struct Hello<'a> { string: &'a str }
 
     let db: Database<Str, Serde<Hello>> = env.create_database(None);
 
     let mut wtxn = env.write_txn();
-    let hello = Hello { string: String::from("hi") };
-    let ret                     = db.put(&mut wtxn, "hello", &hello).unwrap();
+    let hello = Hello { string: "hi" };
+    let _ret                    = db.put(&mut wtxn, "hello", &hello).unwrap();
     let ret: Option<Cow<Hello>> = db.get(&wtxn, "hello").unwrap();
 
     println!("{:?}", ret);
@@ -59,7 +57,7 @@ fn main() {
     let db: Database<Str, Ignore> = env.create_database(None);
 
     let mut wtxn = env.write_txn();
-    let ret                  = db.put(&mut wtxn, "hello", &()).unwrap();
+    let _ret                 = db.put(&mut wtxn, "hello", &()).unwrap();
     let ret: Option<Cow<()>> = db.get(&wtxn, "hello").unwrap();
 
     println!("{:?}", ret);

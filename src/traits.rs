@@ -6,8 +6,8 @@ pub trait BytesEncode {
     fn bytes_encode(item: &Self::Item) -> Option<Cow<[u8]>>;
 }
 
-pub trait BytesDecode {
-    type Item: ToOwned + ?Sized;
+pub trait BytesDecode<'a> {
+    type Item: ToOwned + ?Sized + 'a;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::Item>>;
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Cow<'a, Self::Item>>;
 }

@@ -32,7 +32,7 @@ impl<KC, DC> Database<KC, DC> {
     ) -> ZResult<Option<Cow<'txn, DC::Item>>>
     where
         KC: BytesEncode,
-        DC: BytesDecode,
+        DC: BytesDecode<'txn>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
 
