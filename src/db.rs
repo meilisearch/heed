@@ -18,8 +18,8 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get<'txn>(
         &self,
         txn: &'txn RoTxn,
-        key: &KC::Item,
-    ) -> ZResult<Option<Cow<'txn, DC::Item>>>
+        key: &KC::EItem,
+    ) -> ZResult<Option<Cow<'txn, DC::DItem>>>
     where
         KC: BytesEncode,
         DC: BytesDecode<'txn>,
@@ -51,8 +51,8 @@ impl<KC, DC> Database<KC, DC> {
     pub fn put(
         &self,
         txn: &mut RwTxn,
-        key: &KC::Item,
-        data: &DC::Item,
+        key: &KC::EItem,
+        data: &DC::EItem,
     ) -> ZResult<()>
     where
         KC: BytesEncode,

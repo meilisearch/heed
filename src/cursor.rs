@@ -16,7 +16,7 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         unimplemented!()
     }
 
-    pub fn move_on_first(&mut self) -> ZResult<Option<(Cow<'txn, KC::Item>, Cow<'txn, DC::Item>)>>
+    pub fn move_on_first(&mut self) -> ZResult<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -51,8 +51,8 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
 
     pub fn move_on_key(
         &mut self,
-        key: &<KC as BytesEncode>::Item,
-    ) -> ZResult<Option<(Cow<'txn, <KC as BytesDecode<'txn>>::Item>, Cow<'txn, DC::Item>)>>
+        key: &KC::EItem,
+    ) -> ZResult<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
     where
         KC: BytesEncode + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -87,7 +87,7 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
     }
 
-    pub fn move_on_next(&mut self) -> ZResult<Option<(Cow<'txn, KC::Item>, Cow<'txn, DC::Item>)>>
+    pub fn move_on_next(&mut self) -> ZResult<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -120,7 +120,7 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
     }
 
-    pub fn get_current(&mut self) -> ZResult<Option<(Cow<'txn, KC::Item>, Cow<'txn, DC::Item>)>>
+    pub fn get_current(&mut self) -> ZResult<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -169,7 +169,7 @@ impl<'txn, KC, DC> RwCursor<'txn, KC, DC> {
         unimplemented!()
     }
 
-    pub fn put_current(&mut self, data: &DC::Item) -> ZResult<()>
+    pub fn put_current(&mut self, data: &DC::EItem) -> ZResult<()>
     where DC: BytesEncode
     {
         unimplemented!()
