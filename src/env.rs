@@ -3,17 +3,13 @@ use std::ffi::CString;
 use std::{io, ptr};
 use lmdb_sys as ffi;
 
-use crate::{TxnRead, TxnWrite, Database, ZResult, Error};
+use crate::{RoTxn, RwTxn, Database, ZResult, Error};
 
 #[derive(Clone, Debug)]
 pub struct EnvBuilder {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
-}
-
-pub struct Env {
-    env: *mut ffi::MDB_env,
 }
 
 impl EnvBuilder {
@@ -79,6 +75,10 @@ impl EnvBuilder {
     }
 }
 
+pub struct Env {
+    env: *mut ffi::MDB_env,
+}
+
 impl Env {
     fn new(env: *mut ffi::MDB_env) -> Env {
         Env { env }
@@ -111,11 +111,11 @@ impl Env {
         Database::new(dbi)
     }
 
-    pub fn write_txn(&self) -> TxnWrite {
-        TxnWrite::new(self.env)
+    pub fn write_txn(&self) -> RwTxn {
+        RwTxn::new(self.env)
     }
 
-    pub fn read_txn(&self) -> TxnRead {
-        TxnRead::new(self.env)
+    pub fn read_txn(&self) -> RoTxn {
+        RoTxn::new(self.env)
     }
 }

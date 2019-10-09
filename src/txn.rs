@@ -2,12 +2,12 @@ use std::ops::Deref;
 use std::ptr;
 use lmdb_sys as ffi;
 
-pub struct TxnRead {
+pub struct RoTxn {
     pub txn: *mut ffi::MDB_txn,
 }
 
-impl TxnRead {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> TxnRead {
+impl RoTxn {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> RoTxn {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         let ret = unsafe {
@@ -21,7 +21,7 @@ impl TxnRead {
 
         assert_eq!(ret, 0);
 
-        TxnRead { txn }
+        RoTxn { txn }
     }
 
     pub fn abort(self) {
@@ -29,7 +29,7 @@ impl TxnRead {
     }
 }
 
-impl Drop for TxnRead {
+impl Drop for RoTxn {
     fn drop(&mut self) {
         if !self.txn.is_null() {
             unsafe { ffi::mdb_txn_abort(self.txn) }
@@ -38,12 +38,12 @@ impl Drop for TxnRead {
     }
 }
 
-pub struct TxnWrite {
-    pub txn: TxnRead,
+pub struct RwTxn {
+    pub txn: RoTxn,
 }
 
-impl TxnWrite {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> TxnWrite {
+impl RwTxn {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> RwTxn {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         let ret = unsafe {
@@ -57,7 +57,7 @@ impl TxnWrite {
 
         assert_eq!(ret, 0);
 
-        TxnWrite { txn: TxnRead { txn } }
+        RwTxn { txn: RoTxn { txn } }
     }
 
     pub fn commit(mut self) {
@@ -71,8 +71,8 @@ impl TxnWrite {
     }
 }
 
-impl Deref for TxnWrite {
-    type Target = TxnRead;
+impl Deref for RwTxn {
+    type Target = RoTxn;
 
     fn deref(&self) -> &Self::Target {
         &self.txn
