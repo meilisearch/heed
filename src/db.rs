@@ -1,10 +1,9 @@
 use std::{marker, mem};
 use std::borrow::Cow;
 
-use crate::{ZResult, Error, BytesDecode, BytesEncode, RoTxn, RwTxn};
+use crate::*;
 use lmdb_sys as ffi;
 
-#[derive(Copy, Clone)]
 pub struct Database<KC, DC> {
     dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(KC, DC)>,
@@ -48,6 +47,14 @@ impl<KC, DC> Database<KC, DC> {
         Ok(Some(data))
     }
 
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> RoIter<'txn, KC, DC> {
+        RoIter {
+            cursor: RoCursor::new(txn, *self),
+            init_op: Some(InitOp::MoveOnFirst),
+            _phantom: marker::PhantomData,
+        }
+    }
+
     pub fn put(
         &self,
         txn: &mut RwTxn,
@@ -78,5 +85,41 @@ impl<KC, DC> Database<KC, DC> {
         assert_eq!(ret, 0);
 
         Ok(())
+    }
+}
+
+impl<KC, DC> Clone for Database<KC, DC> {
+    fn clone(&self) -> Database<KC, DC> {
+        Database::new(self.dbi)
+    }
+}
+
+impl<KC, DC> Copy for Database<KC, DC> {}
+
+enum InitOp {
+    MoveOnFirst,
+    GetCurrent,
+}
+
+pub struct RoIter<'txn, KC, DC> {
+    cursor: RoCursor<'txn, KC, DC>,
+    init_op: Option<InitOp>,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
+where KC: BytesDecode<'txn>,
+      DC: BytesDecode<'txn>,
+{
+    type Item = ZResult<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = match self.init_op.take() {
+            Some(InitOp::MoveOnFirst) => self.cursor.move_on_first(),
+            Some(InitOp::GetCurrent) => self.cursor.get_current(),
+            None => self.cursor.move_on_next(),
+        };
+
+        result.transpose()
     }
 }
