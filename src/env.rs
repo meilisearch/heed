@@ -1,9 +1,9 @@
 use std::path::Path;
 use std::ffi::CString;
 use std::{io, ptr};
-use lmdb_sys as ffi;
 
-use crate::{RoTxn, RwTxn, Database, ZResult, Error};
+use crate::lmdb_error::lmdb_result;
+use crate::{RoTxn, RwTxn, Database, Result, Error};
 
 #[derive(Clone, Debug)]
 pub struct EnvBuilder {
@@ -36,42 +36,32 @@ impl EnvBuilder {
         self.max_dbs = Some(dbs); self
     }
 
-    pub fn open<P: AsRef<Path>>(&self, path: P) -> ZResult<Env> {
-        let mut env: *mut ffi::MDB_env = ptr::null_mut();
-        let ret = unsafe { ffi::mdb_env_create(&mut env) };
+    pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+        unsafe {
+            let mut env: *mut ffi::MDB_env = ptr::null_mut();
+            lmdb_result(ffi::mdb_env_create(&mut env))?;
 
-        if ret != 0 { return Err(Error::CouldNotCreateEnv) }
+            let path = path.as_ref();
+            let path = path.to_string_lossy();
+            let path = CString::new(path.as_bytes()).unwrap();
 
-        let path = path.as_ref();
-        let path = path.to_string_lossy();
-        let path = CString::new(path.as_bytes()).unwrap();
+            if let Some(size) = self.map_size {
+                lmdb_result(ffi::mdb_env_set_mapsize(env, size))?;
+            }
 
-        if let Some(size) = self.map_size {
-            let ret = unsafe { ffi::mdb_env_set_mapsize(env, size) };
-            if ret != 0 { panic!("BUG: failed to set map size ({})", ret) }
+            if let Some(readers) = self.max_readers {
+                lmdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
+            }
+
+            if let Some(dbs) = self.max_dbs {
+                lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
+            }
+
+            match lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600)) {
+                Ok(()) => return Ok(Env { env }),
+                Err(e) => { ffi::mdb_env_close(env); Err(Error::Lmdb(e)) },
+            }
         }
-
-        if let Some(readers) = self.max_readers {
-            let ret = unsafe { ffi::mdb_env_set_maxreaders(env, readers) };
-            if ret != 0 { panic!("BUG: failed to set max readers ({})", ret) }
-        }
-
-        if let Some(dbs) = self.max_dbs {
-            let ret = unsafe { ffi::mdb_env_set_maxdbs(env, dbs) };
-            if ret != 0 { panic!("BUG: failed to set max dbs ({})", ret) }
-        }
-
-        let ret = unsafe { ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600) };
-
-        let error = match ret {
-            ffi::MDB_VERSION_MISMATCH => Error::VersionMismatch,
-            ffi::MDB_INVALID => Error::InvalidFile,
-            0 => return Ok(Env::new(env)),
-            os_error         => Error::Io(io::Error::from_raw_os_error(os_error)),
-        };
-
-        unsafe { ffi::mdb_env_close(env) }
-        Err(error)
     }
 }
 
@@ -80,10 +70,6 @@ pub struct Env {
 }
 
 impl Env {
-    fn new(env: *mut ffi::MDB_env) -> Env {
-        Env { env }
-    }
-
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Database<KC, DC> {
         let wtxn = self.write_txn();
 

@@ -2,7 +2,6 @@ use std::{marker, mem};
 use std::borrow::Cow;
 
 use crate::*;
-use lmdb_sys as ffi;
 
 pub struct Database<KC, DC> {
     dbi: ffi::MDB_dbi,
@@ -18,7 +17,7 @@ impl<KC, DC> Database<KC, DC> {
         &self,
         txn: &'txn RoTxn,
         key: &KC::EItem,
-    ) -> ZResult<Option<Cow<'txn, DC::DItem>>>
+    ) -> Result<Option<Cow<'txn, DC::DItem>>>
     where
         KC: BytesEncode,
         DC: BytesDecode<'txn>,
@@ -60,7 +59,7 @@ impl<KC, DC> Database<KC, DC> {
         txn: &mut RwTxn,
         key: &KC::EItem,
         data: &DC::EItem,
-    ) -> ZResult<()>
+    ) -> Result<()>
     where
         KC: BytesEncode,
         DC: BytesEncode,
@@ -111,7 +110,7 @@ impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
 where KC: BytesDecode<'txn>,
       DC: BytesDecode<'txn>,
 {
-    type Item = ZResult<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
+    type Item = Result<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.init_op.take() {

@@ -1,6 +1,5 @@
 use std::ops::Deref;
 use std::ptr;
-use lmdb_sys as ffi;
 
 pub struct RoTxn {
     pub txn: *mut ffi::MDB_txn,
