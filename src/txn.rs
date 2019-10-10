@@ -1,26 +1,27 @@
 use std::ops::Deref;
 use std::ptr;
 
+use crate::lmdb_error::lmdb_result;
+use crate::{Result, Error};
+
 pub struct RoTxn {
     pub txn: *mut ffi::MDB_txn,
 }
 
 impl RoTxn {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> RoTxn {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RoTxn> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        let ret = unsafe {
-            ffi::mdb_txn_begin(
+        unsafe {
+            lmdb_result(ffi::mdb_txn_begin(
                 env,
                 ptr::null_mut(),
                 ffi::MDB_RDONLY,
                 &mut txn,
-            )
+            ))?
         };
 
-        assert_eq!(ret, 0);
-
-        RoTxn { txn }
+        Ok(RoTxn { txn })
     }
 
     pub fn abort(self) {
@@ -42,27 +43,25 @@ pub struct RwTxn {
 }
 
 impl RwTxn {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> RwTxn {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        let ret = unsafe {
-            ffi::mdb_txn_begin(
+        unsafe {
+            lmdb_result(ffi::mdb_txn_begin(
                 env,
                 ptr::null_mut(),
                 0,
                 &mut txn,
-            )
+            ))?
         };
 
-        assert_eq!(ret, 0);
-
-        RwTxn { txn: RoTxn { txn } }
+        Ok(RwTxn { txn: RoTxn { txn } })
     }
 
-    pub fn commit(mut self) {
-        let ret = unsafe { ffi::mdb_txn_commit(self.txn.txn) };
-        assert_eq!(ret, 0);
+    pub fn commit(mut self) -> Result<()> {
+        let result = unsafe { lmdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
         self.txn.txn = ptr::null_mut();
+        result.map_err(Error::Lmdb)
     }
 
     pub fn abort(self) {

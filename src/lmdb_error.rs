@@ -2,7 +2,7 @@ use libc::c_int;
 use std::error::Error as StdError;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::{fmt, result, str};
+use std::{fmt, str};
 
 /// An LMDB error kind.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -52,6 +52,10 @@ pub enum Error {
 }
 
 impl Error {
+    pub fn not_found(&self) -> bool {
+        if let Error::NotFound = self { true } else { false }
+    }
+
     /// Converts a raw error code to an `Error`.
     pub fn from_err_code(err_code: c_int) -> Error {
         match err_code {

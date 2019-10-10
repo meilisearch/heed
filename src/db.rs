@@ -1,6 +1,7 @@
 use std::{marker, mem};
 use std::borrow::Cow;
 
+use crate::lmdb_error::lmdb_result;
 use crate::*;
 
 pub struct Database<KC, DC> {
@@ -27,18 +28,22 @@ impl<KC, DC> Database<KC, DC> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = mem::MaybeUninit::uninit();
 
-        let ret = unsafe {
-            ffi::mdb_get(
+        let result = unsafe {
+            lmdb_result(ffi::mdb_get(
                 txn.txn,
                 self.dbi,
                 &mut key_val,
                 data_val.as_mut_ptr(),
-            )
+            ))
         };
 
-        if ret == ffi::MDB_NOTFOUND { return Ok(None) }
-
-        assert_eq!(ret, 0);
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
+        }
 
         let data = unsafe { crate::from_val(data_val.assume_init()) };
         let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
@@ -71,17 +76,15 @@ impl<KC, DC> Database<KC, DC> {
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = 0;
 
-        let ret = unsafe {
-            ffi::mdb_put(
+        unsafe {
+            lmdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
                 &mut data_val,
                 flags,
-            )
-        };
-
-        assert_eq!(ret, 0);
+            ))?
+        }
 
         Ok(())
     }

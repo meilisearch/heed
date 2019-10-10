@@ -2,7 +2,8 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::{marker, mem};
 
-use crate::{Result, Error, Database, RoTxn, RwTxn, BytesEncode, BytesDecode};
+use crate::lmdb_error::lmdb_result;
+use crate::*;
 
 pub struct RoCursor<'txn, KC, DC> {
     cursor: *mut ffi::MDB_cursor,
@@ -23,28 +24,30 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Move the cursor on the first database key
-        let ret = unsafe {
-            ffi::mdb_cursor_get(
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 ffi::MDB_FIRST,
-            )
+            ))
         };
 
-        match ret {
-            0 => {
-                let key = unsafe { crate::from_val(key_val.assume_init()) };
-                let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-
-                Ok(Some((key, data)))
-            },
-            ffi::MDB_NOTFOUND => Ok(None),
-            _ => panic!("Found an error {}", ret),
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
         }
+
+        let key = unsafe { crate::from_val(key_val.assume_init()) };
+        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
+
+        let data = unsafe { crate::from_val(data_val.assume_init()) };
+        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+
+        Ok(Some((key, data)))
     }
 
     pub fn move_on_key(
@@ -61,28 +64,30 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Move the cursor to the specified key
-        let ret = unsafe {
-            ffi::mdb_cursor_get(
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 &mut key_val,
                 data_val.as_mut_ptr(),
                 ffi::MDB_SET_KEY,
-            )
+            ))
         };
 
-        match ret {
-            0 => {
-                let key = unsafe { crate::from_val(key_val) };
-                let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-
-                Ok(Some((key, data)))
-            },
-            ffi::MDB_NOTFOUND => Ok(None),
-            _ => panic!("Found an error {}", ret),
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
         }
+
+        let key = unsafe { crate::from_val(key_val) };
+        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
+
+        let data = unsafe { crate::from_val(data_val.assume_init()) };
+        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+
+        Ok(Some((key, data)))
     }
 
     pub fn move_on_next(&mut self) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
@@ -94,28 +99,30 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Move the cursor to the next non-dup key
-        let ret = unsafe {
-            ffi::mdb_cursor_get(
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 ffi::MDB_NEXT,
-            )
+            ))
         };
 
-        match ret {
-            0 => {
-                let key = unsafe { crate::from_val(key_val.assume_init()) };
-                let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-
-                Ok(Some((key, data)))
-            },
-            ffi::MDB_NOTFOUND => Ok(None),
-            _ => panic!("Found an error {}", ret),
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
         }
+
+        let key = unsafe { crate::from_val(key_val.assume_init()) };
+        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
+
+        let data = unsafe { crate::from_val(data_val.assume_init()) };
+        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+
+        Ok(Some((key, data)))
     }
 
     pub fn get_current(&mut self) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
@@ -127,28 +134,30 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Retrieve the key/data at the current cursor position
-        let ret = unsafe {
-            ffi::mdb_cursor_get(
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 ffi::MDB_GET_CURRENT,
-            )
+            ))
         };
 
-        match ret {
-            0 => {
-                let key = unsafe { crate::from_val(key_val.assume_init()) };
-                let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-
-                Ok(Some((key, data)))
-            },
-            ffi::MDB_NOTFOUND => Ok(None),
-            _ => panic!("Found an error {}", ret),
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
         }
+
+        let key = unsafe { crate::from_val(key_val.assume_init()) };
+        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
+
+        let data = unsafe { crate::from_val(data_val.assume_init()) };
+        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+
+        Ok(Some((key, data)))
     }
 }
 

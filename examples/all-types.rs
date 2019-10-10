@@ -13,27 +13,27 @@ fn main() {
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an unsized array of u64
-    let db: Database<Type<[i32; 2]>, Str> = env.create_database(Some("kikou"));
+    let db: Database<Type<[i32; 2]>, Str> = env.create_database(Some("kikou")).unwrap();
 
-    let mut wtxn = env.write_txn();
+    let mut wtxn = env.write_txn().unwrap();
     let _ret                  = db.put(&mut wtxn, &[2, 3], "what's up?").unwrap();
     let ret: Option<Cow<str>> = db.get(&wtxn, &[2, 3]).unwrap();
 
     println!("{:?}", ret);
-    wtxn.commit();
+    wtxn.commit().unwrap();
 
 
 
     // even str are supported,
     // here the key will be an str and the data will be an array of two i32
-    let db: Database<Str, Slice<i32>> = env.create_database(Some("kiki"));
+    let db: Database<Str, Slice<i32>> = env.create_database(Some("kiki")).unwrap();
 
-    let mut wtxn = env.write_txn();
+    let mut wtxn = env.write_txn().unwrap();
     let _ret                    = db.put(&mut wtxn, "hello", &[2, 3][..]).unwrap();
     let ret: Option<Cow<[i32]>> = db.get(&wtxn, "hello").unwrap();
 
     println!("{:?}", ret);
-    wtxn.commit();
+    wtxn.commit().unwrap();
 
 
 
@@ -41,22 +41,22 @@ fn main() {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct Hello<'a> { string: &'a str }
 
-    let db: Database<Str, Serde<Hello>> = env.create_database(None);
+    let db: Database<Str, Serde<Hello>> = env.create_database(None).unwrap();
 
-    let mut wtxn = env.write_txn();
+    let mut wtxn = env.write_txn().unwrap();
     let hello = Hello { string: "hi" };
     let _ret                    = db.put(&mut wtxn, "hello", &hello).unwrap();
     let ret: Option<Cow<Hello>> = db.get(&wtxn, "hello").unwrap();
 
     println!("{:?}", ret);
-    wtxn.commit();
+    wtxn.commit().unwrap();
 
 
 
     // you can also ignore the key or the data
-    let db: Database<Str, Ignore> = env.create_database(None);
+    let db: Database<Str, Ignore> = env.create_database(None).unwrap();
 
-    let mut wtxn = env.write_txn();
+    let mut wtxn = env.write_txn().unwrap();
     let _ret                 = db.put(&mut wtxn, "hello", &()).unwrap();
     let ret: Option<Cow<()>> = db.get(&wtxn, "hello").unwrap();
 
@@ -67,5 +67,5 @@ fn main() {
     let ret: Option<Cow<()>> = db.get(&wtxn, "non-existant").unwrap();
 
     println!("{:?}", ret);
-    wtxn.commit();
+    wtxn.commit().unwrap();
 }

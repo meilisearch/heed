@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::ffi::CString;
-use std::{io, ptr};
+use std::ptr;
 
 use crate::lmdb_error::lmdb_result;
 use crate::{RoTxn, RwTxn, Database, Result, Error};
@@ -70,8 +70,8 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Database<KC, DC> {
-        let wtxn = self.write_txn();
+    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>> {
+        let wtxn = self.write_txn()?;
 
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
@@ -80,28 +80,27 @@ impl Env {
             None => ptr::null(),
         };
 
-        let ret = unsafe {
-            ffi::mdb_dbi_open(
+        unsafe {
+            lmdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
                 name_ptr,
                 ffi::MDB_CREATE,
                 &mut dbi,
-            )
+            ))?
         };
 
         drop(name);
-        assert_eq!(ret, 0);
 
-        wtxn.commit();
+        wtxn.commit()?;
 
-        Database::new(dbi)
+        Ok(Database::new(dbi))
     }
 
-    pub fn write_txn(&self) -> RwTxn {
+    pub fn write_txn(&self) -> Result<RwTxn> {
         RwTxn::new(self.env)
     }
 
-    pub fn read_txn(&self) -> RoTxn {
+    pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self.env)
     }
 }
