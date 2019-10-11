@@ -1,25 +1,31 @@
 use std::borrow::Cow;
 use std::ops::Deref;
-use std::{marker, mem};
+use std::{marker, mem, ptr};
 
 use crate::lmdb_error::lmdb_result;
 use crate::*;
 
-pub struct RoCursor<'txn, KC, DC> {
+pub struct RoCursor<'txn> {
     cursor: *mut ffi::MDB_cursor,
-    _marker: marker::PhantomData<&'txn (KC, DC)>,
+    _marker: marker::PhantomData<&'txn ()>,
 }
 
-impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
-    pub(crate) fn new(txn: &'txn RoTxn, db: Database<KC, DC>) -> RoCursor<'txn, KC, DC> {
-        unimplemented!()
+impl<'txn> RoCursor<'txn> {
+    pub(crate) fn new<KC, DC>(txn: &'txn RoTxn, db: Database<KC, DC>) -> Result<RoCursor<'txn>> {
+        let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
+
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_open(
+                txn.txn,
+                db.dbi,
+                &mut cursor,
+            ))
+        };
+
+        Ok(RoCursor { cursor, _marker: marker::PhantomData })
     }
 
-    pub fn move_on_first(&mut self) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
-    where
-        KC: BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
+    pub fn move_on_first(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
@@ -42,25 +48,13 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
 
         let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
         let data = unsafe { crate::from_val(data_val.assume_init()) };
-        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
 
         Ok(Some((key, data)))
     }
 
-    pub fn move_on_key(
-        &mut self,
-        key: &KC::EItem,
-    ) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
-    where
-        KC: BytesEncode + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+    pub fn move_on_key(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Move the cursor to the specified key
@@ -82,19 +76,40 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
 
         let key = unsafe { crate::from_val(key_val) };
-        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
         let data = unsafe { crate::from_val(data_val.assume_init()) };
-        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
 
         Ok(Some((key, data)))
     }
 
-    pub fn move_on_next(&mut self) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
-    where
-        KC: BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
+    pub fn move_on_key_greater_than_or_equal_to(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        let mut key_val = unsafe { crate::into_val(&key) };
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        // Move the cursor to the specified key
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                &mut key_val,
+                data_val.as_mut_ptr(),
+                ffi::MDB_SET_RANGE,
+            ))
+        };
+
+        if let Err(error) = result {
+            if error.not_found() {
+                return Ok(None)
+            } else {
+                return Err(Error::Lmdb(error))
+            }
+        }
+
+        let key = unsafe { crate::from_val(key_val) };
+        let data = unsafe { crate::from_val(data_val.assume_init()) };
+
+        Ok(Some((key, data)))
+    }
+
+    pub fn move_on_next(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
@@ -117,19 +132,12 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
 
         let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
         let data = unsafe { crate::from_val(data_val.assume_init()) };
-        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
 
         Ok(Some((key, data)))
     }
 
-    pub fn get_current(&mut self) -> Result<Option<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>>
-    where
-        KC: BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
+    pub fn get_current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
@@ -152,33 +160,28 @@ impl<'txn, KC, DC> RoCursor<'txn, KC, DC> {
         }
 
         let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let key = KC::bytes_decode(key).ok_or(Error::Decoding)?;
-
         let data = unsafe { crate::from_val(data_val.assume_init()) };
-        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
 
         Ok(Some((key, data)))
     }
 }
 
-impl<KC, DC> Drop for RoCursor<'_, KC, DC> {
+impl Drop for RoCursor<'_> {
     fn drop(&mut self) {
         unsafe { ffi::mdb_cursor_close(self.cursor) }
     }
 }
 
-pub struct RwCursor<'txn, KC, DC> {
-    cursor: RoCursor<'txn, KC, DC>,
+pub struct RwCursor<'txn> {
+    cursor: RoCursor<'txn>,
 }
 
-impl<'txn, KC, DC> RwCursor<'txn, KC, DC> {
-    pub(crate) fn new(txn: &'txn RwTxn, db: Database<KC, DC>) -> RoCursor<'txn, KC, DC> {
+impl<'txn> RwCursor<'txn> {
+    pub(crate) fn new<KC, DC>(txn: &'txn RwTxn, db: Database<KC, DC>) -> RoCursor<'txn> {
         unimplemented!()
     }
 
-    pub fn put_current(&mut self, data: &DC::EItem) -> Result<()>
-    where DC: BytesEncode
-    {
+    pub fn put_current(&mut self, data: &[u8]) -> Result<()> {
         unimplemented!()
     }
 
@@ -187,8 +190,8 @@ impl<'txn, KC, DC> RwCursor<'txn, KC, DC> {
     }
 }
 
-impl<'txn, KC, DC> Deref for RwCursor<'txn, KC, DC> {
-    type Target = RoCursor<'txn, KC, DC>;
+impl<'txn> Deref for RwCursor<'txn> {
+    type Target = RoCursor<'txn>;
 
     fn deref(&self) -> &Self::Target {
         &self.cursor

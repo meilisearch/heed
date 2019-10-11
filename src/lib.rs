@@ -8,7 +8,7 @@ mod traits;
 mod txn;
 mod types;
 
-pub use self::cursor::{RoCursor, RwCursor};
+use self::cursor::{RoCursor, RwCursor};
 pub use self::db::Database;
 pub use self::lmdb_error::Error as LmdbError;
 pub use self::env::{EnvBuilder, Env};

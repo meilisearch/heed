@@ -5,7 +5,7 @@ use crate::lmdb_error::lmdb_result;
 use crate::{Result, Error};
 
 pub struct RoTxn {
-    pub txn: *mut ffi::MDB_txn,
+    pub(crate) txn: *mut ffi::MDB_txn,
 }
 
 impl RoTxn {
@@ -39,7 +39,7 @@ impl Drop for RoTxn {
 }
 
 pub struct RwTxn {
-    pub txn: RoTxn,
+    pub(crate) txn: RoTxn,
 }
 
 impl RwTxn {

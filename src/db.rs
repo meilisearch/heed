@@ -1,11 +1,12 @@
 use std::{marker, mem};
 use std::borrow::Cow;
+use std::ops::{RangeBounds, Bound};
 
 use crate::lmdb_error::lmdb_result;
 use crate::*;
 
 pub struct Database<KC, DC> {
-    dbi: ffi::MDB_dbi,
+    pub(crate) dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(KC, DC)>,
 }
 
@@ -51,12 +52,37 @@ impl<KC, DC> Database<KC, DC> {
         Ok(Some(data))
     }
 
-    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> RoIter<'txn, KC, DC> {
-        RoIter {
-            cursor: RoCursor::new(txn, *self),
-            init_op: Some(InitOp::MoveOnFirst),
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
+        Ok(RoIter {
+            cursor: RoCursor::new(txn, *self)?,
+            move_on_first: true,
             _phantom: marker::PhantomData,
-        }
+        })
+    }
+
+    pub fn range<'txn, R>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode,
+        R: RangeBounds<KC::EItem>,
+    {
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => Bound::Included(KC::bytes_encode(bound).unwrap().into_owned()),
+            Bound::Excluded(bound) => Bound::Excluded(KC::bytes_encode(bound).unwrap().into_owned()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => Bound::Included(KC::bytes_encode(bound).unwrap().into_owned()),
+            Bound::Excluded(bound) => Bound::Excluded(KC::bytes_encode(bound).unwrap().into_owned()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        Ok(RoRange {
+            cursor: RoCursor::new(txn, *self)?,
+            start_bound: Some(start_bound),
+            end_bound,
+            _phantom: marker::PhantomData,
+        })
     }
 
     pub fn put(
@@ -98,14 +124,9 @@ impl<KC, DC> Clone for Database<KC, DC> {
 
 impl<KC, DC> Copy for Database<KC, DC> {}
 
-enum InitOp {
-    MoveOnFirst,
-    GetCurrent,
-}
-
 pub struct RoIter<'txn, KC, DC> {
-    cursor: RoCursor<'txn, KC, DC>,
-    init_op: Option<InitOp>,
+    cursor: RoCursor<'txn>,
+    move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
@@ -116,12 +137,76 @@ where KC: BytesDecode<'txn>,
     type Item = Result<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = match self.init_op.take() {
-            Some(InitOp::MoveOnFirst) => self.cursor.move_on_first(),
-            Some(InitOp::GetCurrent) => self.cursor.get_current(),
+        let result = if self.move_on_first {
+            self.move_on_first = false;
+            self.cursor.move_on_first()
+        } else {
+            self.cursor.move_on_next()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                    (Some(key), Some(data)) => Some(Ok((key, data))),
+                    (_, _) => Some(Err(Error::Decoding)),
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+fn advance_key(bytes: &mut Vec<u8>) {
+    match bytes.last_mut() {
+        Some(&mut 255) | None => bytes.push(0),
+        Some(last) => *last += 1,
+    }
+}
+
+pub struct RoRange<'txn, KC, DC> {
+    cursor: RoCursor<'txn>,
+    start_bound: Option<Bound<Vec<u8>>>,
+    end_bound: Bound<Vec<u8>>,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
+where KC: BytesDecode<'txn>,
+      DC: BytesDecode<'txn>,
+{
+    type Item = Result<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = match self.start_bound.take() {
+            Some(Bound::Included(start)) => self.cursor.move_on_key_greater_than_or_equal_to(&start),
+            Some(Bound::Excluded(mut start)) => {
+                advance_key(&mut start);
+                self.cursor.move_on_key_greater_than_or_equal_to(&start)
+            },
+            Some(Bound::Unbounded) => self.cursor.move_on_first(),
             None => self.cursor.move_on_next(),
         };
 
-        result.transpose()
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match self.end_bound {
+                    Bound::Included(ref end) => key <= end,
+                    Bound::Excluded(ref end) => key < end,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
     }
 }

@@ -68,4 +68,28 @@ fn main() {
 
     println!("{:?}", ret);
     wtxn.commit().unwrap();
+
+
+
+    // you can also iterate over keys in order
+    type BEI64 = zerocopy::I64<byteorder::BigEndian>;
+
+    let db: Database<Type<BEI64>, Ignore> = env.create_database(Some("big-endian-iter")).unwrap();
+
+    let mut wtxn = env.write_txn().unwrap();
+    let _ret = db.put(&mut wtxn, &BEI64::new(0), &()).unwrap();
+    let _ret = db.put(&mut wtxn, &BEI64::new(68), &()).unwrap();
+    let _ret = db.put(&mut wtxn, &BEI64::new(35), &()).unwrap();
+    let _ret = db.put(&mut wtxn, &BEI64::new(42), &()).unwrap();
+
+    let rets: Result<Vec<(Cow<BEI64>, _)>, _> = db.iter(&wtxn).unwrap().collect();
+
+    println!("{:?}", rets);
+
+
+    // ranges are also supported
+    let rets: Result<Vec<(Cow<BEI64>, _)>, _> = db.range(&wtxn, BEI64::new(35)..=BEI64::new(42)).unwrap().collect();
+
+    println!("{:?}", rets);
+    wtxn.commit().unwrap();
 }
