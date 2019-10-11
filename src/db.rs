@@ -19,7 +19,7 @@ impl<KC, DC> Database<KC, DC> {
         &self,
         txn: &'txn RoTxn,
         key: &KC::EItem,
-    ) -> Result<Option<Cow<'txn, DC::DItem>>>
+    ) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode,
         DC: BytesDecode<'txn>,
@@ -134,7 +134,7 @@ impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
 where KC: BytesDecode<'txn>,
       DC: BytesDecode<'txn>,
 {
-    type Item = Result<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
+    type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
@@ -175,7 +175,7 @@ impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
 where KC: BytesDecode<'txn>,
       DC: BytesDecode<'txn>,
 {
-    type Item = Result<(Cow<'txn, KC::DItem>, Cow<'txn, DC::DItem>)>;
+    type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.start_bound.take() {

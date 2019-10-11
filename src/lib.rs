@@ -14,7 +14,7 @@ pub use self::lmdb_error::Error as LmdbError;
 pub use self::env::{EnvBuilder, Env};
 pub use self::traits::{BytesEncode, BytesDecode};
 pub use self::txn::{RoTxn, RwTxn};
-pub use self::types::{Type, Slice, Str, Ignore};
+pub use self::types::{CowType, OwnedType, Type, CowSlice, Slice, Str, Ignore};
 
 #[cfg(feature = "serde")]
 pub use self::types::Serde;

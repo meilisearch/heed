@@ -7,7 +7,7 @@ pub trait BytesEncode {
 }
 
 pub trait BytesDecode<'a> {
-    type DItem: ToOwned + ?Sized + 'a;
+    type DItem: 'a;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Cow<'a, Self::DItem>>;
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem>;
 }

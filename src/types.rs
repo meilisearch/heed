@@ -9,9 +9,9 @@ fn aligned_to(bytes: &[u8], align: usize) -> bool {
 }
 
 
-pub struct Type<T>(std::marker::PhantomData<T>);
+pub struct CowType<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for Type<T> where T: AsBytes {
+impl<T> BytesEncode for CowType<T> where T: AsBytes {
     type EItem = T;
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -19,10 +19,10 @@ impl<T> BytesEncode for Type<T> where T: AsBytes {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for Type<T> where T: FromBytes + Copy {
-    type DItem = T;
+impl<'a, T: 'a> BytesDecode<'a> for CowType<T> where T: FromBytes + Copy {
+    type DItem = Cow<'a, T>;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::DItem>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
         match LayoutVerified::<_, T>::new(bytes) {
             Some(layout) => Some(Cow::Borrowed(layout.into_ref())),
             None => {
@@ -49,9 +49,52 @@ impl<'a, T: 'a> BytesDecode<'a> for Type<T> where T: FromBytes + Copy {
 
 
 
-pub struct Slice<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for Slice<T> where T: AsBytes {
+pub struct Type<T>(std::marker::PhantomData<T>);
+
+impl<T> BytesEncode for Type<T> where T: AsBytes {
+    type EItem = T;
+
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+    }
+}
+
+impl<'a, T: 'a> BytesDecode<'a> for Type<T> where T: FromBytes {
+    type DItem = &'a T;
+
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+        LayoutVerified::<_, T>::new(bytes).map(LayoutVerified::into_ref)
+    }
+}
+
+
+
+pub struct OwnedType<T>(std::marker::PhantomData<T>);
+
+impl<T> BytesEncode for OwnedType<T> where T: AsBytes {
+    type EItem = T;
+
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+    }
+}
+
+impl<'a, T: 'a> BytesDecode<'a> for OwnedType<T> where T: FromBytes + Copy {
+    type DItem = T;
+
+    fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
+        CowType::<T>::bytes_decode(bytes).map(Cow::into_owned)
+    }
+}
+
+
+
+
+
+pub struct CowSlice<T>(std::marker::PhantomData<T>);
+
+impl<T> BytesEncode for CowSlice<T> where T: AsBytes {
     type EItem = [T];
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -59,10 +102,10 @@ impl<T> BytesEncode for Slice<T> where T: AsBytes {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for Slice<T> where T: FromBytes + Copy {
-    type DItem = [T];
+impl<'a, T: 'a> BytesDecode<'a> for CowSlice<T> where T: FromBytes + Copy {
+    type DItem = Cow<'a, [T]>;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::DItem>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
         match LayoutVerified::<_, [T]>::new_slice(bytes) {
             Some(layout) => Some(Cow::Borrowed(layout.into_slice())),
             None => {
@@ -91,6 +134,29 @@ impl<'a, T: 'a> BytesDecode<'a> for Slice<T> where T: FromBytes + Copy {
 }
 
 
+
+
+pub struct Slice<T>(std::marker::PhantomData<T>);
+
+impl<T> BytesEncode for Slice<T> where T: AsBytes {
+    type EItem = [T];
+
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+        Some(Cow::Borrowed(<[T] as AsBytes>::as_bytes(item)))
+    }
+}
+
+impl<'a, T: 'a> BytesDecode<'a> for Slice<T> where T: FromBytes {
+    type DItem = &'a [T];
+
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+        LayoutVerified::<_, [T]>::new_slice(bytes).map(LayoutVerified::into_slice)
+    }
+}
+
+
+
+
 pub struct Str;
 
 impl BytesEncode for Str {
@@ -101,11 +167,11 @@ impl BytesEncode for Str {
     }
 }
 
-impl BytesDecode<'_> for Str {
-    type DItem = str;
+impl<'a> BytesDecode<'a> for Str {
+    type DItem = &'a str;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Cow<Self::DItem>> {
-        std::str::from_utf8(bytes).map(Cow::Borrowed).ok()
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+        std::str::from_utf8(bytes).ok()
     }
 }
 
@@ -124,8 +190,8 @@ impl BytesEncode for Ignore {
 impl BytesDecode<'_> for Ignore {
     type DItem = ();
 
-    fn bytes_decode(_bytes: &[u8]) -> Option<Cow<Self::DItem>> {
-        Some(Cow::Owned(()))
+    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
+        Some(())
     }
 }
 
@@ -149,9 +215,9 @@ impl<T> BytesEncode for Serde<T> where T: Serialize {
 
 #[cfg(feature = "serde")]
 impl<'a, T: 'a> BytesDecode<'a> for Serde<T> where T: Deserialize<'a> + Clone {
-    type DItem = T;
+    type DItem = Cow<'a, T>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Cow<'a, Self::DItem>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
         bincode::deserialize(bytes).map(Cow::Owned).ok()
     }
 }
