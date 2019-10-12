@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::error::Error;
 
 use zerocopy_lmdb::{EnvOpenOptions, Database};
@@ -46,9 +45,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, Serde<Hello>> = env.create_database(None)?;
 
     let mut wtxn = env.write_txn()?;
+
     let hello = Hello { string: "hi" };
-    let _ret                    = db.put(&mut wtxn, "hello", &hello)?;
-    let ret: Option<Cow<Hello>> = db.get(&wtxn,     "hello")?;
+    let _ret               = db.put(&mut wtxn, "hello", &hello)?;
+
+    let ret: Option<Hello> = db.get(&wtxn,     "hello")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
