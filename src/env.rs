@@ -59,7 +59,7 @@ impl EnvBuilder {
 
             match lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600)) {
                 Ok(()) => return Ok(Env { env }),
-                Err(e) => { ffi::mdb_env_close(env); Err(Error::Lmdb(e)) },
+                Err(e) => { ffi::mdb_env_close(env); Err(e.into()) },
             }
         }
     }

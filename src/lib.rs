@@ -42,7 +42,10 @@ impl StdError for Error { }
 
 impl From<LmdbError> for Error {
     fn from(error: LmdbError) -> Error {
-        Error::Lmdb(error)
+        match error {
+            LmdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
+            _ => Error::Lmdb(error),
+        }
     }
 }
 

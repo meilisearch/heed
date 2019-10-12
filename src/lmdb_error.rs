@@ -37,7 +37,11 @@ pub enum Error {
     PageFull,
     /// Database contents grew beyond environment mapsize.
     MapResized,
-    /// MDB_Incompatible: Operation and DB incompatible, or DB flags changed.
+    /// Operation and DB incompatible, or DB type changed. This can mean:
+    ///   - The operation expects an MDB_DUPSORT / MDB_DUPFIXED database.
+    ///   - Opening a named DB when the unnamed DB has MDB_DUPSORT / MDB_INTEGERKEY.
+    ///   - Accessing a data record as a database, or vice versa.
+    ///   - The database was dropped and recreated with different flags.
     Incompatible,
     /// Invalid reuse of reader locktable slot.
     BadRslot,

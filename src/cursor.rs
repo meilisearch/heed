@@ -42,7 +42,7 @@ impl<'txn> RoCursor<'txn> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
@@ -70,7 +70,7 @@ impl<'txn> RoCursor<'txn> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
@@ -98,7 +98,7 @@ impl<'txn> RoCursor<'txn> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
@@ -126,7 +126,7 @@ impl<'txn> RoCursor<'txn> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
@@ -154,7 +154,7 @@ impl<'txn> RoCursor<'txn> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
@@ -203,7 +203,7 @@ impl<'txn> RwCursor<'txn> {
         match result {
             Ok(()) => Ok(true),
             Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(Error::Lmdb(e)),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -216,7 +216,7 @@ impl<'txn> RwCursor<'txn> {
         match result {
             Ok(()) => Ok(true),
             Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(Error::Lmdb(e)),
+            Err(e) => Err(e.into()),
         }
     }
 }

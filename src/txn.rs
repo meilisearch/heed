@@ -58,7 +58,7 @@ impl RwTxn {
     pub fn commit(mut self) -> Result<()> {
         let result = unsafe { lmdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
         self.txn.txn = ptr::null_mut();
-        result.map_err(Error::Lmdb)
+        result.map_err(Into::into)
     }
 
     pub fn abort(self) {

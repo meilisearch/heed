@@ -42,7 +42,7 @@ impl<KC, DC> Database<KC, DC> {
             if error.not_found() {
                 return Ok(None)
             } else {
-                return Err(Error::Lmdb(error))
+                return Err(error.into())
             }
         }
 
