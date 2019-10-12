@@ -13,13 +13,13 @@ impl<'txn> RoCursor<'txn> {
     pub(crate) fn new<KC, DC>(txn: &'txn RoTxn, db: Database<KC, DC>) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
-        let result = unsafe {
+        unsafe {
             lmdb_result(ffi::mdb_cursor_open(
                 txn.txn,
                 db.dbi,
                 &mut cursor,
-            ))
-        };
+            ))?
+        }
 
         Ok(RoCursor { cursor, _marker: marker::PhantomData })
     }

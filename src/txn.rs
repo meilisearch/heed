@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::ptr;
 
 use crate::lmdb_error::lmdb_result;
-use crate::{Result, Error};
+use crate::Result;
 
 pub struct RoTxn {
     pub(crate) txn: *mut ffi::MDB_txn,

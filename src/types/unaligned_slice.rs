@@ -1,9 +1,7 @@
 use std::borrow::Cow;
-use std::{mem, ptr};
 
 use zerocopy::{LayoutVerified, AsBytes, FromBytes, Unaligned};
 use crate::{BytesEncode, BytesDecode};
-use crate::types::aligned_to;
 
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 

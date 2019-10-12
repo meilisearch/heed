@@ -70,7 +70,6 @@ fn main() {
     wtxn.commit().unwrap();
 
 
-
     // you can iterate over keys in order
     type BEI64 = zerocopy::I64<byteorder::BigEndian>;
 
@@ -92,5 +91,14 @@ fn main() {
     let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, range).unwrap().collect();
 
     println!("{:?}", rets);
+
+
+    // delete a range of key
+    let range = BEI64::new(35)..=BEI64::new(42);
+    let deleted: usize = db.del_range(&mut wtxn, range).unwrap();
+
+    let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn).unwrap().collect();
+
+    println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit().unwrap();
 }

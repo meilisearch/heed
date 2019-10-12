@@ -3,7 +3,7 @@ use std::ffi::CString;
 use std::ptr;
 
 use crate::lmdb_error::lmdb_result;
-use crate::{RoTxn, RwTxn, Database, Result, Error};
+use crate::{RoTxn, RwTxn, Database, Result};
 
 #[derive(Clone, Debug)]
 pub struct EnvBuilder {
