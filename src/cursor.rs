@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::{marker, mem, ptr};
 
 use crate::lmdb_error::lmdb_result;
@@ -176,16 +176,48 @@ pub struct RwCursor<'txn> {
 }
 
 impl<'txn> RwCursor<'txn> {
-    pub(crate) fn new<KC, DC>(txn: &'txn RwTxn, db: Database<KC, DC>) -> RoCursor<'txn> {
-        unimplemented!()
+    pub(crate) fn new<KC, DC>(txn: &'txn RwTxn, db: Database<KC, DC>) -> Result<RwCursor<'txn>> {
+        Ok(RwCursor { cursor: RoCursor::new(txn, db)? })
     }
 
-    pub fn put_current(&mut self, data: &[u8]) -> Result<()> {
-        unimplemented!()
+    pub fn put_current(&mut self, data: &[u8]) -> Result<bool> {
+        let key = match self.get_current() {
+            Ok(Some((key, _))) => key,
+            Ok(None) => return Ok(false), // TODO must return an error
+            Err(error) => return Err(error),
+        };
+
+        let mut key_val = unsafe { crate::into_val(&key) };
+        let mut data_val = unsafe { crate::into_val(&data) };
+
+        // Modify the pointed data
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_put(
+                self.cursor.cursor,
+                &mut key_val,
+                &mut data_val,
+                ffi::MDB_CURRENT,
+            ))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(Error::Lmdb(e)),
+        }
     }
 
-    pub fn del_current(&mut self) -> Result<()> {
-        unimplemented!()
+    pub fn del_current(&mut self) -> Result<bool> {
+        // Delete the current entry
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(Error::Lmdb(e)),
+        }
     }
 }
 
@@ -194,5 +226,11 @@ impl<'txn> Deref for RwCursor<'txn> {
 
     fn deref(&self) -> &Self::Target {
         &self.cursor
+    }
+}
+
+impl DerefMut for RwCursor<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cursor
     }
 }

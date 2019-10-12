@@ -31,10 +31,7 @@ impl RoTxn {
 
 impl Drop for RoTxn {
     fn drop(&mut self) {
-        if !self.txn.is_null() {
-            unsafe { ffi::mdb_txn_abort(self.txn) }
-            self.txn = ptr::null_mut();
-        }
+        unsafe { ffi::mdb_txn_abort(self.txn) }
     }
 }
 
@@ -65,7 +62,7 @@ impl RwTxn {
     }
 
     pub fn abort(self) {
-        drop(self)
+        drop(self.txn)
     }
 }
 
