@@ -1,20 +1,25 @@
-use std::path::Path;
+use std::collections::hash_map::{HashMap, Entry};
 use std::ffi::CString;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
 
+use once_cell::sync::OnceCell;
 use crate::lmdb_error::lmdb_result;
 use crate::{RoTxn, RwTxn, Database, Result};
 
+static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+
 #[derive(Clone, Debug)]
-pub struct EnvBuilder {
+pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
 }
 
-impl EnvBuilder {
-    pub fn new() -> EnvBuilder {
-        EnvBuilder { map_size: None, max_readers: None, max_dbs: None }
+impl EnvOpenOptions {
+    pub fn new() -> EnvOpenOptions {
+        EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None }
     }
 
     pub fn map_size(&mut self, size: usize) -> &mut Self {
@@ -37,38 +42,61 @@ impl EnvBuilder {
     }
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
-        unsafe {
-            let mut env: *mut ffi::MDB_env = ptr::null_mut();
-            lmdb_result(ffi::mdb_env_create(&mut env))?;
+        let path = path.as_ref();
+        let path = path.canonicalize()?;
 
-            let path = path.as_ref();
-            let path = path.to_string_lossy();
-            let path = CString::new(path.as_bytes()).unwrap();
+        let mutex = OPENED_ENV.get_or_init(Mutex::default);
+        let mut lock = mutex.lock().unwrap();
 
-            if let Some(size) = self.map_size {
-                lmdb_result(ffi::mdb_env_set_mapsize(env, size))?;
-            }
+        match lock.entry(path) {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let path = entry.key();
+                let path = path.to_string_lossy();
+                let path = CString::new(path.as_bytes()).unwrap();
 
-            if let Some(readers) = self.max_readers {
-                lmdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
-            }
+                unsafe {
+                    let mut env: *mut ffi::MDB_env = ptr::null_mut();
+                    lmdb_result(ffi::mdb_env_create(&mut env))?;
 
-            if let Some(dbs) = self.max_dbs {
-                lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
-            }
+                    if let Some(size) = self.map_size {
+                        lmdb_result(ffi::mdb_env_set_mapsize(env, size))?;
+                    }
 
-            match lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600)) {
-                Ok(()) => return Ok(Env { env, dbi_open_mutex: sync::Mutex::new(()) }),
-                Err(e) => { ffi::mdb_env_close(env); Err(e.into()) },
+                    if let Some(readers) = self.max_readers {
+                        lmdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
+                    }
+
+                    if let Some(dbs) = self.max_dbs {
+                        lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
+                    }
+
+                    let result = lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600));
+
+                    match result {
+                        Ok(()) => {
+                            let inner = EnvInner { env, dbi_open_mutex: sync::Mutex::new(()) };
+                            let env = Env(Arc::new(inner));
+                            Ok(entry.insert(env).clone())
+                        },
+                        Err(e) => { ffi::mdb_env_close(env); Err(e.into()) },
+                    }
+                }
             }
         }
     }
 }
 
-pub struct Env {
+#[derive(Clone)]
+pub struct Env(Arc<EnvInner>);
+
+struct EnvInner {
     env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<()>,
 }
+
+unsafe impl Send for EnvInner {}
+unsafe impl Sync for EnvInner {}
 
 impl Env {
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>> {
@@ -81,7 +109,7 @@ impl Env {
             None => ptr::null(),
         };
 
-        let lock = self.dbi_open_mutex.lock().unwrap();
+        let lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
             lmdb_result(ffi::mdb_dbi_open(
@@ -112,7 +140,7 @@ impl Env {
             None => ptr::null(),
         };
 
-        let lock = self.dbi_open_mutex.lock().unwrap();
+        let lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
             lmdb_result(ffi::mdb_dbi_open(
@@ -136,10 +164,10 @@ impl Env {
     }
 
     pub fn write_txn(&self) -> Result<RwTxn> {
-        RwTxn::new(self.env)
+        RwTxn::new(self.0.env)
     }
 
     pub fn read_txn(&self) -> Result<RoTxn> {
-        RoTxn::new(self.env)
+        RoTxn::new(self.0.env)
     }
 }
