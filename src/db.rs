@@ -34,18 +34,15 @@ impl<KC, DC> Database<KC, DC> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+                Ok(Some(data))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-        let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-
-        Ok(Some(data))
     }
 
     pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {

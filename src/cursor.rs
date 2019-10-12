@@ -38,18 +38,15 @@ impl<'txn> RoCursor<'txn> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-
-        Ok(Some((key, data)))
     }
 
     pub fn move_on_key(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -66,18 +63,15 @@ impl<'txn> RoCursor<'txn> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let key = unsafe { crate::from_val(key_val) };
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-
-        Ok(Some((key, data)))
     }
 
     pub fn move_on_key_greater_than_or_equal_to(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -94,18 +88,15 @@ impl<'txn> RoCursor<'txn> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let key = unsafe { crate::from_val(key_val) };
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-
-        Ok(Some((key, data)))
     }
 
     pub fn move_on_next(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -122,18 +113,15 @@ impl<'txn> RoCursor<'txn> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-
-        Ok(Some((key, data)))
     }
 
     pub fn get_current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -150,18 +138,15 @@ impl<'txn> RoCursor<'txn> {
             ))
         };
 
-        if let Err(error) = result {
-            if error.not_found() {
-                return Ok(None)
-            } else {
-                return Err(error.into())
-            }
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
         }
-
-        let key = unsafe { crate::from_val(key_val.assume_init()) };
-        let data = unsafe { crate::from_val(data_val.assume_init()) };
-
-        Ok(Some((key, data)))
     }
 }
 
