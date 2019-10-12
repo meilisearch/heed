@@ -163,7 +163,7 @@ impl<KC, DC> Database<KC, DC> {
         Ok(())
     }
 
-    pub fn del(&self, txn: &mut RwTxn, key: &KC::EItem) -> Result<bool>
+    pub fn delete(&self, txn: &mut RwTxn, key: &KC::EItem) -> Result<bool>
     where
         KC: BytesEncode,
     {
@@ -186,7 +186,7 @@ impl<KC, DC> Database<KC, DC> {
         }
     }
 
-    pub fn del_range<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
+    pub fn delete_range<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
     where
         KC: BytesEncode + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -201,6 +201,17 @@ impl<KC, DC> Database<KC, DC> {
         }
 
         Ok(count)
+    }
+
+    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
+        unsafe {
+            lmdb_result(ffi::mdb_drop(
+                txn.txn.txn,
+                self.dbi,
+                0,
+            ))
+            .map_err(Into::into)
+        }
     }
 }
 

@@ -95,7 +95,7 @@ fn main() {
 
     // delete a range of key
     let range = BEI64::new(35)..=BEI64::new(42);
-    let deleted: usize = db.del_range(&mut wtxn, range).unwrap();
+    let deleted: usize = db.delete_range(&mut wtxn, range).unwrap();
 
     let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn).unwrap().collect();
 
