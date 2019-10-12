@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::ffi::CString;
-use std::ptr;
+use std::{ptr, sync};
 
 use crate::lmdb_error::lmdb_result;
 use crate::{RoTxn, RwTxn, Database, Result};
@@ -58,7 +58,7 @@ impl EnvBuilder {
             }
 
             match lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600)) {
-                Ok(()) => return Ok(Env { env }),
+                Ok(()) => return Ok(Env { env, dbi_open_mutex: sync::Mutex::new(()) }),
                 Err(e) => { ffi::mdb_env_close(env); Err(e.into()) },
             }
         }
@@ -67,9 +67,41 @@ impl EnvBuilder {
 
 pub struct Env {
     env: *mut ffi::MDB_env,
+    dbi_open_mutex: sync::Mutex<()>,
 }
 
 impl Env {
+    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>> {
+        let rtxn = self.read_txn()?;
+
+        let mut dbi = 0;
+        let name = name.map(|n| CString::new(n).unwrap());
+        let name_ptr = match name {
+            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
+            None => ptr::null(),
+        };
+
+        let lock = self.dbi_open_mutex.lock().unwrap();
+
+        let result = unsafe {
+            lmdb_result(ffi::mdb_dbi_open(
+                rtxn.txn,
+                name_ptr,
+                0,
+                &mut dbi,
+            ))
+        };
+
+        drop(lock);
+        drop(name);
+
+        match result {
+            Ok(()) => Ok(Some(Database::new(dbi))),
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>> {
         let wtxn = self.write_txn()?;
 
@@ -80,20 +112,27 @@ impl Env {
             None => ptr::null(),
         };
 
-        unsafe {
+        let lock = self.dbi_open_mutex.lock().unwrap();
+
+        let result = unsafe {
             lmdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
                 name_ptr,
                 ffi::MDB_CREATE,
                 &mut dbi,
-            ))?
+            ))
         };
 
+        drop(lock);
         drop(name);
 
-        wtxn.commit()?;
-
-        Ok(Database::new(dbi))
+        match result {
+            Ok(()) => {
+                wtxn.commit()?;
+                Ok(Database::new(dbi))
+            },
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub fn write_txn(&self) -> Result<RwTxn> {
