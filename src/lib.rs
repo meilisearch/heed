@@ -6,7 +6,7 @@ mod lmdb_error;
 mod env;
 mod traits;
 mod txn;
-mod types;
+pub mod types;
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::Database;
@@ -14,10 +14,6 @@ pub use self::lmdb_error::Error as LmdbError;
 pub use self::env::{EnvBuilder, Env};
 pub use self::traits::{BytesEncode, BytesDecode};
 pub use self::txn::{RoTxn, RwTxn};
-pub use self::types::{CowType, OwnedType, Type, CowSlice, Slice, Str, Ignore};
-
-#[cfg(feature = "serde")]
-pub use self::types::Serde;
 
 use std::fmt;
 use std::error::Error as StdError;
