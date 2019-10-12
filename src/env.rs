@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::collections::hash_map::{HashMap, Entry};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
@@ -6,7 +7,7 @@ use std::{ptr, sync};
 
 use once_cell::sync::OnceCell;
 use crate::lmdb_error::lmdb_result;
-use crate::{RoTxn, RwTxn, Database, Result};
+use crate::{RoTxn, RwTxn, Database, Result, Error};
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -75,7 +76,7 @@ impl EnvOpenOptions {
 
                     match result {
                         Ok(()) => {
-                            let inner = EnvInner { env, dbi_open_mutex: sync::Mutex::new(()) };
+                            let inner = EnvInner { env, dbi_open_mutex: sync::Mutex::default() };
                             let env = Env(Arc::new(inner));
                             Ok(entry.insert(env).clone())
                         },
@@ -92,14 +93,17 @@ pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<()>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
 }
 
 unsafe impl Send for EnvInner {}
 unsafe impl Sync for EnvInner {}
 
 impl Env {
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>> {
+    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
+    where KC: 'static,
+          DC: 'static,
+    {
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -109,7 +113,7 @@ impl Env {
             None => ptr::null(),
         };
 
-        let lock = self.0.dbi_open_mutex.lock().unwrap();
+        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
             lmdb_result(ffi::mdb_dbi_open(
@@ -120,17 +124,28 @@ impl Env {
             ))
         };
 
-        drop(lock);
         drop(name);
 
         match result {
-            Ok(()) => Ok(Some(Database::new(dbi))),
+            Ok(()) => {
+                let current_types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+                let old_types = lock.entry(dbi).or_insert(current_types);
+
+                if *old_types == current_types {
+                    Ok(Some(Database::new(dbi)))
+                } else {
+                    Err(Error::InvalidDatabaseTyping)
+                }
+            },
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>> {
+    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
+    where KC: 'static,
+          DC: 'static,
+    {
         let wtxn = self.write_txn()?;
 
         let mut dbi = 0;
@@ -140,7 +155,7 @@ impl Env {
             None => ptr::null(),
         };
 
-        let lock = self.0.dbi_open_mutex.lock().unwrap();
+        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
             lmdb_result(ffi::mdb_dbi_open(
@@ -151,13 +166,20 @@ impl Env {
             ))
         };
 
-        drop(lock);
         drop(name);
 
         match result {
             Ok(()) => {
                 wtxn.commit()?;
-                Ok(Database::new(dbi))
+
+                let current_types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+                let old_types = lock.entry(dbi).or_insert(current_types);
+
+                if *old_types == current_types {
+                    Ok(Database::new(dbi))
+                } else {
+                    Err(Error::InvalidDatabaseTyping)
+                }
             },
             Err(e) => Err(e.into()),
         }

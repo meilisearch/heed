@@ -25,6 +25,7 @@ pub enum Error {
     Lmdb(LmdbError),
     Encoding,
     Decoding,
+    InvalidDatabaseTyping,
 }
 
 impl fmt::Display for Error {
@@ -34,6 +35,9 @@ impl fmt::Display for Error {
             Error::Lmdb(error) => write!(f, "{}", error),
             Error::Encoding => write!(f, "error while encoding"),
             Error::Decoding => write!(f, "error while decoding"),
+            Error::InvalidDatabaseTyping => {
+                write!(f, "database was previously opened with different types")
+            },
         }
     }
 }

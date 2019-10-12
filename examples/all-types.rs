@@ -57,7 +57,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
     // you can ignore the data
-    let db: Database<Str, Ignore> = env.create_database(None)?;
+    let db: Database<Str, Ignore> = env.create_database(Some("ignored-data"))?;
+
 
     let mut wtxn = env.write_txn()?;
     let _ret            = db.put(&mut wtxn, "hello", &())?;
@@ -65,12 +66,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", ret);
 
-
-
     let ret: Option<()> = db.get(&wtxn, "non-existant")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
+
+
+    // database opening and types are tested in a way
+    //
+    // we try to open a database twice with the same types
+    let _db: Database<Str, Ignore> = env.create_database(Some("ignored-data"))?;
+
+    // and here we try to open it with other types
+    // asserting that it correctly returns an error
+    //
+    // NOTE that those types are not saved upon runs and
+    // therefore types cannot be checked upon different runs,
+    // the first database opening fix the types for this run.
+    let result = env.create_database::<Str, OwnedSlice<i32>>(Some("ignored-data"));
+    assert!(result.is_err());
+
 
 
     // you can iterate over keys in order
