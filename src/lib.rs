@@ -67,7 +67,6 @@
 //! #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
 //! #     .max_dbs(3000)
 //! #     .open("target/zerocopy.mdb")?;
-//!
 //! // serde types are also supported!!!
 //! #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 //! struct Hello<'a> {
@@ -104,7 +103,6 @@
 //! #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
 //! #     .max_dbs(3000)
 //! #     .open("target/zerocopy.mdb")?;
-//!
 //! // database opening and types are checked
 //! // here we try to open a database twice with the same types
 //! let _db: Database<Str, Unit> = env.create_database(Some("str-unit"))?;

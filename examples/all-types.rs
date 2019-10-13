@@ -1,15 +1,19 @@
 use std::error::Error;
+use std::fs;
 
 use zerocopy_lmdb::{EnvOpenOptions, Database};
 use zerocopy_lmdb::types::*;
 use serde::{Serialize, Deserialize};
+use zerocopy::{AsBytes, FromBytes, Unaligned};
 
 fn main() -> Result<(), Box<dyn Error>> {
+
+    fs::create_dir_all("target/zerocopy.mdb")?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
         .max_dbs(3000)
-        .open("zerocopy.mdb")?;
+        .open("target/zerocopy.mdb")?;
 
     // you can specify that a database will support some typed key/data
     //
@@ -42,14 +46,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct Hello<'a> { string: &'a str }
 
-    let db: Database<Str, Serde<Hello>> = env.create_database(None)?;
+    let db: Database<Str, Serde<Hello>> = env.create_database(Some("serde"))?;
 
     let mut wtxn = env.write_txn()?;
 
     let hello = Hello { string: "hi" };
-    let _ret               = db.put(&mut wtxn, "hello", &hello)?;
+    db.put(&mut wtxn, "hello", &hello)?;
 
     let ret: Option<Hello> = db.get(&wtxn,     "hello")?;
+
+    println!("{:?}", ret);
+    wtxn.commit()?;
+
+
+
+
+    // it is prefered to use zerocopy when possible
+    #[derive(Debug, PartialEq, Eq)]
+    #[derive(AsBytes, FromBytes, Unaligned)]
+    #[repr(C)]
+    struct ZeroBytes {
+        bytes: [u8; 12],
+    }
+
+    let db: Database<Str, UnalignedType<ZeroBytes>> = env.create_database(Some("zerocopy-struct"))?;
+
+    let mut wtxn = env.write_txn()?;
+
+    let zerobytes = ZeroBytes { bytes: [24; 12] };
+    db.put(&mut wtxn, "zero", &zerobytes)?;
+
+    let ret = db.get(&wtxn, "zero")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
