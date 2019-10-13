@@ -5,6 +5,27 @@ use zerocopy::{LayoutVerified, AsBytes, FromBytes};
 use crate::{BytesEncode, BytesDecode};
 use crate::types::aligned_to;
 
+/// Describes a type that must be [memory aligned] and
+/// will be reallocated if it is not.
+///
+/// A [`Cow`] type is returned to represent this behavior.
+///
+/// If you need to store a type that doesn't depends on any
+/// memory alignment it is recommended to use the [`UnalignedType`].
+///
+/// If you don't want to be bored with the [`Cow`] type you can
+/// use the [`OwnedType`].
+///
+/// To store slices, you must look at the [`CowSlice`],
+/// [`OwnedSlice`] or [`UnalignedSlice`] types.
+///
+/// [memory aligned]: https://doc.rust-lang.org/std/mem/fn.align_of.html
+/// [`Cow`]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
+/// [`UnalignedType`]: crate::types::UnalignedType
+/// [`OwnedType`]: crate::types::OwnedType
+/// [`UnalignedSlice`]: crate::types::UnalignedSlice
+/// [`OwnedSlice`]: crate::types::OwnedSlice
+/// [`CowSlice`]: crate::types::CowSlice
 pub struct CowType<T>(std::marker::PhantomData<T>);
 
 impl<T> BytesEncode for CowType<T> where T: AsBytes {

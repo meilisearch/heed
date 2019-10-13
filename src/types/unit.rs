@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 use crate::{BytesEncode, BytesDecode};
 
-pub struct Ignore;
+/// Describes the [unit `()`] type.
+///
+/// [unit `()`]: https://doc.rust-lang.org/std/primitive.unit.html
+pub struct Unit;
 
-impl BytesEncode for Ignore {
+impl BytesEncode for Unit {
     type EItem = ();
 
     fn bytes_encode(_item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -11,7 +14,7 @@ impl BytesEncode for Ignore {
     }
 }
 
-impl BytesDecode<'_> for Ignore {
+impl BytesDecode<'_> for Unit {
     type DItem = ();
 
     fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use crate::{BytesEncode, BytesDecode};
 use crate::types::UnalignedSlice;
 
+/// Describes an [`str`].
 pub struct Str;
 
 impl BytesEncode for Str {

@@ -3,6 +3,14 @@ use std::borrow::Cow;
 use zerocopy::{LayoutVerified, AsBytes, FromBytes, Unaligned};
 use crate::{BytesEncode, BytesDecode};
 
+/// Describes a type that is totally borrowed and doesn't
+/// depends on any [memory alignment].
+///
+/// If you need to store a type that does depend on memory alignment
+/// and that can be big it is recommended to use the [`CowType`].
+///
+/// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
+/// [`CowType`]: crate::types::CowType
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 
 impl<T> BytesEncode for UnalignedSlice<T> where T: AsBytes + Unaligned {

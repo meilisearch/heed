@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
     // you can ignore the data
-    let db: Database<Str, Ignore> = env.create_database(Some("ignored-data"))?;
+    let db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
 
 
     let mut wtxn = env.write_txn()?;
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // database opening and types are tested in a way
     //
     // we try to open a database twice with the same types
-    let _db: Database<Str, Ignore> = env.create_database(Some("ignored-data"))?;
+    let _db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
 
     // and here we try to open it with other types
     // asserting that it correctly returns an error
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // you can iterate over keys in order
     type BEI64 = zerocopy::I64<byteorder::BigEndian>;
 
-    let db: Database<OwnedType<BEI64>, Ignore> = env.create_database(Some("big-endian-iter"))?;
+    let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
 
     let mut wtxn = env.write_txn()?;
     let _ret = db.put(&mut wtxn, &BEI64::new(0), &())?;

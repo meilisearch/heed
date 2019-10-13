@@ -2,6 +2,9 @@ use std::borrow::Cow;
 use serde::{Serialize, Deserialize};
 use crate::{BytesEncode, BytesDecode};
 
+/// Describes an type that is [`Serialize`]/[`Deserialize`].
+///
+/// It can borrow bytes from the original slice.
 pub struct Serde<T>(std::marker::PhantomData<T>);
 
 impl<T> BytesEncode for Serde<T> where T: Serialize {
