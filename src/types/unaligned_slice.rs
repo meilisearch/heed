@@ -21,7 +21,7 @@ impl<T> BytesEncode for UnalignedSlice<T> where T: AsBytes + Unaligned {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for UnalignedSlice<T> where T: FromBytes + Unaligned + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for UnalignedSlice<T> where T: FromBytes + Unaligned {
     type DItem = &'a [T];
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
