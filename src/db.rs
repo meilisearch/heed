@@ -5,6 +5,103 @@ use std::ops::{RangeBounds, Bound};
 use crate::lmdb_error::lmdb_result;
 use crate::*;
 
+/// # Example: iterating over entries
+///
+/// ```
+/// # use std::fs;
+/// # use zerocopy_lmdb::EnvOpenOptions;
+/// use zerocopy_lmdb::Database;
+/// use zerocopy_lmdb::types::*;
+/// use serde::{Serialize, Deserialize};
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fs::create_dir_all("target/zerocopy.mdb")?;
+/// # let env = EnvOpenOptions::new()
+/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .max_dbs(3000)
+/// #     .open("target/zerocopy.mdb")?;
+/// type BEI64 = zerocopy::I64<byteorder::BigEndian>;
+///
+/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
+///
+/// let mut wtxn = env.write_txn()?;
+/// db.put(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put(&mut wtxn, &BEI64::new(35), &())?;
+/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+///
+/// // you can iterate over database entries in order
+/// let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
+/// let rets: Vec<(BEI64, _)> = rets?;
+///
+/// let expected = vec![
+///     (BEI64::new(0), ()),
+///     (BEI64::new(35), ()),
+///     (BEI64::new(42), ()),
+///     (BEI64::new(68), ()),
+/// ];
+///
+/// assert_eq!(rets, expected);
+/// wtxn.abort();
+/// # Ok(()) }
+/// ```
+///
+/// # Example: iterating over and delete ranges of entries
+///
+/// ```
+/// # use std::fs;
+/// # use zerocopy_lmdb::EnvOpenOptions;
+/// use zerocopy_lmdb::Database;
+/// use zerocopy_lmdb::types::*;
+/// use serde::{Serialize, Deserialize};
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fs::create_dir_all("target/zerocopy.mdb")?;
+/// # let env = EnvOpenOptions::new()
+/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .max_dbs(3000)
+/// #     .open("target/zerocopy.mdb")?;
+/// type BEI64 = zerocopy::I64<byteorder::BigEndian>;
+///
+/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
+///
+/// let mut wtxn = env.write_txn()?;
+/// db.put(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put(&mut wtxn, &BEI64::new(35), &())?;
+/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+///
+/// // you can iterate over ranges too!!!
+/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, range)?.collect();
+/// let rets: Vec<(BEI64, _)> = rets?;
+///
+/// let expected = vec![
+///     (BEI64::new(35), ()),
+///     (BEI64::new(42), ()),
+/// ];
+///
+/// assert_eq!(rets, expected);
+///
+///
+/// // even delete a range of keys
+/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let deleted: usize = db.delete_range(&mut wtxn, range)?;
+///
+/// let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
+/// let rets: Vec<(BEI64, _)> = rets?;
+///
+/// let expected = vec![
+///     (BEI64::new(0), ()),
+///     (BEI64::new(68), ()),
+/// ];
+///
+/// assert_eq!(deleted, 2);
+/// assert_eq!(rets, expected);
+///
+/// wtxn.abort();
+/// # Ok(()) }
+/// ```
 pub struct Database<KC, DC> {
     pub(crate) dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(KC, DC)>,

@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 use std::{fmt, str};
 
 /// An LMDB error kind.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {
     /// key/data pair already exists.
     KeyExist,
