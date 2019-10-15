@@ -10,13 +10,13 @@ pub struct RoCursor<'txn> {
 }
 
 impl<'txn> RoCursor<'txn> {
-    pub(crate) fn new<KC, DC>(txn: &'txn RoTxn, db: Database<KC, DC>) -> Result<RoCursor<'txn>> {
+    pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
         unsafe {
             lmdb_result(ffi::mdb_cursor_open(
                 txn.txn,
-                db.dbi,
+                dbi,
                 &mut cursor,
             ))?
         }
@@ -161,8 +161,8 @@ pub struct RwCursor<'txn> {
 }
 
 impl<'txn> RwCursor<'txn> {
-    pub(crate) fn new<KC, DC>(txn: &'txn RwTxn, db: Database<KC, DC>) -> Result<RwCursor<'txn>> {
-        Ok(RwCursor { cursor: RoCursor::new(txn, db)? })
+    pub(crate) fn new(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
+        Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
     }
 
     pub fn put_current(&mut self, data: &[u8]) -> Result<bool> {
