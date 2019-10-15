@@ -7,7 +7,7 @@ use std::{ptr, sync};
 
 use once_cell::sync::OnceCell;
 use crate::lmdb_error::lmdb_result;
-use crate::{RoTxn, RwTxn, Database, Result, Error};
+use crate::{RoTxn, RwTxn, Database, DynDatabase, Result, Error};
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -93,7 +93,7 @@ pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
 }
 
 unsafe impl Send for EnvInner {}
@@ -104,6 +104,15 @@ impl Env {
     where KC: 'static,
           DC: 'static,
     {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        Ok(self.raw_open_database(name, Some(types))?.map(Database::new))
+    }
+
+    pub fn open_dyn_database(&self, name: Option<&str>) -> Result<Option<DynDatabase>> {
+        Ok(self.raw_open_database(name, None)?.map(DynDatabase::new))
+    }
+
+    fn raw_open_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -128,11 +137,10 @@ impl Env {
 
         match result {
             Ok(()) => {
-                let current_types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-                let old_types = lock.entry(dbi).or_insert(current_types);
+                let old_types = lock.entry(dbi).or_insert(types);
 
-                if *old_types == current_types {
-                    Ok(Some(Database::new(dbi)))
+                if *old_types == types {
+                    Ok(Some(dbi))
                 } else {
                     Err(Error::InvalidDatabaseTyping)
                 }
@@ -146,6 +154,15 @@ impl Env {
     where KC: 'static,
           DC: 'static,
     {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        self.raw_create_database(name, Some(types)).map(Database::new)
+    }
+
+    pub fn create_dyn_database(&self, name: Option<&str>) -> Result<DynDatabase> {
+        self.raw_create_database(name, None).map(DynDatabase::new)
+    }
+
+    fn raw_create_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<u32> {
         let wtxn = self.write_txn()?;
 
         let mut dbi = 0;
@@ -172,11 +189,10 @@ impl Env {
             Ok(()) => {
                 wtxn.commit()?;
 
-                let current_types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-                let old_types = lock.entry(dbi).or_insert(current_types);
+                let old_types = lock.entry(dbi).or_insert(types);
 
-                if *old_types == current_types {
-                    Ok(Database::new(dbi))
+                if *old_types == types {
+                    Ok(dbi)
                 } else {
                     Err(Error::InvalidDatabaseTyping)
                 }
