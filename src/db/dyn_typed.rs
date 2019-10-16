@@ -46,6 +46,42 @@ impl DynDatabase {
         }
     }
 
+    pub fn first<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_first() {
+            Ok(Some((key, data))) => {
+                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                    (Some(key), Some(data)) => Ok(Some((key, data))),
+                    (_, _) => Err(Error::Decoding),
+                }
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn last<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_last() {
+            Ok(Some((key, data))) => {
+                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                    (Some(key), Some(data)) => Ok(Some((key, data))),
+                    (_, _) => Err(Error::Decoding),
+                }
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     pub fn iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         Ok(RoIter {
             cursor: RoCursor::new(txn, self.dbi)?,
