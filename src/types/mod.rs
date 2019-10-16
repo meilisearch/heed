@@ -1,11 +1,11 @@
 //!
-//! How to choose the rigth type you need to store things in this database?
+//! How to choose the right type to store things in this database?
 //! For specific types you can choose:
 //!   - [`Str`] to store [`str`]s
 //!   - [`Unit`] to store [unit `()`] types
 //!   - or [`Serde`] to store [`Serialize`]/[`Deserialize`] types
 //!
-//! But if you want to store big types that can support efficient deserializing then
+//! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:
 //!
 //! | Available types    | Encoding type | Decoding type | allocations                                              |
