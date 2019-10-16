@@ -1,8 +1,5 @@
-use std::{marker, mem, ptr};
-use std::borrow::Cow;
-use std::ops::{RangeBounds, Bound};
-
-use crate::lmdb_error::lmdb_result;
+use std::marker;
+use std::ops::RangeBounds;
 use crate::*;
 
 /// A typed database that accepts only the types it was created with.
@@ -105,13 +102,13 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 pub struct Database<KC, DC> {
-    pub(crate) dbi: ffi::MDB_dbi,
+    pub(crate) dyndb: DynDatabase,
     marker: marker::PhantomData<(KC, DC)>,
 }
 
 impl<KC, DC> Database<KC, DC> {
     pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database { dbi, marker: std::marker::PhantomData }
+        Database { dyndb: DynDatabase::new(dbi), marker: std::marker::PhantomData }
     }
 
     pub fn get<'txn>(&self, txn: &'txn RoTxn, key: &KC::EItem) -> Result<Option<DC::DItem>>
@@ -119,45 +116,15 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode,
         DC: BytesDecode<'txn>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = mem::MaybeUninit::uninit();
-
-        let result = unsafe {
-            lmdb_result(ffi::mdb_get(
-                txn.txn,
-                self.dbi,
-                &mut key_val,
-                data_val.as_mut_ptr(),
-            ))
-        };
-
-        match result {
-            Ok(()) => {
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
-                Ok(Some(data))
-            },
-            Err(e) if e.not_found() => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        self.dyndb.get::<KC, DC>(txn, key)
     }
 
     pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
-        Ok(RoIter {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        self.dyndb.iter::<KC, DC>(txn)
     }
 
     pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
-        Ok(RwIter {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        self.dyndb.iter_mut::<KC, DC>(txn)
     }
 
     pub fn range<'txn, R>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn, KC, DC>>
@@ -165,36 +132,7 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode,
         R: RangeBounds<KC::EItem>,
     {
-        let start_bound = match range.start_bound() {
-            Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
-            },
-            Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
-            },
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        let end_bound = match range.end_bound() {
-            Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
-            },
-            Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
-            },
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        Ok(RoRange {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        self.dyndb.range::<KC, DC, R>(txn, range)
     }
 
     pub fn range_mut<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<RwRange<'txn, KC, DC>>
@@ -202,36 +140,7 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode,
         R: RangeBounds<KC::EItem>,
     {
-        let start_bound = match range.start_bound() {
-            Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
-            },
-            Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
-            },
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        let end_bound = match range.end_bound() {
-            Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
-            },
-            Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
-            },
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        Ok(RwRange {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        self.dyndb.range_mut::<KC, DC, R>(txn, range)
     }
 
     pub fn put(&self, txn: &mut RwTxn, key: &KC::EItem, data: &DC::EItem) -> Result<()>
@@ -239,47 +148,14 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode,
         DC: BytesEncode,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = 0;
-
-        unsafe {
-            lmdb_result(ffi::mdb_put(
-                txn.txn.txn,
-                self.dbi,
-                &mut key_val,
-                &mut data_val,
-                flags,
-            ))?
-        }
-
-        Ok(())
+        self.dyndb.put::<KC, DC>(txn, key, data)
     }
 
     pub fn delete(&self, txn: &mut RwTxn, key: &KC::EItem) -> Result<bool>
     where
         KC: BytesEncode,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-
-        let result = unsafe {
-            lmdb_result(ffi::mdb_del(
-                txn.txn.txn,
-                self.dbi,
-                &mut key_val,
-                ptr::null_mut(),
-            ))
-        };
-
-        match result {
-            Ok(()) => Ok(true),
-            Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(e.into()),
-        }
+        self.dyndb.delete::<KC>(txn, key)
     }
 
     pub fn delete_range<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
@@ -288,32 +164,17 @@ impl<KC, DC> Database<KC, DC> {
         DC: BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        let mut count = 0;
-        let mut iter = self.range_mut(txn, range)?;
-
-        while let Some(_) = iter.next() {
-            iter.del_current()?;
-            count += 1;
-        }
-
-        Ok(count)
+        self.dyndb.delete_range::<KC, DC, R>(txn, range)
     }
 
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
-        unsafe {
-            lmdb_result(ffi::mdb_drop(
-                txn.txn.txn,
-                self.dbi,
-                0,
-            ))
-            .map_err(Into::into)
-        }
+        self.dyndb.clear(txn)
     }
 }
 
 impl<KC, DC> Clone for Database<KC, DC> {
     fn clone(&self) -> Database<KC, DC> {
-        Database::new(self.dbi)
+        Database { dyndb: self.dyndb, marker: marker::PhantomData }
     }
 }
 
