@@ -49,6 +49,31 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
+    pub fn move_on_last(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        let mut key_val = mem::MaybeUninit::uninit();
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        // Move the cursor on the first database key
+        let result = unsafe {
+            lmdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                key_val.as_mut_ptr(),
+                data_val.as_mut_ptr(),
+                ffi::MDB_LAST,
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            },
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn move_on_key_greater_than_or_equal_to(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = mem::MaybeUninit::uninit();

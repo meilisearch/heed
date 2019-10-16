@@ -119,6 +119,22 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.get::<KC, DC>(txn, key)
     }
 
+    pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        self.dyndb.first::<KC, DC>(txn)
+    }
+
+    pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        self.dyndb.last::<KC, DC>(txn)
+    }
+
     pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         self.dyndb.iter::<KC, DC>(txn)
     }
