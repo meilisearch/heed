@@ -2,8 +2,9 @@ use std::{marker, mem, ptr};
 use std::borrow::Cow;
 use std::ops::{RangeBounds, Bound};
 
-use crate::lmdb_error::lmdb_result;
 use crate::*;
+use crate::lmdb_error::lmdb_result;
+use super::advance_key;
 
 /// A dynamically typed database that accepts types at call (e.g. `get`, `put`).
 #[derive(Copy, Clone)]
@@ -163,6 +164,58 @@ impl DynDatabase {
             },
             Bound::Unbounded => Bound::Unbounded,
         };
+
+        Ok(RwRange {
+            cursor: RwCursor::new(txn, self.dbi)?,
+            start_bound: Some(start_bound),
+            end_bound,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn prefix_iter<'txn, KC, DC>(
+        &self,
+        txn: &'txn RoTxn,
+        prefix: &KC::EItem,
+    ) -> Result<RoRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode,
+    {
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+
+        let start_bytes = prefix_bytes.into_owned();
+
+        let mut end_bytes = start_bytes.clone();
+        advance_key(&mut end_bytes);
+
+        let end_bound = Bound::Excluded(end_bytes);
+        let start_bound = Bound::Included(start_bytes);
+
+        Ok(RoRange {
+            cursor: RoCursor::new(txn, self.dbi)?,
+            start_bound: Some(start_bound),
+            end_bound,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn prefix_iter_mut<'txn, KC, DC>(
+        &self,
+        txn: &'txn RwTxn,
+        prefix: &KC::EItem,
+    ) -> Result<RwRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode,
+    {
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+
+        let start_bytes = prefix_bytes.into_owned();
+
+        let mut end_bytes = start_bytes.clone();
+        advance_key(&mut end_bytes);
+
+        let end_bound = Bound::Excluded(end_bytes);
+        let start_bound = Bound::Included(start_bytes);
 
         Ok(RwRange {
             cursor: RwCursor::new(txn, self.dbi)?,

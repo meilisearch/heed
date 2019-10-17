@@ -159,6 +159,28 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.range_mut::<KC, DC, R>(txn, range)
     }
 
+    pub fn prefix_iter<'txn>(
+        &self,
+        txn: &'txn RoTxn,
+        prefix: &KC::EItem,
+    ) -> Result<RoRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode,
+    {
+        self.dyndb.prefix_iter::<KC, DC>(txn, prefix)
+    }
+
+    pub fn prefix_iter_mut<'txn>(
+        &self,
+        txn: &'txn RwTxn,
+        prefix: &KC::EItem,
+    ) -> Result<RwRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode,
+    {
+        self.dyndb.prefix_iter_mut::<KC, DC>(txn, prefix)
+    }
+
     pub fn put(&self, txn: &mut RwTxn, key: &KC::EItem, data: &DC::EItem) -> Result<()>
     where
         KC: BytesEncode,
