@@ -9,6 +9,13 @@ mod dyn_typed;
 pub use self::typed::Database;
 pub use self::dyn_typed::DynDatabase;
 
+pub fn advance_key(bytes: &mut Vec<u8>) {
+    match bytes.last_mut() {
+        Some(&mut 255) | None => bytes.push(0),
+        Some(last) => *last += 1,
+    }
+}
+
 pub struct RoIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_first: bool,
@@ -85,13 +92,6 @@ where KC: BytesDecode<'txn>,
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
-    }
-}
-
-fn advance_key(bytes: &mut Vec<u8>) {
-    match bytes.last_mut() {
-        Some(&mut 255) | None => bytes.push(0),
-        Some(last) => *last += 1,
     }
 }
 
