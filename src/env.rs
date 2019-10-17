@@ -137,6 +137,8 @@ impl Env {
 
         match result {
             Ok(()) => {
+                rtxn.commit()?;
+
                 let old_types = lock.entry(dbi).or_insert(types);
 
                 if *old_types == types {

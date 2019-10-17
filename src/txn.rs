@@ -27,11 +27,19 @@ impl RoTxn {
     pub fn abort(self) {
         drop(self)
     }
+
+    pub fn commit(mut self) -> Result<()> {
+        let result = unsafe { lmdb_result(ffi::mdb_txn_commit(self.txn)) };
+        self.txn = ptr::null_mut();
+        result.map_err(Into::into)
+    }
 }
 
 impl Drop for RoTxn {
     fn drop(&mut self) {
-        unsafe { ffi::mdb_txn_abort(self.txn) }
+        if !self.txn.is_null() {
+            unsafe { ffi::mdb_txn_abort(self.txn) }
+        }
     }
 }
 
@@ -55,10 +63,8 @@ impl RwTxn {
         Ok(RwTxn { txn: RoTxn { txn } })
     }
 
-    pub fn commit(mut self) -> Result<()> {
-        let result = unsafe { lmdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
-        self.txn.txn = ptr::null_mut();
-        result.map_err(Into::into)
+    pub fn commit(self) -> Result<()> {
+        self.txn.commit()
     }
 
     pub fn abort(self) {
