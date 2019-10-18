@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fs;
 
-use zerocopy_lmdb::{EnvOpenOptions, Database};
+use zerocopy_lmdb::{EnvOpenOptions, CompactionOption, Database};
 use zerocopy_lmdb::types::*;
 use serde::{Serialize, Deserialize};
 use zerocopy::{AsBytes, FromBytes, Unaligned};
@@ -146,6 +146,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;
+
+    let file = env.copy_to_path("target/zerocopy-copied.mdb", CompactionOption::Enabled)?;
+    println!("copied to {:?}", file);
 
     Ok(())
 }

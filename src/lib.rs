@@ -131,7 +131,7 @@ pub mod types;
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, DynDatabase, RoIter, RwIter, RoRange, RwRange};
 pub use self::lmdb_error::Error as LmdbError;
-pub use self::env::{EnvOpenOptions, Env};
+pub use self::env::{EnvOpenOptions, Env, CompactionOption};
 pub use self::traits::{BytesEncode, BytesDecode};
 pub use self::txn::{RoTxn, RwTxn};
 

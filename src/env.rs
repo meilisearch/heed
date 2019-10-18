@@ -1,6 +1,8 @@
 use std::any::TypeId;
 use std::collections::hash_map::{HashMap, Entry};
 use std::ffi::CString;
+use std::fs::File;
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
@@ -98,6 +100,12 @@ struct EnvInner {
 
 unsafe impl Send for EnvInner {}
 unsafe impl Sync for EnvInner {}
+
+#[derive(Debug, Copy, Clone)]
+pub enum CompactionOption {
+    Enabled,
+    Disabled,
+}
 
 impl Env {
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
@@ -209,5 +217,22 @@ impl Env {
 
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self.0.env)
+    }
+
+    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
+
+        let file = File::create(path)?;
+        let fd = file.as_raw_fd();
+
+        unsafe {
+            lmdb_result(ffi::mdb_env_copyfd2(
+                self.0.env,
+                fd,
+                flags,
+            ))?
+        }
+
+        Ok(file)
     }
 }
