@@ -50,8 +50,11 @@ mod str;
 mod unaligned_slice;
 mod unaligned_type;
 
-#[cfg(feature = "serde")]
-mod serde;
+#[cfg(feature = "serde-bincode")]
+mod serde_bincode;
+
+#[cfg(feature = "serde-json")]
+mod serde_json;
 
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
@@ -68,8 +71,11 @@ pub use self::unaligned_type::UnalignedType;
 /// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
 pub type ByteSlice = UnalignedSlice<u8>;
 
-#[cfg(feature = "serde")]
-pub use self::serde::Serde;
+#[cfg(feature = "serde-bincode")]
+pub use self::serde_bincode::SerdeBincode;
+
+#[cfg(feature = "serde-json")]
+pub use self::serde_json::SerdeJson;
 
 fn aligned_to(bytes: &[u8], align: usize) -> bool {
     (bytes as *const _ as *const () as usize) % align == 0

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fs;
 
-use zerocopy_lmdb::{EnvOpenOptions, CompactionOption};
+use zerocopy_lmdb::EnvOpenOptions;
 use zerocopy_lmdb::types::*;
 use serde::{Serialize, Deserialize};
 use zerocopy::{AsBytes, FromBytes, Unaligned};
@@ -49,11 +49,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
 
     let hello = Hello { string: "hi" };
-    db.put::<Str, Serde<Hello>>(&mut wtxn, "hello", &hello)?;
+    db.put::<Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
 
-    let ret = db.get::<Str, Serde<Hello>>(&wtxn, "hello")?;
+    let ret = db.get::<Str, SerdeBincode<Hello>>(&wtxn, "hello")?;
+    println!("serde-bincode:\t{:?}", ret);
 
-    println!("{:?}", ret);
+    let hello = Hello { string: "hi" };
+    db.put::<Str, SerdeJson<Hello>>(&mut wtxn, "hello", &hello)?;
+
+    let ret = db.get::<Str, SerdeJson<Hello>>(&wtxn, "hello")?;
+    println!("serde-json:\t{:?}", ret);
+
     wtxn.commit()?;
 
 
@@ -144,9 +150,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;
-
-    let file = env.copy_to_path("target/zerocopy-dyn-copied.mdb", CompactionOption::Enabled)?;
-    println!("copied to {:?}", file);
 
     Ok(())
 }

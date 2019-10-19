@@ -12,10 +12,13 @@ libc = "0.2.62"
 once_cell = "1.2.0"
 page_size = "0.4.1"
 serde = { version = "1.0.101", optional = true }
+serde_json = { version = "1.0.41", optional = true }
 zerocopy = "0.2.8"
 
 [dev-dependencies]
 serde = { version = "1.0.101", features = ["derive"] }
 
 [features]
-default = ["serde", "bincode"]
+default = ["serde-bincode", "serde-json"]
+serde-bincode = ["serde", "bincode"]
+serde-json = ["serde", "serde_json"]
