@@ -123,31 +123,6 @@ impl<'txn> RoCursor<'txn> {
             Err(e) => Err(e.into()),
         }
     }
-
-    pub fn get_current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-        let mut key_val = mem::MaybeUninit::uninit();
-        let mut data_val = mem::MaybeUninit::uninit();
-
-        // Retrieve the key/data at the current cursor position
-        let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_get(
-                self.cursor,
-                key_val.as_mut_ptr(),
-                data_val.as_mut_ptr(),
-                ffi::MDB_GET_CURRENT,
-            ))
-        };
-
-        match result {
-            Ok(()) => {
-                let key = unsafe { crate::from_val(key_val.assume_init()) };
-                let data = unsafe { crate::from_val(data_val.assume_init()) };
-                Ok(Some((key, data)))
-            },
-            Err(e) if e.not_found() => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
 }
 
 impl Drop for RoCursor<'_> {
@@ -165,13 +140,7 @@ impl<'txn> RwCursor<'txn> {
         Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
     }
 
-    pub fn put_current(&mut self, data: &[u8]) -> Result<bool> {
-        let key = match self.get_current() {
-            Ok(Some((key, _))) => key,
-            Ok(None) => return Ok(false), // TODO must return an error
-            Err(error) => return Err(error),
-        };
-
+    pub fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
         let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = unsafe { crate::into_val(&data) };
 

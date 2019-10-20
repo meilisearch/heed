@@ -60,11 +60,13 @@ impl<KC, DC> RwIter<'_, KC, DC> {
         self.cursor.del_current()
     }
 
-    pub fn put_current(&mut self, data: &DC::EItem) -> Result<bool>
-    where DC: BytesEncode,
+    pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
+    where KC: BytesEncode,
+          DC: BytesEncode,
     {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.put_current(&data_bytes)
+        self.cursor.put_current(&key_bytes, &data_bytes)
     }
 }
 
@@ -154,11 +156,13 @@ impl<KC, DC> RwRange<'_, KC, DC> {
         self.cursor.del_current()
     }
 
-    pub fn put_current(&mut self, data: &DC::EItem) -> Result<bool>
-    where DC: BytesEncode,
+    pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
+    where KC: BytesEncode,
+          DC: BytesEncode,
     {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.put_current(&data_bytes)
+        self.cursor.put_current(&key_bytes, &data_bytes)
     }
 }
 

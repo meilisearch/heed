@@ -1,14 +1,20 @@
 //! Crate `discern` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
 //!
-//! It provides you a way to store types in [LMDB] without any limit and with a minimal overhead as possible,
+//! It provides you a way to store types in LMDB without any limit and with a minimal overhead as possible,
 //! relying on the [zerocopy] library to avoid copying bytes when that's unnecessary and the [serde] library
 //! when this is unavoidable.
+//!
+//! The Lightning Memory-Mapped Database (LMDB) directly maps files parts into main memory, combined
+//! with the zerocopy library allows us to safely zero-copy parse and serialize Rust types into LMDB.
 //!
 //! [LMDB]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
 //! [zerocopy]: https://docs.rs/zerocopy
 //! [serde]: https://docs.rs/serde
 //!
-//! # Example: opening a database and writing into it
+//! # Examples
+//!
+//! Discern let you open a database, that will support some typed key/data
+//! and ensures, at compile time, that you'll write those types and not others.
 //!
 //! ```
 //! use std::fs;
@@ -23,102 +29,30 @@
 //!     .max_dbs(3000)
 //!     .open("target/zerocopy.mdb")?;
 //!
-//! // you can specify that a database will support some typed key/data
-//! //
-//! // like here we specify that the key will be an array of two i32
-//! // and the data will be an str
+//! // here we specify that the key is an i32 array and the data an str
 //! let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(Some("str"))?;
 //!
 //! let mut wtxn = env.write_txn()?;
-//! let _ret = db.put(&mut wtxn, &[2, 3], "what's up?")?;
+//! db.put(&mut wtxn, &[2, 3], "what's up?")?;
 //!
-//! let ret  = db.get(&wtxn, &[2, 3])?;
-//!
+//! let ret = db.get(&wtxn, &[2, 3])?;
 //! assert_eq!(ret, Some("what's up?"));
+//!
 //! wtxn.commit()?;
 //!
 //! // Be careful, you cannot open a database while in a transaction!
-//! // here the key will be an str and the data will be a slice of u8
+//! // So don't forget to commit/abort it before.
 //! let db: Database<Str, ByteSlice> = env.create_database(Some("bytes"))?;
 //!
 //! let mut wtxn = env.write_txn()?;
-//! let _ret = db.put(&mut wtxn, "hello", &[2, 3][..])?;
+//! db.put(&mut wtxn, "hello", &[2, 3][..])?;
 //!
-//! let ret  = db.get(&wtxn, "hello")?;
-//!
+//! let ret = db.get(&wtxn, "hello")?;
 //! assert_eq!(ret, Some(&[2, 3][..]));
 //!
 //! wtxn.commit()?;
 //! # Ok(()) }
 //! ```
-//!
-//! # Example: writing serde types without much overhead
-//!
-//! ```
-//! # use std::fs;
-//! # use discern::EnvOpenOptions;
-//! use discern::Database;
-//! use discern::types::*;
-//! use serde::{Serialize, Deserialize};
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # fs::create_dir_all("target/zerocopy.mdb")?;
-//! # let env = EnvOpenOptions::new()
-//! #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
-//! #     .max_dbs(3000)
-//! #     .open("target/zerocopy.mdb")?;
-//! // serde types are also supported!!!
-//! #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-//! struct Hello<'a> {
-//!     string: &'a str,
-//! }
-//!
-//! let db: Database<Str, Serde<Hello>> = env.create_database(Some("serde"))?;
-//!
-//! let mut wtxn = env.write_txn()?;
-//!
-//! let hello = Hello { string: "hi" };
-//! let _ret  = db.put(&mut wtxn, "hello", &hello)?;
-//!
-//! let ret = db.get(&wtxn, "hello")?;
-//!
-//! assert_eq!(ret, Some(hello));
-//! wtxn.commit()?;
-//!
-//! # Ok(()) }
-//! ```
-//!
-//! # Example: opening a database with the wrong type
-//!
-//! ```
-//! # use std::fs;
-//! # use discern::EnvOpenOptions;
-//! use discern::Database;
-//! use discern::types::*;
-//! use serde::{Serialize, Deserialize};
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # fs::create_dir_all("target/zerocopy.mdb")?;
-//! # let env = EnvOpenOptions::new()
-//! #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
-//! #     .max_dbs(3000)
-//! #     .open("target/zerocopy.mdb")?;
-//! // database opening and types are checked
-//! // here we try to open a database twice with the same types
-//! let _db: Database<Str, Unit> = env.create_database(Some("str-unit"))?;
-//!
-//! // and here we try to open it with other types
-//! // asserting that it correctly returns an error
-//! //
-//! // NOTE that those types are not saved upon runs and
-//! // therefore types cannot be checked upon different runs,
-//! // the first database opening fix the types for this run.
-//! let result = env.create_database::<Str, OwnedSlice<i32>>(Some("str-unit"));
-//! assert!(result.is_err());
-//! # Ok(()) }
-//! ```
-
-use std::io;
 
 mod cursor;
 mod db;
@@ -138,10 +72,9 @@ pub use self::env::{EnvOpenOptions, Env, CompactionOption};
 pub use self::traits::{BytesEncode, BytesDecode};
 pub use self::txn::{RoTxn, RwTxn};
 
-use std::fmt;
-use std::error::Error as StdError;
-use std::result::Result as StdResult;
+use std::{fmt, io, error, result};
 
+/// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
@@ -165,7 +98,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl StdError for Error { }
+impl error::Error for Error { }
 
 impl From<LmdbError> for Error {
     fn from(error: LmdbError) -> Error {
@@ -182,7 +115,7 @@ impl From<io::Error> for Error {
     }
 }
 
-pub type Result<T> = StdResult<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
 
 unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
     ffi::MDB_val { mv_size: value.len(), mv_data: value.as_ptr() as *mut libc::c_void }

@@ -1,9 +1,10 @@
+//! Types that can be used to serialize and deserialize types inside databases.
 //!
 //! How to choose the right type to store things in this database?
 //! For specific types you can choose:
 //!   - [`Str`] to store [`str`]s
 //!   - [`Unit`] to store [unit `()`] types
-//!   - or [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
+//!   - [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
 //!
 //! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:
