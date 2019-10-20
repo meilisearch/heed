@@ -111,13 +111,13 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 pub struct Database<KC, DC> {
-    pub(crate) dyndb: DynDatabase,
+    pub(crate) dyndb: PolyDatabase,
     marker: marker::PhantomData<(KC, DC)>,
 }
 
 impl<KC, DC> Database<KC, DC> {
     pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database { dyndb: DynDatabase::new(dbi), marker: std::marker::PhantomData }
+        Database { dyndb: PolyDatabase::new(dbi), marker: std::marker::PhantomData }
     }
 
     /// Retrieves the value associated with a key.

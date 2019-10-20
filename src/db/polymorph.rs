@@ -8,13 +8,13 @@ use super::advance_key;
 
 /// A dynamically typed database that accepts types at call (e.g. `get`, `put`).
 #[derive(Copy, Clone)]
-pub struct DynDatabase {
+pub struct PolyDatabase {
     pub(crate) dbi: ffi::MDB_dbi
 }
 
-impl DynDatabase {
-    pub(crate) fn new(dbi: ffi::MDB_dbi) -> DynDatabase {
-        DynDatabase { dbi }
+impl PolyDatabase {
+    pub(crate) fn new(dbi: ffi::MDB_dbi) -> PolyDatabase {
+        PolyDatabase { dbi }
     }
 
     pub fn get<'txn, KC, DC>(&self, txn: &'txn RoTxn, key: &KC::EItem) -> Result<Option<DC::DItem>>

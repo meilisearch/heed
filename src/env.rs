@@ -9,7 +9,7 @@ use std::{ptr, sync};
 
 use once_cell::sync::OnceCell;
 use crate::lmdb_error::lmdb_result;
-use crate::{RoTxn, RwTxn, Database, DynDatabase, Result, Error};
+use crate::{RoTxn, RwTxn, Database, PolyDatabase, Result, Error};
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -116,8 +116,8 @@ impl Env {
         Ok(self.raw_open_database(name, Some(types))?.map(Database::new))
     }
 
-    pub fn open_dyn_database(&self, name: Option<&str>) -> Result<Option<DynDatabase>> {
-        Ok(self.raw_open_database(name, None)?.map(DynDatabase::new))
+    pub fn open_dyn_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
+        Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
     }
 
     fn raw_open_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<Option<u32>> {
@@ -168,8 +168,8 @@ impl Env {
         self.raw_create_database(name, Some(types)).map(Database::new)
     }
 
-    pub fn create_dyn_database(&self, name: Option<&str>) -> Result<DynDatabase> {
-        self.raw_create_database(name, None).map(DynDatabase::new)
+    pub fn create_dyn_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
+        self.raw_create_database(name, None).map(PolyDatabase::new)
     }
 
     fn raw_create_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<u32> {

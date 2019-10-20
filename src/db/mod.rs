@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use std::ops::Bound;
 use crate::*;
 
-mod typed;
-mod dyn_typed;
+mod uniform;
+mod polymorph;
 
-pub use self::typed::Database;
-pub use self::dyn_typed::DynDatabase;
+pub use self::uniform::Database;
+pub use self::polymorph::PolyDatabase;
 
 pub fn advance_key(bytes: &mut Vec<u8>) {
     match bytes.last_mut() {
