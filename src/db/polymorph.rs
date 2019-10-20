@@ -1,15 +1,15 @@
-use std::{marker, mem, ptr};
 use std::borrow::Cow;
-use std::ops::{RangeBounds, Bound};
+use std::ops::{Bound, RangeBounds};
+use std::{marker, mem, ptr};
 
-use crate::*;
-use crate::lmdb_error::lmdb_result;
 use super::advance_key;
+use crate::lmdb_error::lmdb_result;
+use crate::*;
 
 /// A dynamically typed database that accepts types at call (e.g. `get`, `put`).
 #[derive(Copy, Clone)]
 pub struct PolyDatabase {
-    pub(crate) dbi: ffi::MDB_dbi
+    pub(crate) dbi: ffi::MDB_dbi,
 }
 
 impl PolyDatabase {
@@ -41,7 +41,7 @@ impl PolyDatabase {
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
                 let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
                 Ok(Some(data))
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -54,11 +54,9 @@ impl PolyDatabase {
     {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_first() {
-            Ok(Some((key, data))) => {
-                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                    (Some(key), Some(data)) => Ok(Some((key, data))),
-                    (_, _) => Err(Error::Decoding),
-                }
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -72,11 +70,9 @@ impl PolyDatabase {
     {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_last() {
-            Ok(Some((key, data))) => {
-                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                    (Some(key), Some(data)) => Ok(Some((key, data))),
-                    (_, _) => Err(Error::Decoding),
-                }
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -123,7 +119,11 @@ impl PolyDatabase {
         })
     }
 
-    pub fn range<'txn, KC, DC, R>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn, KC, DC>>
+    pub fn range<'txn, KC, DC, R>(
+        &self,
+        txn: &'txn RoTxn,
+        range: R,
+    ) -> Result<RoRange<'txn, KC, DC>>
     where
         KC: BytesEncode,
         R: RangeBounds<KC::EItem>,
@@ -132,11 +132,11 @@ impl PolyDatabase {
             Bound::Included(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
-            },
+            }
             Bound::Excluded(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
-            },
+            }
             Bound::Unbounded => Bound::Unbounded,
         };
 
@@ -144,11 +144,11 @@ impl PolyDatabase {
             Bound::Included(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
-            },
+            }
             Bound::Excluded(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
-            },
+            }
             Bound::Unbounded => Bound::Unbounded,
         };
 
@@ -160,7 +160,11 @@ impl PolyDatabase {
         })
     }
 
-    pub fn range_mut<'txn, KC, DC, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<RwRange<'txn, KC, DC>>
+    pub fn range_mut<'txn, KC, DC, R>(
+        &self,
+        txn: &'txn mut RwTxn,
+        range: R,
+    ) -> Result<RwRange<'txn, KC, DC>>
     where
         KC: BytesEncode,
         R: RangeBounds<KC::EItem>,
@@ -169,11 +173,11 @@ impl PolyDatabase {
             Bound::Included(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
-            },
+            }
             Bound::Excluded(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
-            },
+            }
             Bound::Unbounded => Bound::Unbounded,
         };
 
@@ -181,11 +185,11 @@ impl PolyDatabase {
             Bound::Included(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
-            },
+            }
             Bound::Excluded(bound) => {
                 let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
-            },
+            }
             Bound::Unbounded => Bound::Unbounded,
         };
 
@@ -315,13 +319,6 @@ impl PolyDatabase {
     }
 
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
-        unsafe {
-            lmdb_result(ffi::mdb_drop(
-                txn.txn.txn,
-                self.dbi,
-                0,
-            ))
-            .map_err(Into::into)
-        }
+        unsafe { lmdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }

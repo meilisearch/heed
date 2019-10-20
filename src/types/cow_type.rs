@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::{mem, ptr};
 
-use zerocopy::{LayoutVerified, AsBytes, FromBytes};
-use crate::{BytesEncode, BytesDecode};
 use crate::types::aligned_to;
+use crate::{BytesDecode, BytesEncode};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 /// Describes a type that must be [memory aligned] and
 /// will be reallocated if it is not.
@@ -28,7 +28,10 @@ use crate::types::aligned_to;
 /// [`CowSlice`]: crate::types::CowSlice
 pub struct CowType<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for CowType<T> where T: AsBytes {
+impl<T> BytesEncode for CowType<T>
+where
+    T: AsBytes,
+{
     type EItem = T;
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -36,7 +39,10 @@ impl<T> BytesEncode for CowType<T> where T: AsBytes {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for CowType<T> where T: FromBytes + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for CowType<T>
+where
+    T: FromBytes + Copy,
+{
     type DItem = Cow<'a, T>;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
@@ -54,12 +60,12 @@ impl<'a, T: 'a> BytesDecode<'a> for CowType<T> where T: FromBytes + Copy {
                     unsafe {
                         let dst = data.as_mut_ptr() as *mut u8;
                         ptr::copy_nonoverlapping(bytes.as_ptr(), dst, len);
-                        return Some(Cow::Owned(data.assume_init()))
+                        return Some(Cow::Owned(data.assume_init()));
                     }
                 }
 
                 None
-            },
+            }
         }
     }
 }

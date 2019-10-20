@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::{mem, ptr};
 
-use zerocopy::{LayoutVerified, AsBytes, FromBytes};
-use crate::{BytesEncode, BytesDecode};
 use crate::types::aligned_to;
+use crate::{BytesDecode, BytesEncode};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 /// Describes a slice that must be [memory aligned] and
 /// will be reallocated if it is not.
@@ -22,7 +22,10 @@ use crate::types::aligned_to;
 /// [`OwnedSlice`]: crate::types::OwnedSlice
 pub struct CowSlice<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for CowSlice<T> where T: AsBytes {
+impl<T> BytesEncode for CowSlice<T>
+where
+    T: AsBytes,
+{
     type EItem = [T];
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -30,7 +33,10 @@ impl<T> BytesEncode for CowSlice<T> where T: AsBytes {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for CowSlice<T> where T: FromBytes + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for CowSlice<T>
+where
+    T: FromBytes + Copy,
+{
     type DItem = Cow<'a, [T]>;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
@@ -52,11 +58,11 @@ impl<'a, T: 'a> BytesDecode<'a> for CowSlice<T> where T: FromBytes + Copy {
                         vec.set_len(elems);
                     }
 
-                    return Some(Cow::Owned(vec))
+                    return Some(Cow::Owned(vec));
                 }
 
                 None
-            },
+            }
         }
     }
 }

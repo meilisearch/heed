@@ -1,5 +1,5 @@
 use std::any::TypeId;
-use std::collections::hash_map::{HashMap, Entry};
+use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
 use std::fs::File;
 use std::os::unix::io::AsRawFd;
@@ -7,9 +7,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
 
-use once_cell::sync::OnceCell;
 use crate::lmdb_error::lmdb_result;
-use crate::{RoTxn, RwTxn, Database, PolyDatabase, Result, Error};
+use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use lmdb_sys as ffi;
+use once_cell::sync::OnceCell;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -22,13 +23,20 @@ pub struct EnvOpenOptions {
 
 impl EnvOpenOptions {
     pub fn new() -> EnvOpenOptions {
-        EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None }
+        EnvOpenOptions {
+            map_size: None,
+            max_readers: None,
+            max_dbs: None,
+        }
     }
 
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         if size % page_size::get() != 0 {
-            panic!("map size ({}) must be a multiple of the system page size ({})",
-                    size, page_size::get());
+            panic!(
+                "map size ({}) must be a multiple of the system page size ({})",
+                size,
+                page_size::get()
+            );
         }
 
         self.map_size = Some(size);
@@ -37,11 +45,13 @@ impl EnvOpenOptions {
     }
 
     pub fn max_readers(&mut self, readers: u32) -> &mut Self {
-        self.max_readers = Some(readers); self
+        self.max_readers = Some(readers);
+        self
     }
 
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
-        self.max_dbs = Some(dbs); self
+        self.max_dbs = Some(dbs);
+        self
     }
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
@@ -78,11 +88,17 @@ impl EnvOpenOptions {
 
                     match result {
                         Ok(()) => {
-                            let inner = EnvInner { env, dbi_open_mutex: sync::Mutex::default() };
+                            let inner = EnvInner {
+                                env,
+                                dbi_open_mutex: sync::Mutex::default(),
+                            };
                             let env = Env(Arc::new(inner));
                             Ok(entry.insert(env).clone())
-                        },
-                        Err(e) => { ffi::mdb_env_close(env); Err(e.into()) },
+                        }
+                        Err(e) => {
+                            ffi::mdb_env_close(env);
+                            Err(e.into())
+                        }
                     }
                 }
             }
@@ -109,18 +125,25 @@ pub enum CompactionOption {
 
 impl Env {
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
-    where KC: 'static,
-          DC: 'static,
+    where
+        KC: 'static,
+        DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        Ok(self.raw_open_database(name, Some(types))?.map(Database::new))
+        Ok(self
+            .raw_open_database(name, Some(types))?
+            .map(Database::new))
     }
 
     pub fn open_dyn_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
         Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
     }
 
-    fn raw_open_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<Option<u32>> {
+    fn raw_open_database(
+        &self,
+        name: Option<&str>,
+        types: Option<(TypeId, TypeId)>,
+    ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -132,14 +155,7 @@ impl Env {
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe {
-            lmdb_result(ffi::mdb_dbi_open(
-                rtxn.txn,
-                name_ptr,
-                0,
-                &mut dbi,
-            ))
-        };
+        let result = unsafe { lmdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
 
         drop(name);
 
@@ -154,25 +170,31 @@ impl Env {
                 } else {
                     Err(Error::InvalidDatabaseTyping)
                 }
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    where KC: 'static,
-          DC: 'static,
+    where
+        KC: 'static,
+        DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types)).map(Database::new)
+        self.raw_create_database(name, Some(types))
+            .map(Database::new)
     }
 
     pub fn create_dyn_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
         self.raw_create_database(name, None).map(PolyDatabase::new)
     }
 
-    fn raw_create_database(&self, name: Option<&str>, types: Option<(TypeId, TypeId)>) -> Result<u32> {
+    fn raw_create_database(
+        &self,
+        name: Option<&str>,
+        types: Option<(TypeId, TypeId)>,
+    ) -> Result<u32> {
         let wtxn = self.write_txn()?;
 
         let mut dbi = 0;
@@ -206,7 +228,7 @@ impl Env {
                 } else {
                     Err(Error::InvalidDatabaseTyping)
                 }
-            },
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -220,18 +242,16 @@ impl Env {
     }
 
     pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
+        let flags = if let CompactionOption::Enabled = option {
+            ffi::MDB_CP_COMPACT
+        } else {
+            0
+        };
 
         let file = File::create(path)?;
         let fd = file.as_raw_fd();
 
-        unsafe {
-            lmdb_result(ffi::mdb_env_copyfd2(
-                self.0.env,
-                fd,
-                flags,
-            ))?
-        }
+        unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
 
         Ok(file)
     }

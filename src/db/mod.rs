@@ -1,13 +1,13 @@
-use std::marker;
-use std::borrow::Cow;
-use std::ops::Bound;
 use crate::*;
+use std::borrow::Cow;
+use std::marker;
+use std::ops::Bound;
 
-mod uniform;
 mod polymorph;
+mod uniform;
 
-pub use self::uniform::Database;
 pub use self::polymorph::PolyDatabase;
+pub use self::uniform::Database;
 
 pub fn advance_key(bytes: &mut Vec<u8>) {
     match bytes.last_mut() {
@@ -23,8 +23,9 @@ pub struct RoIter<'txn, KC, DC> {
 }
 
 impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
-where KC: BytesDecode<'txn>,
-      DC: BytesDecode<'txn>,
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -37,11 +38,9 @@ where KC: BytesDecode<'txn>,
         };
 
         match result {
-            Ok(Some((key, data))) => {
-                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                    (Some(key), Some(data)) => Some(Ok((key, data))),
-                    (_, _) => Some(Err(Error::Decoding)),
-                }
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Some(Ok((key, data))),
+                (_, _) => Some(Err(Error::Decoding)),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -61,8 +60,9 @@ impl<KC, DC> RwIter<'_, KC, DC> {
     }
 
     pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
-    where KC: BytesEncode,
-          DC: BytesEncode,
+    where
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -71,8 +71,9 @@ impl<KC, DC> RwIter<'_, KC, DC> {
 }
 
 impl<'txn, KC, DC> Iterator for RwIter<'txn, KC, DC>
-where KC: BytesDecode<'txn>,
-      DC: BytesDecode<'txn>,
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -85,11 +86,9 @@ where KC: BytesDecode<'txn>,
         };
 
         match result {
-            Ok(Some((key, data))) => {
-                match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                    (Some(key), Some(data)) => Some(Ok((key, data))),
-                    (_, _) => Some(Err(Error::Decoding)),
-                }
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Some(Ok((key, data))),
+                (_, _) => Some(Err(Error::Decoding)),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -105,18 +104,21 @@ pub struct RoRange<'txn, KC, DC> {
 }
 
 impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
-where KC: BytesDecode<'txn>,
-      DC: BytesDecode<'txn>,
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.start_bound.take() {
-            Some(Bound::Included(start)) => self.cursor.move_on_key_greater_than_or_equal_to(&start),
+            Some(Bound::Included(start)) => {
+                self.cursor.move_on_key_greater_than_or_equal_to(&start)
+            }
             Some(Bound::Excluded(mut start)) => {
                 advance_key(&mut start);
                 self.cursor.move_on_key_greater_than_or_equal_to(&start)
-            },
+            }
             Some(Bound::Unbounded) => self.cursor.move_on_first(),
             None => self.cursor.move_on_next(),
         };
@@ -137,7 +139,7 @@ where KC: BytesDecode<'txn>,
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -157,8 +159,9 @@ impl<KC, DC> RwRange<'_, KC, DC> {
     }
 
     pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
-    where KC: BytesEncode,
-          DC: BytesEncode,
+    where
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -167,18 +170,21 @@ impl<KC, DC> RwRange<'_, KC, DC> {
 }
 
 impl<'txn, KC, DC> Iterator for RwRange<'txn, KC, DC>
-where KC: BytesDecode<'txn>,
-      DC: BytesDecode<'txn>,
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.start_bound.take() {
-            Some(Bound::Included(start)) => self.cursor.move_on_key_greater_than_or_equal_to(&start),
+            Some(Bound::Included(start)) => {
+                self.cursor.move_on_key_greater_than_or_equal_to(&start)
+            }
             Some(Bound::Excluded(mut start)) => {
                 advance_key(&mut start);
                 self.cursor.move_on_key_greater_than_or_equal_to(&start)
-            },
+            }
             Some(Bound::Unbounded) => self.cursor.move_on_first(),
             None => self.cursor.move_on_next(),
         };
@@ -199,7 +205,7 @@ where KC: BytesDecode<'txn>,
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }

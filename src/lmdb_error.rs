@@ -57,7 +57,11 @@ pub enum Error {
 
 impl Error {
     pub fn not_found(&self) -> bool {
-        if let Error::NotFound = self { true } else { false }
+        if let Error::NotFound = self {
+            true
+        } else {
+            false
+        }
     }
 
     /// Converts a raw error code to an `Error`.
@@ -128,7 +132,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl StdError for Error { }
+impl StdError for Error {}
 
 pub fn lmdb_result(err_code: c_int) -> Result<(), Error> {
     if err_code == ffi::MDB_SUCCESS {
@@ -145,6 +149,9 @@ mod test {
     #[test]
     fn test_description() {
         assert_eq!("Permission denied", Error::from_err_code(13).to_string());
-        assert_eq!("MDB_NOTFOUND: No matching key/data pair found", Error::NotFound.to_string());
+        assert_eq!(
+            "MDB_NOTFOUND: No matching key/data pair found",
+            Error::NotFound.to_string()
+        );
     }
 }

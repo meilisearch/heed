@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use zerocopy::{LayoutVerified, AsBytes, FromBytes, Unaligned};
-use crate::{BytesEncode, BytesDecode};
+use crate::{BytesDecode, BytesEncode};
+use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
 
 /// Describes a type that is totally borrowed and doesn't
 /// depends on any [memory alignment].
@@ -13,7 +13,10 @@ use crate::{BytesEncode, BytesDecode};
 /// [`CowType`]: crate::types::CowType
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for UnalignedSlice<T> where T: AsBytes + Unaligned {
+impl<T> BytesEncode for UnalignedSlice<T>
+where
+    T: AsBytes + Unaligned,
+{
     type EItem = [T];
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -21,7 +24,10 @@ impl<T> BytesEncode for UnalignedSlice<T> where T: AsBytes + Unaligned {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for UnalignedSlice<T> where T: FromBytes + Unaligned {
+impl<'a, T: 'a> BytesDecode<'a> for UnalignedSlice<T>
+where
+    T: FromBytes + Unaligned,
+{
     type DItem = &'a [T];
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {

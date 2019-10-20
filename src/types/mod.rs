@@ -45,12 +45,12 @@
 
 mod cow_slice;
 mod cow_type;
-mod unit;
 mod owned_slice;
 mod owned_type;
 mod str;
 mod unaligned_slice;
 mod unaligned_type;
+mod unit;
 
 #[cfg(feature = "serde-bincode")]
 mod serde_bincode;
@@ -60,12 +60,12 @@ mod serde_json;
 
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
-pub use self::unit::Unit;
 pub use self::owned_slice::OwnedSlice;
 pub use self::owned_type::OwnedType;
 pub use self::str::Str;
 pub use self::unaligned_slice::UnalignedSlice;
 pub use self::unaligned_type::UnalignedType;
+pub use self::unit::Unit;
 
 /// Describes a slice of bytes `[u8]` that is totally
 /// borrowed and doesn't depends on any [memory alignment].

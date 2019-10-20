@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::{BytesEncode, BytesDecode};
 use crate::types::CowSlice;
+use crate::{BytesDecode, BytesEncode};
 
 /// Describes a [`Vec`] of types that are totally owned (doesn't
 /// hold any reference to the original slice).
@@ -20,7 +20,10 @@ use crate::types::CowSlice;
 /// [`CowType`]: crate::types::CowType
 pub struct OwnedSlice<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for OwnedSlice<T> where T: AsBytes {
+impl<T> BytesEncode for OwnedSlice<T>
+where
+    T: AsBytes,
+{
     type EItem = [T];
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
@@ -28,7 +31,10 @@ impl<T> BytesEncode for OwnedSlice<T> where T: AsBytes {
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for OwnedSlice<T> where T: FromBytes + Copy {
+impl<'a, T: 'a> BytesDecode<'a> for OwnedSlice<T>
+where
+    T: FromBytes + Copy,
+{
     type DItem = Vec<T>;
 
     fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {

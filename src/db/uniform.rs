@@ -1,6 +1,6 @@
+use crate::*;
 use std::marker;
 use std::ops::RangeBounds;
-use crate::*;
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -117,7 +117,10 @@ pub struct Database<KC, DC> {
 
 impl<KC, DC> Database<KC, DC> {
     pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database { dyndb: PolyDatabase::new(dbi), marker: std::marker::PhantomData }
+        Database {
+            dyndb: PolyDatabase::new(dbi),
+            marker: std::marker::PhantomData,
+        }
     }
 
     /// Retrieves the value associated with a key.
@@ -515,7 +518,11 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<RwRange<'txn, KC, DC>>
+    pub fn range_mut<'txn, R>(
+        &self,
+        txn: &'txn mut RwTxn,
+        range: R,
+    ) -> Result<RwRange<'txn, KC, DC>>
     where
         KC: BytesEncode,
         R: RangeBounds<KC::EItem>,
@@ -827,7 +834,10 @@ impl<KC, DC> Database<KC, DC> {
 
 impl<KC, DC> Clone for Database<KC, DC> {
     fn clone(&self) -> Database<KC, DC> {
-        Database { dyndb: self.dyndb, marker: marker::PhantomData }
+        Database {
+            dyndb: self.dyndb,
+            marker: marker::PhantomData,
+        }
     }
 }
 

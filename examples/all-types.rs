@@ -1,14 +1,13 @@
 use std::error::Error;
 use std::fs;
 
-use heed::{EnvOpenOptions, Database};
-use heed::types::*;
-use serde::{Serialize, Deserialize};
-use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
 use heed::byteorder::BE;
+use heed::types::*;
+use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
+use heed::{Database, EnvOpenOptions};
+use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-
     fs::create_dir_all("target/zerocopy.mdb")?;
 
     let env = EnvOpenOptions::new()
@@ -23,29 +22,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(Some("kikou"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret              = db.put(&mut wtxn, &[2, 3], "what's up?")?;
-    let ret: Option<&str> = db.get(&wtxn,     &[2, 3])?;
+    let _ret = db.put(&mut wtxn, &[2, 3], "what's up?")?;
+    let ret: Option<&str> = db.get(&wtxn, &[2, 3])?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
-
-
 
     // here the key will be an str and the data will be a slice of u8
     let db: Database<Str, ByteSlice> = env.create_database(Some("kiki"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret               = db.put(&mut wtxn, "hello", &[2, 3][..])?;
-    let ret: Option<&[u8]> = db.get(&wtxn,     "hello")?;
+    let _ret = db.put(&mut wtxn, "hello", &[2, 3][..])?;
+    let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
 
-
-
     // serde types are also supported!!!
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct Hello<'a> { string: &'a str }
+    struct Hello<'a> {
+        string: &'a str,
+    }
 
     let db: Database<Str, SerdeBincode<Hello>> = env.create_database(Some("serde-bincode"))?;
 
@@ -59,8 +56,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-
-
     let db: Database<Str, SerdeJson<Hello>> = env.create_database(Some("serde-json"))?;
 
     let mut wtxn = env.write_txn()?;
@@ -73,18 +68,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-
-
-
     // it is prefered to use zerocopy when possible
-    #[derive(Debug, PartialEq, Eq)]
-    #[derive(AsBytes, FromBytes, Unaligned)]
+    #[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Unaligned)]
     #[repr(C)]
     struct ZeroBytes {
         bytes: [u8; 12],
     }
 
-    let db: Database<Str, UnalignedType<ZeroBytes>> = env.create_database(Some("zerocopy-struct"))?;
+    let db: Database<Str, UnalignedType<ZeroBytes>> =
+        env.create_database(Some("zerocopy-struct"))?;
 
     let mut wtxn = env.write_txn()?;
 
@@ -96,15 +88,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{:?}", ret);
     wtxn.commit()?;
 
-
-
     // you can ignore the data
     let db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
 
-
     let mut wtxn = env.write_txn()?;
-    let _ret            = db.put(&mut wtxn, "hello", &())?;
-    let ret: Option<()> = db.get(&wtxn,     "hello")?;
+    let _ret = db.put(&mut wtxn, "hello", &())?;
+    let ret: Option<()> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
 
@@ -112,7 +101,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", ret);
     wtxn.commit()?;
-
 
     // database opening and types are tested in a way
     //
@@ -127,8 +115,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // the first database opening fix the types for this run.
     let result = env.create_database::<Str, OwnedSlice<i32>>(Some("ignored-data"));
     assert!(result.is_err());
-
-
 
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
@@ -145,13 +131,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", rets);
 
-
     // or iterate over ranges too!!!
     let range = BEI64::new(35)..=BEI64::new(42);
     let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, range)?.collect();
 
     println!("{:?}", rets);
-
 
     // delete a range of key
     let range = BEI64::new(35)..=BEI64::new(42);

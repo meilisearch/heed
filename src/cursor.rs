@@ -13,15 +13,12 @@ impl<'txn> RoCursor<'txn> {
     pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
-        unsafe {
-            lmdb_result(ffi::mdb_cursor_open(
-                txn.txn,
-                dbi,
-                &mut cursor,
-            ))?
-        }
+        unsafe { lmdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
 
-        Ok(RoCursor { cursor, _marker: marker::PhantomData })
+        Ok(RoCursor {
+            cursor,
+            _marker: marker::PhantomData,
+        })
     }
 
     pub fn move_on_first(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -43,7 +40,7 @@ impl<'txn> RoCursor<'txn> {
                 let key = unsafe { crate::from_val(key_val.assume_init()) };
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
                 Ok(Some((key, data)))
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -68,13 +65,16 @@ impl<'txn> RoCursor<'txn> {
                 let key = unsafe { crate::from_val(key_val.assume_init()) };
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
                 Ok(Some((key, data)))
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
-    pub fn move_on_key_greater_than_or_equal_to(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_key_greater_than_or_equal_to(
+        &mut self,
+        key: &[u8],
+    ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = mem::MaybeUninit::uninit();
 
@@ -93,7 +93,7 @@ impl<'txn> RoCursor<'txn> {
                 let key = unsafe { crate::from_val(key_val) };
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
                 Ok(Some((key, data)))
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -118,7 +118,7 @@ impl<'txn> RoCursor<'txn> {
                 let key = unsafe { crate::from_val(key_val.assume_init()) };
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
                 Ok(Some((key, data)))
-            },
+            }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -137,7 +137,9 @@ pub struct RwCursor<'txn> {
 
 impl<'txn> RwCursor<'txn> {
     pub(crate) fn new(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
-        Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
+        Ok(RwCursor {
+            cursor: RoCursor::new(txn, dbi)?,
+        })
     }
 
     pub fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
@@ -163,9 +165,7 @@ impl<'txn> RwCursor<'txn> {
 
     pub fn del_current(&mut self) -> Result<bool> {
         // Delete the current entry
-        let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0))
-        };
+        let result = unsafe { lmdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
 
         match result {
             Ok(()) => Ok(true),

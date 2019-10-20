@@ -51,14 +51,7 @@ impl RwTxn {
     pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        unsafe {
-            lmdb_result(ffi::mdb_txn_begin(
-                env,
-                ptr::null_mut(),
-                0,
-                &mut txn,
-            ))?
-        };
+        unsafe { lmdb_result(ffi::mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn))? };
 
         Ok(RwTxn { txn: RoTxn { txn } })
     }

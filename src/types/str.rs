@@ -1,6 +1,6 @@
-use std::borrow::Cow;
-use crate::{BytesEncode, BytesDecode};
 use crate::types::UnalignedSlice;
+use crate::{BytesDecode, BytesEncode};
+use std::borrow::Cow;
 
 /// Describes an [`str`].
 pub struct Str;

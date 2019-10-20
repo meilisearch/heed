@@ -56,8 +56,8 @@
 
 mod cursor;
 mod db;
-mod lmdb_error;
 mod env;
+mod lmdb_error;
 mod traits;
 mod txn;
 pub mod types;
@@ -66,13 +66,15 @@ pub use byteorder;
 pub use zerocopy;
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::db::{Database, PolyDatabase, RoIter, RwIter, RoRange, RwRange};
+pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
+pub use self::env::{CompactionOption, Env, EnvOpenOptions};
 pub use self::lmdb_error::Error as LmdbError;
-pub use self::env::{EnvOpenOptions, Env, CompactionOption};
-pub use self::traits::{BytesEncode, BytesDecode};
+pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 
-use std::{fmt, io, error, result};
+use std::{error, fmt, io, result};
+
+use lmdb_sys as ffi;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
@@ -93,12 +95,12 @@ impl fmt::Display for Error {
             Error::Decoding => write!(f, "error while decoding"),
             Error::InvalidDatabaseTyping => {
                 write!(f, "database was previously opened with different types")
-            },
+            }
         }
     }
 }
 
-impl error::Error for Error { }
+impl error::Error for Error {}
 
 impl From<LmdbError> for Error {
     fn from(error: LmdbError) -> Error {
@@ -118,7 +120,10 @@ impl From<io::Error> for Error {
 pub type Result<T> = result::Result<T, Error>;
 
 unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
-    ffi::MDB_val { mv_size: value.len(), mv_data: value.as_ptr() as *mut libc::c_void }
+    ffi::MDB_val {
+        mv_size: value.len(),
+        mv_data: value.as_ptr() as *mut libc::c_void,
+    }
 }
 
 unsafe fn from_val<'a>(value: ffi::MDB_val) -> &'a [u8] {
