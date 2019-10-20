@@ -83,6 +83,30 @@ impl PolyDatabase {
         }
     }
 
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut count = 0;
+
+        match cursor.move_on_first()? {
+            Some(_) => count += 1,
+            None => return Ok(0),
+        }
+
+        while let Some(_) = cursor.move_on_next()? {
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_first()? {
+            Some(_) => Ok(false),
+            None => Ok(true),
+        }
+    }
+
     pub fn iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         Ok(RoIter {
             cursor: RoCursor::new(txn, self.dbi)?,

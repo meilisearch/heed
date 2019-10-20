@@ -244,6 +244,88 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.last::<KC, DC>(txn)
     }
 
+    /// Returns the number of elements in this database.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use discern::EnvOpenOptions;
+    /// use discern::Database;
+    /// use discern::types::*;
+    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all("target/zerocopy.mdb")?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open("target/zerocopy.mdb")?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.len(&wtxn)?;
+    /// assert_eq!(ret, 4);
+    ///
+    /// db.delete(&mut wtxn, &BEI32::new(27))?;
+    ///
+    /// let ret = db.len(&wtxn)?;
+    /// assert_eq!(ret, 3);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
+        self.dyndb.len(txn)
+    }
+
+    /// Returns `true` if and only if this database is empty.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use discern::EnvOpenOptions;
+    /// use discern::Database;
+    /// use discern::types::*;
+    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all("target/zerocopy.mdb")?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open("target/zerocopy.mdb")?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.is_empty(&wtxn)?;
+    /// assert_eq!(ret, false);
+    ///
+    /// db.clear(&mut wtxn)?;
+    ///
+    /// let ret = db.is_empty(&wtxn)?;
+    /// assert_eq!(ret, true);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
+        self.dyndb.is_empty(txn)
+    }
+
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
     ///
     /// ```
@@ -732,10 +814,9 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// db.clear(&mut wtxn)?;
     ///
-    /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, None);
+    /// let ret = db.is_empty(&wtxn)?;
+    /// assert!(ret);
     ///
-    /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
