@@ -1,4 +1,4 @@
-//! Crate `zerocopy-lmdb` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
+//! Crate `discern` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
 //!
 //! It provides you a way to store types in [LMDB] without any limit and with a minimal overhead as possible,
 //! relying on the [zerocopy] library to avoid copying bytes when that's unnecessary and the [serde] library
@@ -12,8 +12,8 @@
 //!
 //! ```
 //! use std::fs;
-//! use zerocopy_lmdb::{EnvOpenOptions, Database};
-//! use zerocopy_lmdb::types::*;
+//! use discern::{EnvOpenOptions, Database};
+//! use discern::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! fs::create_dir_all("target/zerocopy.mdb")?;
@@ -56,9 +56,9 @@
 //!
 //! ```
 //! # use std::fs;
-//! # use zerocopy_lmdb::EnvOpenOptions;
-//! use zerocopy_lmdb::Database;
-//! use zerocopy_lmdb::types::*;
+//! # use discern::EnvOpenOptions;
+//! use discern::Database;
+//! use discern::types::*;
 //! use serde::{Serialize, Deserialize};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -92,9 +92,9 @@
 //!
 //! ```
 //! # use std::fs;
-//! # use zerocopy_lmdb::EnvOpenOptions;
-//! use zerocopy_lmdb::Database;
-//! use zerocopy_lmdb::types::*;
+//! # use discern::EnvOpenOptions;
+//! use discern::Database;
+//! use discern::types::*;
 //! use serde::{Serialize, Deserialize};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {

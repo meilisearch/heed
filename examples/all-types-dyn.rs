@@ -1,11 +1,11 @@
 use std::error::Error;
 use std::fs;
 
-use zerocopy_lmdb::EnvOpenOptions;
-use zerocopy_lmdb::types::*;
+use discern::EnvOpenOptions;
+use discern::types::*;
 use serde::{Serialize, Deserialize};
-use zerocopy_lmdb::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
-use zerocopy_lmdb::byteorder::BE;
+use discern::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
+use discern::byteorder::BE;
 
 fn main() -> Result<(), Box<dyn Error>> {
 

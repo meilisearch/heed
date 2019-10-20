@@ -8,9 +8,9 @@ use crate::*;
 ///
 /// ```
 /// # use std::fs;
-/// # use zerocopy_lmdb::EnvOpenOptions;
-/// use zerocopy_lmdb::Database;
-/// use zerocopy_lmdb::types::*;
+/// # use discern::EnvOpenOptions;
+/// use discern::Database;
+/// use discern::types::*;
 /// use serde::{Serialize, Deserialize};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,9 +49,9 @@ use crate::*;
 ///
 /// ```
 /// # use std::fs;
-/// # use zerocopy_lmdb::EnvOpenOptions;
-/// use zerocopy_lmdb::Database;
-/// use zerocopy_lmdb::types::*;
+/// # use discern::EnvOpenOptions;
+/// use discern::Database;
+/// use discern::types::*;
 /// use serde::{Serialize, Deserialize};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {

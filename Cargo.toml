@@ -1,7 +1,7 @@
 [package]
-name = "zerocopy-lmdb"
+name = "discern"
 version = "0.1.0"
-authors = ["Clément Renault <clement@meilisearch.com>"]
+authors = ["Kerollmops <renault.cle@gmail.com>"]
 edition = "2018"
 
 [dependencies]
@@ -22,7 +22,6 @@ serde = { version = "1.0.101", features = ["derive"] }
 default = ["serde-bincode", "serde-json"]
 serde-bincode = ["serde", "bincode"]
 serde-json = ["serde", "serde_json"]
-
 # serde_json features
 preserve_order = ["serde_json/preserve_order"]
 arbitrary_precision = ["serde_json/arbitrary_precision"]
