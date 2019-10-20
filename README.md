@@ -1,48 +1,46 @@
-# zerocopy-lmdb
-An LMDB wrapper with the minimum overhead possible that uses the zerocopy library.
+# heed
+A fully typed LMDB wrapper with the minimum overhead, uses zerocopy internally.
+
+![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
 
 This library is able to serialize all kind of types, not just bytes slices, even Serde types are supported.
 
 ```rust
 fs::create_dir_all("target/zerocopy.mdb")?;
+let env = EnvOpenOptions::new().open("target/zerocopy.mdb")?;
 
-let env = EnvOpenOptions::new()
-    .map_size(10 * 1024 * 1024 * 1024) // 10GB
-    .max_dbs(3000)
-    .open("target/zerocopy.mdb")?;
+// we will open the default unamed database
+let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
 
-#[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Unaligned)]
-#[repr(C)]
-struct ZeroBytes {
-    bytes: [u8; 12],
-}
-
-let db: Database<Str, UnalignedType<ZeroBytes>> = env.create_database(Some("zerocopy-struct"))?;
-
+// opening a write transaction
 let mut wtxn = env.write_txn()?;
-
-let zerobytes = ZeroBytes { bytes: [24; 12] };
-db.put(&mut wtxn, "zero", &zerobytes)?;
-
-let ret = db.get(&wtxn, "zero")?;
-
-assert_eq!(ret, Some(zerobytes));
+db.put(&mut wtxn, "seven", &7)?;
+db.put(&mut wtxn, "zero", &0)?;
+db.put(&mut wtxn, "five", &5)?;
+db.put(&mut wtxn, "three", &3)?;
 wtxn.commit()?;
+
+// opening a read transaction
+// to check if those values are now available
+let mut rtxn = env.read_txn()?;
+
+let ret = db.get(&rtxn, "zero")?;
+assert_eq!(ret, Some(0));
+
+let ret = db.get(&rtxn, "five")?;
+assert_eq!(ret, Some(5));
 ```
 
 Yo want to see more about all the possibilities? Go check out [the example](examples/all-types.rs).
 
 ## Where is the 0.1 version?
 
-I am currently not sure about the library name so I did not published a version on crates.io.
-So to be able to see the documentation you will need to have a nighlty rust version, clone the repository
-and generate the documentation by yourself.
-
-About the name, I think that `zerocopy-lmdb` is way to long and could be reduced to `zlmdb` or something like that.
+I am currently not sure about the library name, so, I did not published a version on crates.io.
+To be able to see the documentation you will need to have a nightly rust version, clone the repository and generate the documentation by yourself.
 
 ```bash
-git clone https://github.com/Kerollmops/zerocopy-lmdb.git
-cd zerocopy-lmdb
+git clone https://github.com/Kerollmops/heed.git
+cd heed
 # rustup override set nighlty
 cargo doc --open
 ```

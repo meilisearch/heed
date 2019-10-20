@@ -1,11 +1,11 @@
 use std::error::Error;
 use std::fs;
 
-use discern::EnvOpenOptions;
-use discern::types::*;
+use heed::EnvOpenOptions;
+use heed::types::*;
 use serde::{Serialize, Deserialize};
-use discern::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
-use discern::byteorder::BE;
+use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
+use heed::byteorder::BE;
 
 fn main() -> Result<(), Box<dyn Error>> {
 

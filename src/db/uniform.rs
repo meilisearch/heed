@@ -7,15 +7,15 @@ use crate::*;
 /// # Example: Iterate over databases entries
 ///
 /// In this example we store numbers in big endian this way those are ordered.
-/// Thanks to their bytes representation, discern is able to iterate over them
+/// Thanks to their bytes representation, heed is able to iterate over them
 /// from the lowest to the highest.
 ///
 /// ```
 /// # use std::fs;
-/// # use discern::EnvOpenOptions;
-/// use discern::Database;
-/// use discern::types::*;
-/// use discern::{zerocopy::I64, byteorder::BigEndian};
+/// # use heed::EnvOpenOptions;
+/// use heed::Database;
+/// use heed::types::*;
+/// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -58,10 +58,10 @@ use crate::*;
 ///
 /// ```
 /// # use std::fs;
-/// # use discern::EnvOpenOptions;
-/// use discern::Database;
-/// use discern::types::*;
-/// use discern::{zerocopy::I64, byteorder::BigEndian};
+/// # use heed::EnvOpenOptions;
+/// use heed::Database;
+/// use heed::types::*;
+/// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -126,9 +126,9 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -168,10 +168,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -210,10 +210,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -248,10 +248,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -289,10 +289,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -330,10 +330,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -369,10 +369,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -423,10 +423,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -470,10 +470,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -530,10 +530,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -581,10 +581,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -642,10 +642,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -684,10 +684,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -736,10 +736,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
@@ -790,10 +790,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// ```
     /// # use std::fs;
-    /// # use discern::EnvOpenOptions;
-    /// use discern::Database;
-    /// use discern::types::*;
-    /// use discern::{zerocopy::I32, byteorder::BigEndian};
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all("target/zerocopy.mdb")?;
