@@ -1,6 +1,7 @@
 # heed
 A fully typed LMDB wrapper with minimum overhead, uses zerocopy internally.
 
+[![Build Status](https://dev.azure.com/renaultcle/heed/_apis/build/status/Kerollmops.heed?branchName=master)](https://dev.azure.com/renaultcle/heed/_build/latest?definitionId=1&branchName=master)
 [![dependency status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)
 
 ![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
