@@ -1,8 +1,10 @@
-use libc::c_int;
 use std::error::Error as StdError;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::{fmt, str};
+
+use libc::c_int;
+use lmdb_sys as ffi;
 
 /// An LMDB error kind.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::ptr;
 
+use lmdb_sys as ffi;
+
 use crate::lmdb_error::lmdb_result;
 use crate::Result;
 

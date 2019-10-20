@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{marker, mem, ptr};
 
+use lmdb_sys as ffi;
+
 use super::advance_key;
 use crate::lmdb_error::lmdb_result;
 use crate::*;

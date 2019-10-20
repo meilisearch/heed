@@ -1,6 +1,8 @@
 use std::ops::{Deref, DerefMut};
 use std::{marker, mem, ptr};
 
+use lmdb_sys as ffi;
+
 use crate::lmdb_error::lmdb_result;
 use crate::*;
 

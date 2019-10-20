@@ -1,6 +1,9 @@
-use crate::*;
 use std::marker;
 use std::ops::RangeBounds;
+
+use lmdb_sys as ffi;
+
+use crate::*;
 
 /// A typed database that accepts only the types it was created with.
 ///
