@@ -2,7 +2,9 @@
 A fully typed LMDB wrapper with minimum overhead, uses zerocopy internally.
 
 [![Build Status](https://dev.azure.com/renaultcle/heed/_apis/build/status/Kerollmops.heed?branchName=master)](https://dev.azure.com/renaultcle/heed/_build/latest?definitionId=1&branchName=master)
-[![dependency status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)
+[![Dependency Status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)
+[![Heed Doc](https://docs.rs/heed/badge.svg)](https://docs.rs/heed)
+[![Crates.io](https://img.shields.io/crates/v/$CRATE.svg)](https://crates.io/crates/heed)
 
 ![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
 
@@ -34,16 +36,4 @@ let ret = db.get(&rtxn, "five")?;
 assert_eq!(ret, Some(5));
 ```
 
-Yo want to see more about all the possibilities? Go check out [the example](examples/all-types.rs).
-
-## Where is the 0.1 version?
-
-I am currently not sure about the library name, so, I did not published a version on crates.io.
-To be able to see the documentation you will need to have a nightly rust version, clone the repository and generate the documentation by yourself.
-
-```bash
-git clone https://github.com/Kerollmops/heed.git
-cd heed
-# rustup override set nighlty
-cargo doc --open
-```
+You want to see more about all the possibilities? Go check out [the example](examples/all-types.rs).
