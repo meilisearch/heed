@@ -1,0 +1,41 @@
+---
+trigger:
+  branches:
+    include: [ master ]
+
+pr: [ master ]
+
+jobs:
+  - job: test
+    pool:
+      vmImage: 'Ubuntu 16.04'
+    steps:
+      - script: |
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+          $HOME/.cargo/bin/rustup component add rustfmt
+        displayName: 'Install rustc and components'
+      - script: |
+          $HOME/.cargo/bin/cargo check
+        displayName: 'Check Heed'
+      - script: |
+          $HOME/.cargo/bin/cargo test
+        displayName: 'Test Heed'
+      - script: |
+          $HOME/.cargo/bin/cargo fmt --all -- --check
+        displayName: 'Fmt Heed'
+
+  - job: build
+    dependsOn:
+      - test
+    condition: succeeded()
+    pool:
+      vmImage: 'Ubuntu 16.04'
+    steps:
+      - script: |
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+          $HOME/.cargo/bin/rustup component add rustfmt
+        displayName: 'Install rustc and components'
+      - script: |
+          $HOME/.cargo/bin/cargo build --release
+        displayName: 'Build Heed'
+
