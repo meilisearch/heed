@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use serde::{Serialize, Deserialize};
 use crate::{BytesEncode, BytesDecode};
 
-/// Describes a type that is [`Serialize`]/[`Deserialize`] and uses bincode to do that.
+/// Describes a type that is [`Serialize`]/[`Deserialize`] and uses `bincode` to do so.
 ///
 /// It can borrow bytes from the original slice.
 pub struct SerdeBincode<T>(std::marker::PhantomData<T>);

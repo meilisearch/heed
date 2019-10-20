@@ -4,7 +4,8 @@ use std::fs;
 use zerocopy_lmdb::EnvOpenOptions;
 use zerocopy_lmdb::types::*;
 use serde::{Serialize, Deserialize};
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy_lmdb::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
+use zerocopy_lmdb::byteorder::BE;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -120,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
     // you can iterate over keys in order
-    type BEI64 = zerocopy::I64<byteorder::BigEndian>;
+    type BEI64 = I64<BE>;
 
     let db = env.create_dyn_database(Some("big-endian-iter"))?;
 

@@ -3,7 +3,7 @@
 //! For specific types you can choose:
 //!   - [`Str`] to store [`str`]s
 //!   - [`Unit`] to store [unit `()`] types
-//!   - or [`Serde`] to store [`Serialize`]/[`Deserialize`] types
+//!   - or [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
 //!
 //! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:
@@ -21,7 +21,7 @@
 //! The `UnalignedSlice/Type` types also need to implement the [`Unaligned`] trait.
 //!
 //! If you don't want to/cannot deal with `AsBytes`, `Frombytes` or `Unaligned` requirements
-//! we recommend you to use the `Serde` type and deal with the `Serialize`/`Deserialize` traits.
+//! we recommend you to use the `SerdeBincode` or `SerdeJson` types and deal with the `Serialize`/`Deserialize` traits.
 //!
 //! [`AsBytes`]: zerocopy::AsBytes
 //! [`FromBytes`]: zerocopy::FromBytes
@@ -30,7 +30,8 @@
 //! [`Str`]: crate::types::Str
 //! [unit `()`]: https://doc.rust-lang.org/std/primitive.unit.html
 //! [`Unit`]: crate::types::Unit
-//! [`Serde`]: crate::types::Serde
+//! [`SerdeBincode`]: crate::types::SerdeBincode
+//! [`SerdeJson`]: crate::types::SerdeJson
 //! [`Serialize`]: serde::Serialize
 //! [`Deserialize`]: serde::Deserialize
 //!

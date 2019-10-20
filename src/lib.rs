@@ -128,6 +128,9 @@ mod traits;
 mod txn;
 pub mod types;
 
+pub use byteorder;
+pub use zerocopy;
+
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, DynDatabase, RoIter, RwIter, RoRange, RwRange};
 pub use self::lmdb_error::Error as LmdbError;
