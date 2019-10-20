@@ -1,5 +1,7 @@
 # heed
-A fully typed LMDB wrapper with the minimum overhead, uses zerocopy internally.
+A fully typed LMDB wrapper with minimum overhead, uses zerocopy internally.
+
+[![dependency status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)
 
 ![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
 
