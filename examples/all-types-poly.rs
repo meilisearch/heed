@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an str
-    let db = env.create_dyn_database(Some("kikou"))?;
+    let db = env.create_poly_database(Some("kikou"))?;
 
     let mut wtxn = env.write_txn()?;
     db.put::<OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // here the key will be an str and the data will be a slice of u8
-    let db = env.create_dyn_database(Some("kiki"))?;
+    let db = env.create_poly_database(Some("kiki"))?;
 
     let mut wtxn = env.write_txn()?;
     db.put::<Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let db = env.create_dyn_database(Some("serde"))?;
+    let db = env.create_poly_database(Some("serde"))?;
 
     let mut wtxn = env.write_txn()?;
 
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         bytes: [u8; 12],
     }
 
-    let db = env.create_dyn_database(Some("zerocopy-struct"))?;
+    let db = env.create_poly_database(Some("zerocopy-struct"))?;
 
     let mut wtxn = env.write_txn()?;
 
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // you can ignore the data
-    let db = env.create_dyn_database(Some("ignored-data"))?;
+    let db = env.create_poly_database(Some("ignored-data"))?;
 
     let mut wtxn = env.write_txn()?;
     db.put::<Str, Unit>(&mut wtxn, "hello", &())?;
@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // database opening and types are tested in a way
     //
     // we try to open a database twice with the same types
-    let _db = env.create_dyn_database(Some("ignored-data"))?;
+    let _db = env.create_poly_database(Some("ignored-data"))?;
 
     // and here we try to open it with other types
     // asserting that it correctly returns an error
@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db = env.create_dyn_database(Some("big-endian-iter"))?;
+    let db = env.create_poly_database(Some("big-endian-iter"))?;
 
     let mut wtxn = env.write_txn()?;
     db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;

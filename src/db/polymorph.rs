@@ -8,7 +8,99 @@ use super::advance_key;
 use crate::lmdb_error::lmdb_result;
 use crate::*;
 
-/// A dynamically typed database that accepts types at call (e.g. `get`, `put`).
+/// A polymorphic database that accepts types on call methods and not at creation.
+///
+/// # Example: Iterate over ranges of databases entries
+///
+/// In this example we store numbers in big endian this way those are ordered.
+/// Thanks to their bytes representation, heed is able to iterate over them
+/// from the lowest to the highest.
+///
+/// ```
+/// # use std::fs;
+/// # use heed::EnvOpenOptions;
+/// use heed::PolyDatabase;
+/// use heed::types::*;
+/// use heed::{zerocopy::I64, byteorder::BigEndian};
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fs::create_dir_all("target/zerocopy.mdb")?;
+/// # let env = EnvOpenOptions::new()
+/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .max_dbs(3000)
+/// #     .open("target/zerocopy.mdb")?;
+/// type BEI64 = I64<BigEndian>;
+///
+/// let db: PolyDatabase = env.create_poly_database(Some("big-endian-iter"))?;
+///
+/// let mut wtxn = env.write_txn()?;
+/// # db.clear(&mut wtxn)?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+///
+/// // you can iterate over database entries in order
+/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let mut range = db.range::<OwnedType<BEI64>, Str, _>(&wtxn, range)?;
+/// assert_eq!(range.next().transpose()?, Some((BEI64::new(35), "thirty five")));
+/// assert_eq!(range.next().transpose()?, Some((BEI64::new(42), "forty two")));
+/// assert_eq!(range.next().transpose()?, None);
+///
+/// drop(range);
+/// wtxn.commit()?;
+/// # Ok(()) }
+/// ```
+///
+/// # Example: Selete ranges of entries
+///
+/// Discern also support ranges deletions.
+/// Same configuration as above, numbers are ordered, therefore it is safe to specify
+/// a range and be able to iterate over and/or delete it.
+///
+/// ```
+/// # use std::fs;
+/// # use heed::EnvOpenOptions;
+/// use heed::PolyDatabase;
+/// use heed::types::*;
+/// use heed::{zerocopy::I64, byteorder::BigEndian};
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fs::create_dir_all("target/zerocopy.mdb")?;
+/// # let env = EnvOpenOptions::new()
+/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .max_dbs(3000)
+/// #     .open("target/zerocopy.mdb")?;
+/// type BEI64 = I64<BigEndian>;
+///
+/// let db: PolyDatabase = env.create_poly_database(Some("big-endian-iter"))?;
+///
+/// let mut wtxn = env.write_txn()?;
+/// # db.clear(&mut wtxn)?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+///
+/// // even delete a range of keys
+/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let deleted = db.delete_range::<OwnedType<BEI64>, Str,_ >(&mut wtxn, range)?;
+/// assert_eq!(deleted, 2);
+///
+/// let rets: Result<_, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+/// let rets: Vec<(BEI64, _)> = rets?;
+///
+/// let expected = vec![
+///     (BEI64::new(0), ()),
+///     (BEI64::new(68), ()),
+/// ];
+///
+/// assert_eq!(deleted, 2);
+/// assert_eq!(rets, expected);
+///
+/// wtxn.commit()?;
+/// # Ok(()) }
+/// ```
 #[derive(Copy, Clone)]
 pub struct PolyDatabase {
     pub(crate) dbi: ffi::MDB_dbi,

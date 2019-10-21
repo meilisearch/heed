@@ -23,34 +23,28 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! fs::create_dir_all("target/zerocopy.mdb")?;
+//! let env = EnvOpenOptions::new().open("target/zerocopy.mdb")?;
 //!
-//! let env = EnvOpenOptions::new()
-//!     .map_size(10 * 1024 * 1024 * 1024) // 10GB
-//!     .max_dbs(3000)
-//!     .open("target/zerocopy.mdb")?;
+//! // we will open the default unamed database
+//! let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
 //!
-//! // here we specify that the key is an i32 array and the data an str
-//! let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(Some("str"))?;
-//!
+//! // opening a write transaction
 //! let mut wtxn = env.write_txn()?;
-//! db.put(&mut wtxn, &[2, 3], "what's up?")?;
-//!
-//! let ret = db.get(&wtxn, &[2, 3])?;
-//! assert_eq!(ret, Some("what's up?"));
-//!
+//! db.put(&mut wtxn, "seven", &7)?;
+//! db.put(&mut wtxn, "zero", &0)?;
+//! db.put(&mut wtxn, "five", &5)?;
+//! db.put(&mut wtxn, "three", &3)?;
 //! wtxn.commit()?;
 //!
-//! // Be careful, you cannot open a database while in a transaction!
-//! // So don't forget to commit/abort it before.
-//! let db: Database<Str, ByteSlice> = env.create_database(Some("bytes"))?;
+//! // opening a read transaction
+//! // to check if those values are now available
+//! let mut rtxn = env.read_txn()?;
 //!
-//! let mut wtxn = env.write_txn()?;
-//! db.put(&mut wtxn, "hello", &[2, 3][..])?;
+//! let ret = db.get(&rtxn, "zero")?;
+//! assert_eq!(ret, Some(0));
 //!
-//! let ret = db.get(&wtxn, "hello")?;
-//! assert_eq!(ret, Some(&[2, 3][..]));
-//!
-//! wtxn.commit()?;
+//! let ret = db.get(&rtxn, "five")?;
+//! assert_eq!(ret, Some(5));
 //! # Ok(()) }
 //! ```
 

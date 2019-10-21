@@ -186,7 +186,7 @@ impl Env {
             .map(Database::new)
     }
 
-    pub fn create_dyn_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
+    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
         self.raw_create_database(name, None).map(PolyDatabase::new)
     }
 
