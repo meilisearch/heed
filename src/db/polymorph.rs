@@ -84,7 +84,7 @@ use crate::*;
 ///
 /// // even delete a range of keys
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted = db.delete_range::<OwnedType<BEI64>, Str,_ >(&mut wtxn, range)?;
+/// let deleted = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, range)?;
 /// assert_eq!(deleted, 2);
 ///
 /// let rets: Result<_, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
@@ -395,14 +395,23 @@ impl PolyDatabase {
         }
     }
 
-    pub fn delete_range<'txn, KC, DC, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
+    pub fn delete_range<'txn, KC, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
     where
         KC: BytesEncode + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
+        struct Ignore;
+
+        impl BytesDecode<'_> for Ignore {
+            type DItem = ();
+
+            fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
+                Some(())
+            }
+        }
+
         let mut count = 0;
-        let mut iter = self.range_mut::<KC, DC, _>(txn, range)?;
+        let mut iter = self.range_mut::<KC, Ignore, _>(txn, range)?;
 
         while let Some(_) = iter.next() {
             iter.del_current()?;

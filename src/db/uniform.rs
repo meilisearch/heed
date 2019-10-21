@@ -785,10 +785,9 @@ impl<KC, DC> Database<KC, DC> {
     pub fn delete_range<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
     where
         KC: BytesEncode + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.delete_range::<KC, DC, R>(txn, range)
+        self.dyndb.delete_range::<KC, R>(txn, range)
     }
 
     /// Deletes all key/value pairs in this database.
