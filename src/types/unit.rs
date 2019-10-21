@@ -17,7 +17,7 @@ impl BytesEncode for Unit {
 impl BytesDecode<'_> for Unit {
     type DItem = ();
 
-    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
-        Some(())
+    fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
+        if bytes.is_empty() { Some(()) } else { None }
     }
 }
