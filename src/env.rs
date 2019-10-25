@@ -11,6 +11,8 @@ use crate::lmdb_error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
+use enumflags2::BitFlags;
+use crate::flags::Flags;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -19,6 +21,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
+    flags: BitFlags<Flags>,     // LMDB flags
 }
 
 impl EnvOpenOptions {
@@ -27,6 +30,7 @@ impl EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
+            flags: BitFlags::empty(),
         }
     }
 
@@ -51,6 +55,49 @@ impl EnvOpenOptions {
 
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
         self.max_dbs = Some(dbs);
+        self
+    }
+
+    /// Set one or more LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html).
+    /// ```
+    /// use std::fs;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    /// use heed::flags::Flags;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// fs::create_dir_all("target/zerocopy.mdb")?;
+    /// let mut envBuilder = EnvOpenOptions::new();
+    /// unsafe {
+    ///     envBuilder.flag(Flags::MdbNoSync);
+    ///     envBuilder.flag(Flags::MdbNoMetaSync);
+    /// }
+    ///  let env = envBuilder.open("target/zerocopy.mdb")?;
+    ///
+    /// // we will open the default unamed database
+    /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+    ///
+    /// // opening a write transaction
+    /// let mut wtxn = env.write_txn()?;
+    /// db.put(&mut wtxn, "seven", &7)?;
+    /// db.put(&mut wtxn, "zero", &0)?;
+    /// db.put(&mut wtxn, "five", &5)?;
+    /// db.put(&mut wtxn, "three", &3)?;
+    /// wtxn.commit()?;
+    ///
+    /// // opening a read transaction
+    /// // to check if those values are now available
+    /// let mut rtxn = env.read_txn()?;
+    ///
+    /// let ret = db.get(&rtxn, "zero")?;
+    /// assert_eq!(ret, Some(0));
+    ///
+    /// let ret = db.get(&rtxn, "five")?;
+    /// assert_eq!(ret, Some(5));
+    /// # Ok(()) }
+    /// ```
+    pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
+        self.flags.insert(flag);
         self
     }
 
@@ -84,7 +131,7 @@ impl EnvOpenOptions {
                         lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
-                    let result = lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600));
+                    let result = lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags.bits(), 0o600));
 
                     match result {
                         Ok(()) => {
@@ -115,6 +162,7 @@ struct EnvInner {
 }
 
 unsafe impl Send for EnvInner {}
+
 unsafe impl Sync for EnvInner {}
 
 #[derive(Debug, Copy, Clone)]
@@ -125,9 +173,9 @@ pub enum CompactionOption {
 
 impl Env {
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
-    where
-        KC: 'static,
-        DC: 'static,
+        where
+            KC: 'static,
+            DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
@@ -177,9 +225,9 @@ impl Env {
     }
 
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
+        where
+            KC: 'static,
+            DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         self.raw_create_database(name, Some(types))

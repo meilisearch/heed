@@ -54,6 +54,7 @@ mod env;
 mod lmdb_error;
 mod traits;
 mod txn;
+pub mod flags;
 pub mod types;
 
 pub use byteorder;
