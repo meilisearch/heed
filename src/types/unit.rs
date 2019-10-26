@@ -18,6 +18,10 @@ impl BytesDecode<'_> for Unit {
     type DItem = ();
 
     fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
-        if bytes.is_empty() { Some(()) } else { None }
+        if bytes.is_empty() {
+            Some(())
+        } else {
+            None
+        }
     }
 }

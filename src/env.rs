@@ -7,12 +7,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
 
+use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use enumflags2::BitFlags;
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
-use enumflags2::BitFlags;
-use crate::flags::Flags;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
 
@@ -21,7 +21,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
-    flags: BitFlags<Flags>,     // LMDB flags
+    flags: BitFlags<Flags>, // LMDB flags
 }
 
 impl EnvOpenOptions {
@@ -67,12 +67,12 @@ impl EnvOpenOptions {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// fs::create_dir_all("target/zerocopy.mdb")?;
-    /// let mut envBuilder = EnvOpenOptions::new();
+    /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe {
-    ///     envBuilder.flag(Flags::MdbNoSync);
-    ///     envBuilder.flag(Flags::MdbNoMetaSync);
+    ///     env_builder.flag(Flags::MdbNoSync);
+    ///     env_builder.flag(Flags::MdbNoMetaSync);
     /// }
-    ///  let env = envBuilder.open("target/zerocopy.mdb")?;
+    ///  let env = env_builder.open("target/zerocopy.mdb")?;
     ///
     /// // we will open the default unamed database
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
@@ -131,7 +131,12 @@ impl EnvOpenOptions {
                         lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
-                    let result = lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags.bits(), 0o600));
+                    let result = lmdb_result(ffi::mdb_env_open(
+                        env,
+                        path.as_ptr(),
+                        self.flags.bits(),
+                        0o600,
+                    ));
 
                     match result {
                         Ok(()) => {
@@ -173,9 +178,9 @@ pub enum CompactionOption {
 
 impl Env {
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
-        where
-            KC: 'static,
-            DC: 'static,
+    where
+        KC: 'static,
+        DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
@@ -225,9 +230,9 @@ impl Env {
     }
 
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-        where
-            KC: 'static,
-            DC: 'static,
+    where
+        KC: 'static,
+        DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         self.raw_create_database(name, Some(types))
