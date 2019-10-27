@@ -461,7 +461,11 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, R>(&self, txn: &'txn RoTxn, range: &'a R) -> Result<RoRange<'txn, KC, DC>>
+    pub fn range<'a, 'txn, R>(
+        &self,
+        txn: &'txn RoTxn,
+        range: &'a R,
+    ) -> Result<RoRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
