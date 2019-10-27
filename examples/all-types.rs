@@ -133,13 +133,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // or iterate over ranges too!!!
     let range = BEI64::new(35)..=BEI64::new(42);
-    let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, range)?.collect();
+    let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
     // delete a range of key
     let range = BEI64::new(35)..=BEI64::new(42);
-    let deleted: usize = db.delete_range(&mut wtxn, range)?;
+    let deleted: usize = db.delete_range(&mut wtxn, &range)?;
 
     let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
 
