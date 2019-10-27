@@ -6,6 +6,7 @@ use lmdb_sys as ffi;
 
 use super::advance_key;
 use crate::lmdb_error::lmdb_result;
+use crate::types::DecodeIgnore;
 use crate::*;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
@@ -143,7 +144,11 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, KC, DC>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn, KC, DC>(
+        &self,
+        txn: &'txn RoTxn,
+        key: &'a KC::EItem,
+    ) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
@@ -819,7 +824,12 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, KC, DC>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn put<'a, KC, DC>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -959,18 +969,8 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        struct Ignore;
-
-        impl BytesDecode<'_> for Ignore {
-            type DItem = ();
-
-            fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
-                Some(())
-            }
-        }
-
         let mut count = 0;
-        let mut iter = self.range_mut::<KC, Ignore, _>(txn, range)?;
+        let mut iter = self.range_mut::<KC, DecodeIgnore, _>(txn, range)?;
 
         while let Some(_) = iter.next() {
             iter.del_current()?;
