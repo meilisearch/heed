@@ -5,7 +5,7 @@ use std::borrow::Cow;
 /// Describes an [`str`].
 pub struct Str;
 
-impl BytesEncode for Str {
+impl BytesEncode<'_> for Str {
     type EItem = str;
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {

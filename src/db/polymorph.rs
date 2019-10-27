@@ -42,7 +42,7 @@ use crate::*;
 ///
 /// // you can iterate over database entries in order
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let mut range = db.range::<OwnedType<BEI64>, Str, _>(&wtxn, range)?;
+/// let mut range = db.range::<OwnedType<BEI64>, Str, _>(&wtxn, &range)?;
 /// assert_eq!(range.next().transpose()?, Some((BEI64::new(35), "thirty five")));
 /// assert_eq!(range.next().transpose()?, Some((BEI64::new(42), "forty two")));
 /// assert_eq!(range.next().transpose()?, None);
@@ -84,7 +84,7 @@ use crate::*;
 ///
 /// // even delete a range of keys
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, range)?;
+/// let deleted = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, &range)?;
 /// assert_eq!(deleted, 2);
 ///
 /// let rets: Result<_, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
@@ -143,9 +143,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'txn, KC, DC>(&self, txn: &'txn RoTxn, key: &KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn, KC, DC>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
@@ -499,7 +499,7 @@ impl PolyDatabase {
     /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut iter = db.range::<OwnedType<BEI32>, Str, _>(&wtxn, range)?;
+    /// let mut iter = db.range::<OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -508,13 +508,13 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'txn, KC, DC, R>(
+    pub fn range<'a, 'txn, KC, DC, R>(
         &self,
         txn: &'txn RoTxn,
-        range: R,
+        range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
         let start_bound = match range.start_bound() {
@@ -579,7 +579,7 @@ impl PolyDatabase {
     /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.range_mut::<OwnedType<BEI32>, Str, _>(&mut wtxn, range)?;
+    /// let mut range = db.range_mut::<OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// let ret = range.del_current()?;
     /// assert!(ret);
@@ -601,13 +601,13 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'txn, KC, DC, R>(
+    pub fn range_mut<'a, 'txn, KC, DC, R>(
         &self,
         txn: &'txn mut RwTxn,
-        range: R,
+        range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
         let start_bound = match range.start_bound() {
@@ -682,13 +682,13 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'txn, KC, DC>(
+    pub fn prefix_iter<'a, 'txn, KC, DC>(
         &self,
         txn: &'txn RoTxn,
-        prefix: &KC::EItem,
+        prefix: &'a KC::EItem,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
 
@@ -761,13 +761,13 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'txn, KC, DC>(
+    pub fn prefix_iter_mut<'a, 'txn, KC, DC>(
         &self,
         txn: &'txn RwTxn,
-        prefix: &KC::EItem,
+        prefix: &'a KC::EItem,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
 
@@ -819,10 +819,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<KC, DC>(&self, txn: &mut RwTxn, key: &KC::EItem, data: &DC::EItem) -> Result<()>
+    pub fn put<'a, KC, DC>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
-        KC: BytesEncode,
-        DC: BytesEncode,
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -884,9 +884,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<KC>(&self, txn: &mut RwTxn, key: &KC::EItem) -> Result<bool>
+    pub fn delete<'a, KC>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
@@ -941,7 +941,7 @@ impl PolyDatabase {
     /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let ret = db.delete_range::<OwnedType<BEI32>, _>(&mut wtxn, range)?;
+    /// let ret = db.delete_range::<OwnedType<BEI32>, _>(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
     ///
@@ -954,9 +954,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'txn, KC, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, KC, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
-        KC: BytesEncode + BytesDecode<'txn>,
+        KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
         struct Ignore;
