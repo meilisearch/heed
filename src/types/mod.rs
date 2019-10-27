@@ -73,6 +73,20 @@ pub use self::unit::Unit;
 /// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
 pub type ByteSlice = UnalignedSlice<u8>;
 
+/// A convenient struct made to ignore the type when decoding it.
+///
+/// It is appropriate to be used to count keys for example
+/// or to ensure that an entry exist for example.
+pub struct DecodeIgnore;
+
+impl crate::traits::BytesDecode<'_> for DecodeIgnore {
+    type DItem = ();
+
+    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
+        Some(())
+    }
+}
+
 #[cfg(feature = "serde-bincode")]
 pub use self::serde_bincode::SerdeBincode;
 
