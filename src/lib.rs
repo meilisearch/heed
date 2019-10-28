@@ -51,6 +51,7 @@
 mod cursor;
 mod db;
 mod env;
+pub mod flags;
 mod lmdb_error;
 mod traits;
 mod txn;

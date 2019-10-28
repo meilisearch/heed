@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
 
+use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use lmdb_sys as ffi;
@@ -19,6 +20,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
+    flags: u32, // LMDB flags
 }
 
 impl EnvOpenOptions {
@@ -27,6 +29,7 @@ impl EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
+            flags: 0,
         }
     }
 
@@ -51,6 +54,52 @@ impl EnvOpenOptions {
 
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
         self.max_dbs = Some(dbs);
+        self
+    }
+
+    /// Set one or more LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html).
+    /// ```
+    /// use std::fs;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    /// use heed::flags::Flags;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// fs::create_dir_all("target/zerocopy.mdb")?;
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// unsafe {
+    ///     env_builder.flag(Flags::MdbNoSync);
+    ///     env_builder.flag(Flags::MdbNoMetaSync);
+    /// }
+    /// let env = env_builder.open("target/zerocopy.mdb")?;
+    ///
+    /// // we will open the default unamed database
+    /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+    ///
+    /// // opening a write transaction
+    /// let mut wtxn = env.write_txn()?;
+    /// db.put(&mut wtxn, "seven", &7)?;
+    /// db.put(&mut wtxn, "zero", &0)?;
+    /// db.put(&mut wtxn, "five", &5)?;
+    /// db.put(&mut wtxn, "three", &3)?;
+    /// wtxn.commit()?;
+    ///
+    /// // Force the OS to flush the buffers (see Flags::MdbNoSync and Flags::MdbNoMetaSync).
+    /// env.force_sync();
+    ///
+    /// // opening a read transaction
+    /// // to check if those values are now available
+    /// let mut rtxn = env.read_txn()?;
+    ///
+    /// let ret = db.get(&rtxn, "zero")?;
+    /// assert_eq!(ret, Some(0));
+    ///
+    /// let ret = db.get(&rtxn, "five")?;
+    /// assert_eq!(ret, Some(5));
+    /// # Ok(()) }
+    /// ```
+    pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
+        self.flags = self.flags | flag as u32;
         self
     }
 
@@ -84,7 +133,8 @@ impl EnvOpenOptions {
                         lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
-                    let result = lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), 0, 0o600));
+                    let result =
+                        lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
 
                     match result {
                         Ok(()) => {
@@ -115,6 +165,7 @@ struct EnvInner {
 }
 
 unsafe impl Send for EnvInner {}
+
 unsafe impl Sync for EnvInner {}
 
 #[derive(Debug, Copy, Clone)]
@@ -254,5 +305,11 @@ impl Env {
         unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
 
         Ok(file)
+    }
+
+    pub fn force_sync(&self) -> Result<()> {
+        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
+
+        Ok(())
     }
 }
