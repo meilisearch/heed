@@ -10,7 +10,6 @@ use std::{ptr, sync};
 use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
-use enumflags2::BitFlags;
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
 
@@ -21,7 +20,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
-    flags: BitFlags<Flags>, // LMDB flags
+    flags: u32, // LMDB flags
 }
 
 impl EnvOpenOptions {
@@ -30,7 +29,7 @@ impl EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
-            flags: BitFlags::empty(),
+            flags: 0,
         }
     }
 
@@ -72,7 +71,7 @@ impl EnvOpenOptions {
     ///     env_builder.flag(Flags::MdbNoSync);
     ///     env_builder.flag(Flags::MdbNoMetaSync);
     /// }
-    ///  let env = env_builder.open("target/zerocopy.mdb")?;
+    /// let env = env_builder.open("target/zerocopy.mdb")?;
     ///
     /// // we will open the default unamed database
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
@@ -84,6 +83,9 @@ impl EnvOpenOptions {
     /// db.put(&mut wtxn, "five", &5)?;
     /// db.put(&mut wtxn, "three", &3)?;
     /// wtxn.commit()?;
+    ///
+    /// // Force the OS to flush the buffers (see Flags::MdbNoSync and Flags::MdbNoMetaSync).
+    /// env.force_sync();
     ///
     /// // opening a read transaction
     /// // to check if those values are now available
@@ -97,7 +99,7 @@ impl EnvOpenOptions {
     /// # Ok(()) }
     /// ```
     pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
-        self.flags.insert(flag);
+        self.flags = self.flags | flag as u32;
         self
     }
 
@@ -131,12 +133,8 @@ impl EnvOpenOptions {
                         lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
-                    let result = lmdb_result(ffi::mdb_env_open(
-                        env,
-                        path.as_ptr(),
-                        self.flags.bits(),
-                        0o600,
-                    ));
+                    let result =
+                        lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
 
                     match result {
                         Ok(()) => {
@@ -307,5 +305,11 @@ impl Env {
         unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
 
         Ok(file)
+    }
+
+    pub fn force_sync(&self) -> Result<()> {
+        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
+
+        Ok(())
     }
 }
