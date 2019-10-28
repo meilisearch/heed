@@ -19,13 +19,13 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
 /// [`CowSlice`]: crate::types::CowSlice
 pub struct UnalignedType<T>(std::marker::PhantomData<T>);
 
-impl<T> BytesEncode for UnalignedType<T>
+impl<'a, T: 'a> BytesEncode<'a> for UnalignedType<T>
 where
     T: AsBytes + Unaligned,
 {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
         Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
     }
 }

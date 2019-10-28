@@ -85,7 +85,7 @@ use crate::*;
 ///
 /// // you can iterate over ranges too!!!
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let rets: Result<_, _> = db.range(&wtxn, range)?.collect();
+/// let rets: Result<_, _> = db.range(&wtxn, &range)?.collect();
 /// let rets: Vec<(BEI64, _)> = rets?;
 ///
 /// let expected = vec![
@@ -97,7 +97,7 @@ use crate::*;
 ///
 /// // even delete a range of keys
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted: usize = db.delete_range(&mut wtxn, range)?;
+/// let deleted: usize = db.delete_range(&mut wtxn, &range)?;
 ///
 /// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
 /// let rets: Vec<(BEI64, _)> = rets?;
@@ -158,9 +158,9 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'txn>(&self, txn: &'txn RoTxn, key: &KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
         self.dyndb.get::<KC, DC>(txn, key)
@@ -452,7 +452,7 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut iter = db.range(&wtxn, range)?;
+    /// let mut iter = db.range(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -461,9 +461,13 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'txn, R>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn, KC, DC>>
+    pub fn range<'a, 'txn, R>(
+        &self,
+        txn: &'txn RoTxn,
+        range: &'a R,
+    ) -> Result<RoRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
         self.dyndb.range::<KC, DC, R>(txn, range)
@@ -499,7 +503,7 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.range_mut(&mut wtxn, range)?;
+    /// let mut range = db.range_mut(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// let ret = range.del_current()?;
     /// assert!(ret);
@@ -521,13 +525,13 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'txn, R>(
+    pub fn range_mut<'a, 'txn, R>(
         &self,
         txn: &'txn mut RwTxn,
-        range: R,
+        range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
         self.dyndb.range_mut::<KC, DC, R>(txn, range)
@@ -573,13 +577,13 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'txn>(
+    pub fn prefix_iter<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
-        prefix: &KC::EItem,
+        prefix: &'a KC::EItem,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         self.dyndb.prefix_iter::<KC, DC>(txn, prefix)
     }
@@ -637,13 +641,13 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'txn>(
+    pub fn prefix_iter_mut<'a, 'txn>(
         &self,
         txn: &'txn RwTxn,
-        prefix: &KC::EItem,
+        prefix: &'a KC::EItem,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         self.dyndb.prefix_iter_mut::<KC, DC>(txn, prefix)
     }
@@ -680,10 +684,10 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put(&self, txn: &mut RwTxn, key: &KC::EItem, data: &DC::EItem) -> Result<()>
+    pub fn put<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
-        KC: BytesEncode,
-        DC: BytesEncode,
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
     {
         self.dyndb.put::<KC, DC>(txn, key, data)
     }
@@ -728,9 +732,9 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete(&self, txn: &mut RwTxn, key: &KC::EItem) -> Result<bool>
+    pub fn delete<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
-        KC: BytesEncode,
+        KC: BytesEncode<'a>,
     {
         self.dyndb.delete::<KC>(txn, key)
     }
@@ -769,7 +773,7 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let ret = db.delete_range(&mut wtxn, range)?;
+    /// let ret = db.delete_range(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
     ///
@@ -782,9 +786,9 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'txn, R>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
-        KC: BytesEncode + BytesDecode<'txn>,
+        KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
         self.dyndb.delete_range::<KC, R>(txn, range)
