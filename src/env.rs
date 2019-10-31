@@ -186,7 +186,7 @@ impl Env {
             .map(Database::new))
     }
 
-    pub fn open_dyn_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
+    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
         Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
     }
 
