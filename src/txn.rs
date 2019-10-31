@@ -1,4 +1,5 @@
-use std::ops::{Deref, DerefMut};
+use std::marker;
+use std::ops::Deref;
 use std::ptr;
 
 use lmdb_sys as ffi;
@@ -43,28 +44,32 @@ impl Drop for RoTxn {
     }
 }
 
-pub struct RwTxn {
+pub struct RwTxn<'p> {
     pub(crate) txn: RoTxn,
+    _parent: marker::PhantomData<&'p mut ()>,
 }
 
-impl RwTxn {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn> {
+impl RwTxn<'_> {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn<'static>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe { lmdb_result(ffi::mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn } })
+        Ok(RwTxn {
+            txn: RoTxn { txn },
+            _parent: marker::PhantomData,
+        })
     }
 
-    pub(crate) fn new_nested(env: *mut ffi::MDB_env, parent: &mut RwTxn) -> Result<NestedRwTxn> {
+    pub(crate) fn nested<'p>(env: *mut ffi::MDB_env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
 
         unsafe { lmdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))? };
 
-        Ok(NestedRwTxn {
-            _parent: parent,
-            txn: RwTxn { txn: RoTxn { txn } },
+        Ok(RwTxn {
+            txn: RoTxn { txn },
+            _parent: marker::PhantomData,
         })
     }
 
@@ -75,37 +80,10 @@ impl RwTxn {
     pub fn abort(self) {}
 }
 
-impl Deref for RwTxn {
+impl Deref for RwTxn<'_> {
     type Target = RoTxn;
 
     fn deref(&self) -> &Self::Target {
         &self.txn
-    }
-}
-
-pub struct NestedRwTxn<'p> {
-    _parent: &'p mut RwTxn,
-    txn: RwTxn,
-}
-
-impl NestedRwTxn<'_> {
-    pub fn commit(self) -> Result<()> {
-        self.txn.commit()
-    }
-
-    pub fn abort(self) {}
-}
-
-impl Deref for NestedRwTxn<'_> {
-    type Target = RwTxn;
-
-    fn deref(&self) -> &Self::Target {
-        &self.txn
-    }
-}
-
-impl DerefMut for NestedRwTxn<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.txn
     }
 }

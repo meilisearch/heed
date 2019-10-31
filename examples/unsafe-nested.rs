@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let grtxn = env.read_txn()?;
     let mut wtxn = env.write_txn()?;
 
-    let mut nwtxn = unsafe { env.nested_write_txn(&mut wtxn)? };
+    let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
 
     db.put(&mut nwtxn, "what", &[4, 5][..])?;
     let ret = db.get(&nwtxn, "what")?;
@@ -40,13 +40,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // ------
     println!();
 
-    let mut nwtxn = unsafe { env.nested_write_txn(&mut wtxn)? };
+    // also try with multiple levels of nesting
+    let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
+    let mut nnwtxn = env.nested_write_txn(&mut nwtxn)?;
 
-    db.put(&mut nwtxn, "humm...", &[6, 7][..])?;
-    let ret = db.get(&nwtxn, "humm...")?;
+    db.put(&mut nnwtxn, "humm...", &[6, 7][..])?;
+    let ret = db.get(&nnwtxn, "humm...")?;
     println!("nested(2) \"humm...\": {:?}", ret);
 
     println!("nested(2) commit");
+    nnwtxn.commit()?;
     nwtxn.commit()?;
 
     let ret = db.get(&grtxn, "humm...")?;
@@ -63,6 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("parent commit");
     wtxn.commit()?;
+    // wtxn.abort();
 
     // ------
     println!();

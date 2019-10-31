@@ -65,7 +65,7 @@ pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
 pub use self::lmdb_error::Error as LmdbError;
 pub use self::traits::{BytesDecode, BytesEncode};
-pub use self::txn::{NestedRwTxn, RoTxn, RwTxn};
+pub use self::txn::{RoTxn, RwTxn};
 
 use std::{error, fmt, io, result};
 
