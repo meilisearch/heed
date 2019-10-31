@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::ptr;
 
 use lmdb_sys as ffi;
@@ -26,15 +26,13 @@ impl RoTxn {
         Ok(RoTxn { txn })
     }
 
-    pub fn abort(self) {
-        drop(self)
-    }
-
     pub fn commit(mut self) -> Result<()> {
         let result = unsafe { lmdb_result(ffi::mdb_txn_commit(self.txn)) };
         self.txn = ptr::null_mut();
         result.map_err(Into::into)
     }
+
+    pub fn abort(self) {}
 }
 
 impl Drop for RoTxn {
@@ -58,13 +56,16 @@ impl RwTxn {
         Ok(RwTxn { txn: RoTxn { txn } })
     }
 
-    pub(crate) unsafe fn new_nested(env: *mut ffi::MDB_env, parent: &RwTxn) -> Result<RwTxn> {
+    pub(crate) fn new_nested(env: *mut ffi::MDB_env, parent: &mut RwTxn) -> Result<NestedRwTxn> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
 
-        lmdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))?;
+        unsafe { lmdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn } })
+        Ok(NestedRwTxn {
+            _parent: parent,
+            txn: RwTxn { txn: RoTxn { txn } },
+        })
     }
 
     pub fn commit(self) -> Result<()> {
@@ -79,5 +80,32 @@ impl Deref for RwTxn {
 
     fn deref(&self) -> &Self::Target {
         &self.txn
+    }
+}
+
+pub struct NestedRwTxn<'p> {
+    _parent: &'p mut RwTxn,
+    txn: RwTxn,
+}
+
+impl NestedRwTxn<'_> {
+    pub fn commit(self) -> Result<()> {
+        self.txn.commit()
+    }
+
+    pub fn abort(self) {}
+}
+
+impl Deref for NestedRwTxn<'_> {
+    type Target = RwTxn;
+
+    fn deref(&self) -> &Self::Target {
+        &self.txn
+    }
+}
+
+impl DerefMut for NestedRwTxn<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.txn
     }
 }
