@@ -58,13 +58,20 @@ impl RwTxn {
         Ok(RwTxn { txn: RoTxn { txn } })
     }
 
+    pub(crate) unsafe fn new_nested(env: *mut ffi::MDB_env, parent: &RwTxn) -> Result<RwTxn> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
+
+        lmdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))?;
+
+        Ok(RwTxn { txn: RoTxn { txn } })
+    }
+
     pub fn commit(self) -> Result<()> {
         self.txn.commit()
     }
 
-    pub fn abort(self) {
-        drop(self.txn)
-    }
+    pub fn abort(self) {}
 }
 
 impl Deref for RwTxn {

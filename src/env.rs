@@ -288,6 +288,10 @@ impl Env {
         RwTxn::new(self.0.env)
     }
 
+    pub unsafe fn nested_write_txn(&self, parent: &RwTxn) -> Result<RwTxn> {
+        RwTxn::new_nested(self.0.env, parent)
+    }
+
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self.0.env)
     }
