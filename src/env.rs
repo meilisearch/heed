@@ -9,7 +9,7 @@ use std::{ptr, sync};
 
 use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
-use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use crate::{Database, Error, NestedRwTxn, PolyDatabase, Result, RoTxn, RwTxn};
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
 
@@ -288,7 +288,7 @@ impl Env {
         RwTxn::new(self.0.env)
     }
 
-    pub unsafe fn nested_write_txn(&self, parent: &RwTxn) -> Result<RwTxn> {
+    pub fn nested_write_txn<'p>(&self, parent: &'p mut RwTxn) -> Result<NestedRwTxn<'p>> {
         RwTxn::new_nested(self.0.env, parent)
     }
 

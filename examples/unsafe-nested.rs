@@ -13,17 +13,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         .open("target/zerocopy.mdb")?;
 
     // here the key will be an str and the data will be a slice of u8
-    let db: Database<Str, ByteSlice> = env.create_database(Some("kiki"))?;
+    let db: Database<Str, ByteSlice> = env.create_database(None)?;
+
+    // clear db
+    let mut wtxn = env.write_txn()?;
+    db.clear(&mut wtxn)?;
+    wtxn.commit()?;
+
+    // -----
 
     let grtxn = env.read_txn()?;
     let mut wtxn = env.write_txn()?;
 
-    db.put(&mut wtxn, "hello", &[2, 3][..])?;
-
-    let ret = db.get(&wtxn, "hello")?;
-    println!("parent \"hello\": {:?}", ret);
-
-    let mut nwtxn = unsafe { env.nested_write_txn(&wtxn)? };
+    let mut nwtxn = unsafe { env.nested_write_txn(&mut wtxn)? };
 
     db.put(&mut nwtxn, "what", &[4, 5][..])?;
     let ret = db.get(&nwtxn, "what")?;
@@ -33,9 +35,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     nwtxn.abort();
 
     let ret = db.get(&wtxn, "what")?;
-    println!("nested(1) \"what\": {:?}", ret);
+    println!("parent \"what\": {:?}", ret);
 
-    let mut nwtxn = unsafe { env.nested_write_txn(&wtxn)? };
+    // ------
+    println!();
+
+    let mut nwtxn = unsafe { env.nested_write_txn(&mut wtxn)? };
 
     db.put(&mut nwtxn, "humm...", &[6, 7][..])?;
     let ret = db.get(&nwtxn, "humm...")?;
@@ -45,19 +50,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     nwtxn.commit()?;
 
     let ret = db.get(&grtxn, "humm...")?;
-    println!("parent rtxn \"humm...\": {:?}", ret);
+    println!("grand parent (reader) \"humm...\": {:?}", ret);
     grtxn.abort();
 
     let ret = db.get(&wtxn, "humm...")?;
-    println!("nested(2) \"humm...\": {:?}", ret);
+    println!("parent \"humm...\": {:?}", ret);
+
+    db.put(&mut wtxn, "hello", &[2, 3][..])?;
+
+    let ret = db.get(&wtxn, "hello")?;
+    println!("parent \"hello\": {:?}", ret);
 
     println!("parent commit");
     wtxn.commit()?;
 
+    // ------
+    println!();
+
     let rtxn = env.read_txn()?;
 
     let ret = db.get(&rtxn, "hello")?;
-    println!("parent \"hello\": {:?}", ret);
+    println!("parent (reader) \"hello\": {:?}", ret);
+
+    let ret = db.get(&rtxn, "humm...")?;
+    println!("parent (reader) \"humm...\": {:?}", ret);
 
     Ok(())
 }
