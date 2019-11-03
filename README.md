@@ -4,7 +4,7 @@ A fully typed LMDB wrapper with minimum overhead, uses zerocopy internally.
 [![Build Status](https://dev.azure.com/renaultcle/heed/_apis/build/status/Kerollmops.heed?branchName=master)](https://dev.azure.com/renaultcle/heed/_build/latest?definitionId=1&branchName=master)
 [![Dependency Status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)
 [![Heed Doc](https://docs.rs/heed/badge.svg)](https://docs.rs/heed)
-[![Crates.io](https://img.shields.io/crates/v/$CRATE.svg)](https://crates.io/crates/heed)
+[![Crates.io](https://img.shields.io/crates/v/heed.svg)](https://crates.io/crates/heed)
 
 ![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
 
