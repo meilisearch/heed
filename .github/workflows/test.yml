@@ -1,0 +1,33 @@
+---
+on: [pull_request]
+
+name: Cargo test
+jobs:
+  check:
+    name: Test the heed project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: meilidb-http
+            asset_name: meilidb-http-linux-amd64
+          - os: windows-latest
+            artifact_name: meilidb-http.exe
+            asset_name: meilidb-http-windows-amd64
+          - os: macos-latest
+            artifact_name: meilidb-http-macos-amd64
+            asset_name: meilidb-http-macos-amd64
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
