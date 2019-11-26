@@ -288,11 +288,19 @@ impl Env {
         RwTxn::new(self.0.env)
     }
 
-    pub fn nested_write_txn<'p>(&self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+    pub fn typed_write_txn<T>(&self) -> Result<RwTxn<T>> {
+        RwTxn::<T>::new(self.0.env)
+    }
+
+    pub fn nested_write_txn<'p, T>(&self, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'p, T>> {
         RwTxn::nested(self.0.env, parent)
     }
 
     pub fn read_txn(&self) -> Result<RoTxn> {
+        RoTxn::new(self.0.env)
+    }
+
+    pub fn typed_read_txn<T>(&self) -> Result<RoTxn<T>> {
         RoTxn::new(self.0.env)
     }
 

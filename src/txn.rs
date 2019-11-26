@@ -7,12 +7,13 @@ use lmdb_sys as ffi;
 use crate::lmdb_error::lmdb_result;
 use crate::Result;
 
-pub struct RoTxn {
+pub struct RoTxn<T=()> {
     pub(crate) txn: *mut ffi::MDB_txn,
+    _phantom: marker::PhantomData<T>,
 }
 
-impl RoTxn {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RoTxn> {
+impl<T> RoTxn<T> {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RoTxn<T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -24,7 +25,7 @@ impl RoTxn {
             ))?
         };
 
-        Ok(RoTxn { txn })
+        Ok(RoTxn { txn, _phantom: marker::PhantomData })
     }
 
     pub fn commit(mut self) -> Result<()> {
@@ -36,7 +37,7 @@ impl RoTxn {
     pub fn abort(self) {}
 }
 
-impl Drop for RoTxn {
+impl<T> Drop for RoTxn<T> {
     fn drop(&mut self) {
         if !self.txn.is_null() {
             unsafe { ffi::mdb_txn_abort(self.txn) }
@@ -44,31 +45,31 @@ impl Drop for RoTxn {
     }
 }
 
-pub struct RwTxn<'p> {
-    pub(crate) txn: RoTxn,
+pub struct RwTxn<'p, T=()> {
+    pub(crate) txn: RoTxn<T>,
     _parent: marker::PhantomData<&'p mut ()>,
 }
 
-impl RwTxn<'_> {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn<'static>> {
+impl<T> RwTxn<'_, T> {
+    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn<'static, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe { lmdb_result(ffi::mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn))? };
 
         Ok(RwTxn {
-            txn: RoTxn { txn },
+            txn: RoTxn { txn, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }
 
-    pub(crate) fn nested<'p>(env: *mut ffi::MDB_env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+    pub(crate) fn nested<'p>(env: *mut ffi::MDB_env, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'p, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
 
         unsafe { lmdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))? };
 
         Ok(RwTxn {
-            txn: RoTxn { txn },
+            txn: RoTxn { txn, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }
@@ -80,8 +81,8 @@ impl RwTxn<'_> {
     pub fn abort(self) {}
 }
 
-impl Deref for RwTxn<'_> {
-    type Target = RoTxn;
+impl<T> Deref for RwTxn<'_, T> {
+    type Target = RoTxn<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.txn
