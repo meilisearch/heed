@@ -5,6 +5,10 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{ptr, sync};
+#[cfg(windows)]
+use std::ffi::OsStr;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
@@ -12,7 +16,20 @@ use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
 
+
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+
+#[cfg(windows)]
+/// Adding a 'missing' trait from windows OsStrExt
+trait OsStrExtLmdb {
+    fn as_bytes(&self) -> &[u8];
+}
+#[cfg(windows)]
+impl OsStrExtLmdb for OsStr {
+    fn as_bytes(&self) -> &[u8] {
+        &self.to_str().unwrap().as_bytes()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct EnvOpenOptions {
@@ -114,8 +131,7 @@ impl EnvOpenOptions {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let path = entry.key();
-                let path = path.to_string_lossy();
-                let path = CString::new(path.as_bytes()).unwrap();
+                let path = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
