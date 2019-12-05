@@ -21,6 +21,9 @@ serde = { version = "1.0.101", optional = true }
 serde_json = { version = "1.0.41", optional = true }
 zerocopy = "0.2.8"
 
+[target.'cfg(windows)'.dependencies]
+url = "2.1.0"
+
 [dev-dependencies]
 serde = { version = "1.0.101", features = ["derive"] }
 

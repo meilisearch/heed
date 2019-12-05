@@ -4,7 +4,7 @@ use std::ffi::CString;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::{ptr, sync};
+use std::{io, ptr, sync};
 #[cfg(windows)]
 use std::ffi::OsStr;
 #[cfg(unix)]
@@ -16,8 +16,22 @@ use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
 
-
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+
+// Thanks to the mozilla/rkv project
+// Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
+// Otherwise, `Env::from_env()` will panic with error_no(123).
+#[cfg(not(windows))]
+fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
+    path.canonicalize()
+}
+
+#[cfg(windows)]
+fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
+    let canonical = path.canonicalize()?;
+    let url = url::Url::from_file_path(&canonical).map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
+    url.to_file_path().map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
+}
 
 #[cfg(windows)]
 /// Adding a 'missing' trait from windows OsStrExt
@@ -122,7 +136,7 @@ impl EnvOpenOptions {
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let path = path.as_ref();
-        let path = path.canonicalize()?;
+        let path = canonicalize_path(path)?;
 
         let mutex = OPENED_ENV.get_or_init(Mutex::default);
         let mut lock = mutex.lock().unwrap();
