@@ -2,10 +2,13 @@ use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
 use std::fs::File;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::{ptr, sync};
+use std::{io, ptr, sync};
+#[cfg(windows)]
+use std::ffi::OsStr;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
@@ -14,6 +17,33 @@ use lmdb_sys as ffi;
 use once_cell::sync::OnceCell;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+
+// Thanks to the mozilla/rkv project
+// Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
+// Otherwise, `Env::from_env()` will panic with error_no(123).
+#[cfg(not(windows))]
+fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
+    path.canonicalize()
+}
+
+#[cfg(windows)]
+fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
+    let canonical = path.canonicalize()?;
+    let url = url::Url::from_file_path(&canonical).map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
+    url.to_file_path().map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
+}
+
+#[cfg(windows)]
+/// Adding a 'missing' trait from windows OsStrExt
+trait OsStrExtLmdb {
+    fn as_bytes(&self) -> &[u8];
+}
+#[cfg(windows)]
+impl OsStrExtLmdb for OsStr {
+    fn as_bytes(&self) -> &[u8] {
+        &self.to_str().unwrap().as_bytes()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct EnvOpenOptions {
@@ -60,18 +90,19 @@ impl EnvOpenOptions {
     /// Set one or more LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html).
     /// ```
     /// use std::fs;
+    /// use std::path::Path;
     /// use heed::{EnvOpenOptions, Database};
     /// use heed::types::*;
     /// use heed::flags::Flags;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all("target/zerocopy.mdb")?;
+    /// fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe {
     ///     env_builder.flag(Flags::MdbNoSync);
     ///     env_builder.flag(Flags::MdbNoMetaSync);
     /// }
-    /// let env = env_builder.open("target/zerocopy.mdb")?;
+    /// let env = env_builder.open(Path::new("target").join("zerocopy.mdb"))?;
     ///
     /// // we will open the default unamed database
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
@@ -105,7 +136,7 @@ impl EnvOpenOptions {
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let path = path.as_ref();
-        let path = path.canonicalize()?;
+        let path = canonicalize_path(path)?;
 
         let mutex = OPENED_ENV.get_or_init(Mutex::default);
         let mut lock = mutex.lock().unwrap();
@@ -114,8 +145,7 @@ impl EnvOpenOptions {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let path = entry.key();
-                let path = path.to_string_lossy();
-                let path = CString::new(path.as_bytes()).unwrap();
+                let path = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
@@ -304,7 +334,10 @@ impl Env {
         RoTxn::new(self.0.env)
     }
 
+    #[cfg(not(windows))]
     pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+        use std::os::unix::io::AsRawFd;
+
         let flags = if let CompactionOption::Enabled = option {
             ffi::MDB_CP_COMPACT
         } else {
@@ -315,6 +348,24 @@ impl Env {
         let fd = file.as_raw_fd();
 
         unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
+
+        Ok(file)
+    }
+
+    #[cfg(windows)]
+    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+        use std::os::windows::io::AsRawHandle;
+
+        let flags = if let CompactionOption::Enabled = option {
+            ffi::MDB_CP_COMPACT
+        } else {
+            0
+        };
+
+        let file = File::create(path)?;
+        let handle = file.as_raw_handle();
+
+        unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, handle, flags))? }
 
         Ok(file)
     }

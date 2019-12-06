@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs;
+use std::path::Path;
 
 use heed::byteorder::BE;
 use heed::types::*;
@@ -8,12 +9,12 @@ use heed::EnvOpenOptions;
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all("target/zerocopy-dyn.mdb")?;
+    fs::create_dir_all(Path::new("target").join("zerocopy-dyn.mdb"))?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
         .max_dbs(3000)
-        .open("target/zerocopy-dyn.mdb")?;
+        .open(Path::new("target").join("zerocopy-dyn.mdb"))?;
 
     // you can specify that a database will support some typed key/data
     //

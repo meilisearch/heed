@@ -1,16 +1,17 @@
 use std::error::Error;
 use std::fs;
+use std::path::Path;
 
 use heed::types::*;
 use heed::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all("target/zerocopy.mdb")?;
+    fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
         .max_dbs(3000)
-        .open("target/zerocopy.mdb")?;
+        .open(Path::new("target").join("zerocopy.mdb"))?;
 
     // here the key will be an str and the data will be a slice of u8
     let db: Database<Str, ByteSlice> = env.create_database(None)?;
