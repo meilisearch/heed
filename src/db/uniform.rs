@@ -853,6 +853,57 @@ impl<KC, DC> Database<KC, DC> {
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
         self.dyndb.clear(txn)
     }
+
+    /// Get an handle on the internal polymorphic database.
+    ///
+    /// Using this method is useful when you want to skip deserializing of the value,
+    /// by specifying that the value is of type `DecodeIgnore` for example.
+    ///
+    /// [`DecodeIgnore`]: crate::types::DecodeIgnore
+    ///
+    /// # Safety
+    ///
+    /// It is up to you to ensure that the data read and written using the polymorphic
+    /// handle correspond to the the typed, uniform one. If an invalid write is made,
+    /// it can corrupt the database from the eyes of heed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// // Check if a key exists and skip potentially expensive deserializing
+    /// let ret = db.as_polymorph().get::<_, OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
+    /// assert!(ret.is_some());
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn as_polymorph(&self) -> &PolyDatabase {
+        &self.dyndb
+    }
 }
 
 impl<KC, DC> Clone for Database<KC, DC> {
