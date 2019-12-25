@@ -706,6 +706,50 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.put::<T, KC, DC>(txn, key, data)
     }
 
+    /// Append the given key/data pair to the end of the database.
+    ///
+    /// This option allows fast bulk loading when keys are already known to be in the correct order.
+    /// Loading unsorted keys will cause a MDB_KEYEXIST error.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn append<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        self.dyndb.append::<T, KC, DC>(txn, key, data)
+    }
+
     /// Deletes a key-value pairs in this database.
     ///
     /// If the key does not exist, then `false` is returned.
