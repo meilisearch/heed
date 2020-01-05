@@ -148,7 +148,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn get<'a, 'txn, T, KC, DC>(
-        &self,
+        self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
     ) -> Result<Option<DC::DItem>>
@@ -216,7 +216,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, T, KC, DC>(
+        self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -267,7 +270,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, T, KC, DC>(
+        self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -321,7 +327,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<usize> {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         let mut count = 0;
 
@@ -375,7 +381,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
+    pub fn is_empty<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<bool> {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_first()? {
             Some(_) => Ok(false),
@@ -419,7 +425,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
+    pub fn iter<'txn, T, KC, DC>(self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         Ok(RoIter {
             cursor: RoCursor::new(txn, self.dbi)?,
             move_on_first: true,
@@ -476,7 +482,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, T, KC, DC>(
+        self,
+        txn: &'txn mut RwTxn<T>,
+    ) -> Result<RwIter<'txn, KC, DC>> {
         Ok(RwIter {
             cursor: RwCursor::new(txn, self.dbi)?,
             move_on_first: true,
@@ -524,7 +533,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn range<'a, 'txn, T, KC, DC, R>(
-        &self,
+        self,
         txn: &'txn RoTxn<T>,
         range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
@@ -618,7 +627,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn range_mut<'a, 'txn, T, KC, DC, R>(
-        &self,
+        self,
         txn: &'txn mut RwTxn<T>,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
@@ -700,7 +709,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn prefix_iter<'a, 'txn, T, KC, DC>(
-        &self,
+        self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RoRange<'txn, KC, DC>>
@@ -780,7 +789,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn prefix_iter_mut<'a, 'txn, T, KC, DC>(
-        &self,
+        self,
         txn: &'txn RwTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RwRange<'txn, KC, DC>>
@@ -839,7 +848,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn put<'a, T, KC, DC>(
-        &self,
+        self,
         txn: &mut RwTxn<T>,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
@@ -905,7 +914,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn append<'a, T, KC, DC>(
-        &self,
+        self,
         txn: &mut RwTxn<T>,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
@@ -975,7 +984,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T, KC>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a, T, KC>(self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
@@ -1046,7 +1055,11 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, KC, R>(&self, txn: &'txn mut RwTxn<T>, range: &'a R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, T, KC, R>(
+        self,
+        txn: &'txn mut RwTxn<T>,
+        range: &'a R,
+    ) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -1102,7 +1115,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
+    pub fn clear<T>(self, txn: &mut RwTxn<T>) -> Result<()> {
         unsafe { lmdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }

@@ -1,14 +1,14 @@
 use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
+#[cfg(windows)]
+use std::ffi::OsStr;
 use std::fs::File;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{io, ptr, sync};
-#[cfg(windows)]
-use std::ffi::OsStr;
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
 use crate::lmdb_error::lmdb_result;
@@ -29,8 +29,10 @@ fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
 #[cfg(windows)]
 fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
     let canonical = path.canonicalize()?;
-    let url = url::Url::from_file_path(&canonical).map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
-    url.to_file_path().map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
+    let url = url::Url::from_file_path(&canonical)
+        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
+    url.to_file_path()
+        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
 }
 
 #[cfg(windows)]
@@ -45,7 +47,7 @@ impl OsStrExtLmdb for OsStr {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
@@ -129,8 +131,9 @@ impl EnvOpenOptions {
     /// assert_eq!(ret, Some(5));
     /// # Ok(()) }
     /// ```
+    /// # Safety
     pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
-        self.flags = self.flags | flag as u32;
+        self.flags |= flag as u32;
         self
     }
 

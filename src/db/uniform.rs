@@ -161,7 +161,11 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T>(&self, txn: &'txn RoTxn<T>, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn, T>(
+        self,
+        txn: &'txn RoTxn<T>,
+        key: &'a KC::EItem,
+    ) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
@@ -204,7 +208,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -247,7 +251,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -293,7 +297,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<usize> {
         self.dyndb.len(txn)
     }
 
@@ -335,7 +339,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
+    pub fn is_empty<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<bool> {
         self.dyndb.is_empty(txn)
     }
 
@@ -375,7 +379,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
+    pub fn iter<'txn, T>(self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         self.dyndb.iter::<T, KC, DC>(txn)
     }
 
@@ -428,7 +432,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, T>(self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
         self.dyndb.iter_mut::<T, KC, DC>(txn)
     }
 
@@ -472,7 +476,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn range<'a, 'txn, T, R>(
-        &self,
+        self,
         txn: &'txn RoTxn<T>,
         range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
@@ -537,7 +541,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn range_mut<'a, 'txn, T, R>(
-        &self,
+        self,
         txn: &'txn mut RwTxn<T>,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
@@ -590,7 +594,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn prefix_iter<'a, 'txn, T>(
-        &self,
+        self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RoRange<'txn, KC, DC>>
@@ -655,7 +659,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn prefix_iter_mut<'a, 'txn, T>(
-        &self,
+        self,
         txn: &'txn RwTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RwRange<'txn, KC, DC>>
@@ -698,7 +702,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn put<'a, T>(
+        self,
+        txn: &mut RwTxn<T>,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -742,7 +751,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn append<'a, T>(
+        self,
+        txn: &mut RwTxn<T>,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -791,7 +805,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a, T>(self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
@@ -846,7 +860,11 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, R>(&self, txn: &'txn mut RwTxn<T>, range: &'a R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, T, R>(
+        self,
+        txn: &'txn mut RwTxn<T>,
+        range: &'a R,
+    ) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -894,7 +912,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
+    pub fn clear<T>(self, txn: &mut RwTxn<T>) -> Result<()> {
         self.dyndb.clear(txn)
     }
 

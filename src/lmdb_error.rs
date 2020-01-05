@@ -58,7 +58,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn not_found(&self) -> bool {
+    pub fn not_found(self) -> bool {
         if let Error::NotFound = self {
             true
         } else {

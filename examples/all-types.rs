@@ -9,7 +9,7 @@ use heed::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(Path::new("target").join("zerocopy-dyn.mdb"))?;
+    fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(Some("kikou"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret = db.put(&mut wtxn, &[2, 3], "what's up?")?;
+    db.put(&mut wtxn, &[2, 3], "what's up?")?;
     let ret: Option<&str> = db.get(&wtxn, &[2, 3])?;
 
     println!("{:?}", ret);
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, ByteSlice> = env.create_database(Some("kiki"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret = db.put(&mut wtxn, "hello", &[2, 3][..])?;
+    db.put(&mut wtxn, "hello", &[2, 3][..])?;
     let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret = db.put(&mut wtxn, "hello", &())?;
+    db.put(&mut wtxn, "hello", &())?;
     let ret: Option<()> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
@@ -123,10 +123,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
 
     let mut wtxn = env.write_txn()?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(0), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(68), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(35), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(42), &())?;
+    db.put(&mut wtxn, &BEI64::new(0), &())?;
+    db.put(&mut wtxn, &BEI64::new(68), &())?;
+    db.put(&mut wtxn, &BEI64::new(35), &())?;
+    db.put(&mut wtxn, &BEI64::new(42), &())?;
 
     let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
 
