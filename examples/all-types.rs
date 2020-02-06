@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // serde types are also supported!!!
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     struct Hello<'a> {
         string: &'a str,
     }
