@@ -20,7 +20,7 @@ where
 
 impl<'a, T: 'a> BytesDecode<'a> for SerdeJson<T>
 where
-    T: Deserialize<'a> + Clone,
+    T: Deserialize<'a>,
 {
     type DItem = T;
 
