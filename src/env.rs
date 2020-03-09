@@ -45,6 +45,18 @@ impl OsStrExtLmdb for OsStr {
     }
 }
 
+#[cfg(windows)]
+fn get_file_fd(file: &File) -> std::os::windows::io::RawHandle {
+    use std::os::windows::io::AsRawHandle;
+    file.as_raw_handle()
+}
+
+#[cfg(unix)]
+fn get_file_fd(file: &File) -> std::os::unix::io::RawFd {
+    use std::os::unix::io::AsRawFd;
+    file.as_raw_fd()
+}
+
 #[derive(Clone, Debug)]
 pub struct EnvOpenOptions {
     map_size: Option<usize>,
@@ -334,38 +346,18 @@ impl Env {
         RoTxn::new(self.0.env)
     }
 
-    #[cfg(not(windows))]
+    // TODO rename into `copy_to_file` for more clarity
     pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        use std::os::unix::io::AsRawFd;
+        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
 
-        let flags = if let CompactionOption::Enabled = option {
-            ffi::MDB_CP_COMPACT
-        } else {
-            0
-        };
-
-        let file = File::create(path)?;
-        let fd = file.as_raw_fd();
+        let file = File::create(&path)?;
+        let fd = get_file_fd(&file);
 
         unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
 
-        Ok(file)
-    }
-
-    #[cfg(windows)]
-    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        use std::os::windows::io::AsRawHandle;
-
-        let flags = if let CompactionOption::Enabled = option {
-            ffi::MDB_CP_COMPACT
-        } else {
-            0
-        };
-
-        let file = File::create(path)?;
-        let handle = file.as_raw_handle();
-
-        unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, handle, flags))? }
+        // We reopen the file to make sure the read cursor is at the start,
+        // even a seek to start doesn't work properly.
+        let file = File::open(path)?;
 
         Ok(file)
     }
