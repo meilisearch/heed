@@ -348,18 +348,24 @@ impl Env {
 
     // TODO rename into `copy_to_file` for more clarity
     pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
-
         let file = File::create(&path)?;
         let fd = get_file_fd(&file);
 
-        unsafe { lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))? }
+        unsafe { self.copy_to_fd(fd, option)?; }
 
-        // We reopen the file to make sure the read cursor is at the start,
+        // We reopen the file to make sure the cursor is at the start,
         // even a seek to start doesn't work properly.
         let file = File::open(path)?;
 
         Ok(file)
+    }
+
+    pub unsafe fn copy_to_fd(&self, fd: ffi::mdb_filehandle_t, option: CompactionOption) -> Result<()> {
+        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
+
+        lmdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))?;
+
+        Ok(())
     }
 
     pub fn force_sync(&self) -> Result<()> {
