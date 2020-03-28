@@ -15,7 +15,7 @@ byteorder = { version = "1.3.4", default-features = false }
 heed-traits = { version = "0.7.0", path = "../heed-traits" }
 heed-types = { version = "0.7.0", path = "../heed-types" }
 libc = "0.2.68"
-lmdb-rkv-sys = "0.11.0"
+mdbx-sys = "0.7.1"
 once_cell = "1.3.1"
 page_size = "0.4.2"
 zerocopy = "0.3.0"

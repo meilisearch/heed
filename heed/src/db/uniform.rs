@@ -1,7 +1,7 @@
 use std::marker;
 use std::ops::RangeBounds;
 
-use lmdb_sys as ffi;
+use mdbx_sys as ffi;
 
 use crate::*;
 
@@ -121,7 +121,7 @@ pub struct Database<KC, DC> {
 }
 
 impl<KC, DC> Database<KC, DC> {
-    pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
+    pub(crate) fn new(dbi: ffi::MDBX_dbi) -> Database<KC, DC> {
         Database {
             dyndb: PolyDatabase::new(dbi),
             marker: std::marker::PhantomData,

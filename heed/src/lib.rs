@@ -70,7 +70,7 @@ pub use self::txn::{RoTxn, RwTxn};
 
 use std::{error, fmt, io, result};
 
-use lmdb_sys as ffi;
+use mdbx_sys as ffi;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
@@ -115,13 +115,13 @@ impl From<io::Error> for Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
-    ffi::MDB_val {
-        mv_size: value.len(),
-        mv_data: value.as_ptr() as *mut libc::c_void,
+unsafe fn into_val(value: &[u8]) -> ffi::MDBX_val {
+    ffi::MDBX_val {
+        iov_base: value.as_ptr() as *mut libc::c_void,
+        iov_len: value.len(),
     }
 }
 
-unsafe fn from_val<'a>(value: ffi::MDB_val) -> &'a [u8] {
-    std::slice::from_raw_parts(value.mv_data as *const u8, value.mv_size)
+unsafe fn from_val<'a>(value: ffi::MDBX_val) -> &'a [u8] {
+    std::slice::from_raw_parts(value.iov_base as *const u8, value.iov_len)
 }
