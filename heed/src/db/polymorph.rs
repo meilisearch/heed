@@ -5,7 +5,7 @@ use std::{marker, mem, ptr};
 use mdbx_sys as ffi;
 
 use super::advance_key;
-use crate::lmdb_error::lmdb_result;
+use crate::mdbx_error::lmdb_result;
 use crate::types::DecodeIgnore;
 use crate::*;
 

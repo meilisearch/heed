@@ -1,4 +1,5 @@
 /target
+heed/target
 **/*.rs.bk
 Cargo.lock
 /*.mdb

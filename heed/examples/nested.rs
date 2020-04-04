@@ -6,12 +6,14 @@ use heed::types::*;
 use heed::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    let path = Path::new("target").join("heed.mdb");
+
+    fs::create_dir_all(&path)?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
         .max_dbs(3000)
-        .open(Path::new("target").join("zerocopy.mdb"))?;
+        .open(path)?;
 
     // here the key will be an str and the data will be a slice of u8
     let db: Database<Str, ByteSlice> = env.create_database(None)?;

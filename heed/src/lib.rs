@@ -53,7 +53,7 @@ mod cursor;
 mod db;
 mod env;
 pub mod flags;
-mod lmdb_error;
+mod mdbx_error;
 mod txn;
 
 pub use byteorder;
@@ -64,7 +64,7 @@ use heed_traits as traits;
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
-pub use self::lmdb_error::Error as LmdbError;
+pub use self::mdbx_error::Error as LmdbError;
 pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 

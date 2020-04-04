@@ -11,7 +11,7 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
-use crate::lmdb_error::lmdb_result;
+use crate::mdbx_error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use mdbx_sys as ffi;
 use once_cell::sync::OnceCell;

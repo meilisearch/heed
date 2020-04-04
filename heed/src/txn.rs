@@ -4,7 +4,7 @@ use std::ptr;
 
 use mdbx_sys as ffi;
 
-use crate::lmdb_error::lmdb_result;
+use crate::mdbx_error::lmdb_result;
 use crate::Result;
 
 pub struct RoTxn<T=()> {

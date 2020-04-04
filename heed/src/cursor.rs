@@ -3,7 +3,7 @@ use std::{marker, mem, ptr};
 
 use mdbx_sys as ffi;
 
-use crate::lmdb_error::lmdb_result;
+use crate::mdbx_error::lmdb_result;
 use crate::*;
 
 pub struct RoCursor<'txn> {
