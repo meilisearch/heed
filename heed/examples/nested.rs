@@ -23,7 +23,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // -----
 
-    let grtxn = env.read_txn()?;
     let mut wtxn = env.write_txn()?;
 
     let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
@@ -53,10 +52,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     nnwtxn.commit()?;
     nwtxn.commit()?;
 
-    let ret = db.get(&grtxn, "humm...")?;
-    println!("grand parent (reader) \"humm...\": {:?}", ret);
-    grtxn.abort()?;
-
     let ret = db.get(&wtxn, "humm...")?;
     println!("parent \"humm...\": {:?}", ret);
 
@@ -67,7 +62,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("parent commit");
     wtxn.commit()?;
-    // wtxn.abort();
 
     // ------
     println!();
