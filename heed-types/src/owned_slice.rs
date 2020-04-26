@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::types::CowSlice;
-use crate::{BytesDecode, BytesEncode};
+use crate::CowSlice;
+use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes a [`Vec`] of types that are totally owned (doesn't
 /// hold any reference to the original slice).

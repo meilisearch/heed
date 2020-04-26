@@ -1,5 +1,5 @@
-use crate::types::UnalignedSlice;
-use crate::{BytesDecode, BytesEncode};
+use crate::UnalignedSlice;
+use heed_traits::{BytesDecode, BytesEncode};
 use std::borrow::Cow;
 
 /// Describes an [`str`].

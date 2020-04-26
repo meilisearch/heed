@@ -9,7 +9,7 @@ use heed::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(Path::new("target").join("zerocopy-dyn.mdb"))?;
+    fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB

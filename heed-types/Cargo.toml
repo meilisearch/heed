@@ -1,0 +1,26 @@
+[package]
+name = "heed-types"
+version = "0.7.0"
+authors = ["Kerollmops <renault.cle@gmail.com>"]
+description = "The types used with the fully typed LMDB wrapper, heed"
+license = "MIT"
+repository = "https://github.com/Kerollmops/heed"
+readme = "../README.md"
+edition = "2018"
+
+[dependencies]
+bincode = { version = "1.2.1", optional = true }
+heed-traits = { version = "0.7.0", path = "../heed-traits" }
+serde = { version = "1.0.105", optional = true }
+serde_json = { version = "1.0.49", optional = true }
+zerocopy = "0.3.0"
+
+[features]
+default = ["serde-bincode", "serde-json"]
+serde-bincode = ["serde", "bincode"]
+serde-json = ["serde", "serde_json"]
+# serde_json features
+preserve_order = ["serde_json/preserve_order"]
+arbitrary_precision = ["serde_json/arbitrary_precision"]
+raw_value = ["serde_json/raw_value"]
+unbounded_depth = ["serde_json/unbounded_depth"]

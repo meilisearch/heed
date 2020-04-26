@@ -79,7 +79,7 @@ pub type ByteSlice = UnalignedSlice<u8>;
 /// or to ensure that an entry exist for example.
 pub struct DecodeIgnore;
 
-impl crate::traits::BytesDecode<'_> for DecodeIgnore {
+impl heed_traits::BytesDecode<'_> for DecodeIgnore {
     type DItem = ();
 
     fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {

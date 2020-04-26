@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use crate::types::CowType;
-use crate::{BytesDecode, BytesEncode};
+use crate::CowType;
+use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes};
 
 /// Describes a type that is totally owned (doesn't

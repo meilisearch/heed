@@ -1,5 +1,5 @@
-use crate::{BytesDecode, BytesEncode};
 use std::borrow::Cow;
+use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes the [unit `()`] type.
 ///

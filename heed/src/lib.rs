@@ -54,12 +54,12 @@ mod db;
 mod env;
 pub mod flags;
 mod lmdb_error;
-mod traits;
 mod txn;
-pub mod types;
 
 pub use byteorder;
+pub use heed_types as types;
 pub use zerocopy;
+use heed_traits as traits;
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};

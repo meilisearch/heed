@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::{mem, ptr};
 
-use crate::types::aligned_to;
-use crate::{BytesDecode, BytesEncode};
+use crate::aligned_to;
+use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 
 /// Describes a slice that must be [memory aligned] and

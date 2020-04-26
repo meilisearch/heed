@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{BytesDecode, BytesEncode};
+use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
 
 /// Describes a slice that is totally borrowed and doesn't

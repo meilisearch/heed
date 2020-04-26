@@ -1,4 +1,4 @@
-use crate::{BytesDecode, BytesEncode};
+use heed_traits::{BytesDecode, BytesEncode};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
