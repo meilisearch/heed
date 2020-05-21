@@ -15,7 +15,8 @@ byteorder = { version = "1.3.4", default-features = false }
 heed-traits = { version = "0.7.0", path = "../heed-traits" }
 heed-types = { version = "0.7.0", path = "../heed-types" }
 libc = "0.2.68"
-mdbx-sys = "0.7.1"
+lmdb-rkv-sys = { version = "0.11.0", optional = true }
+mdbx-sys = { version = "0.7.1", optional = true }
 once_cell = "1.3.1"
 page_size = "0.4.2"
 zerocopy = "0.3.0"
@@ -27,9 +28,19 @@ url = "2.1.1"
 serde = { version = "1.0.105", features = ["derive"] }
 
 [features]
-default = ["serde-bincode", "serde-json"]
+default = ["lmdb", "serde-bincode", "serde-json"]
+
+# Choose between using the MDBX key-value store or LMDB
+# MDBX is a fork of LMDB: https://github.com/erthink/libmdbx
+#
+# You cannot use both features at the same time, you have to choose!
+lmdb = ["lmdb-rkv-sys"]
+mdbx = ["mdbx-sys"]
+
+# Enable the serde en/decoders for bincode or serde_json
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]
 serde-json = ["heed-types/serde", "heed-types/serde_json"]
+
 # serde_json features
 preserve_order = ["heed-types/preserve_order"]
 arbitrary_precision = ["heed-types/arbitrary_precision"]

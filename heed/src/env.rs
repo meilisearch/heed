@@ -11,9 +11,9 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
-use crate::mdbx_error::lmdb_result;
+use crate::mdb::error::lmdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
-use mdbx_sys as ffi;
+use crate::mdb::ffi;
 use once_cell::sync::OnceCell;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
@@ -160,23 +160,23 @@ impl EnvOpenOptions {
                 let path = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
-                    let mut env: *mut ffi::MDBX_env = ptr::null_mut();
-                    lmdb_result(ffi::mdbx_env_create(&mut env))?;
+                    let mut env: *mut ffi::MDB_env = ptr::null_mut();
+                    lmdb_result(ffi::mdb_env_create(&mut env))?;
 
                     if let Some(size) = self.map_size {
-                        lmdb_result(ffi::mdbx_env_set_mapsize(env, size))?;
+                        lmdb_result(ffi::mdb_env_set_mapsize(env, size))?;
                     }
 
                     if let Some(readers) = self.max_readers {
-                        lmdb_result(ffi::mdbx_env_set_maxreaders(env, readers))?;
+                        lmdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
                     }
 
                     if let Some(dbs) = self.max_dbs {
-                        lmdb_result(ffi::mdbx_env_set_maxdbs(env, dbs))?;
+                        lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
                     let result =
-                        lmdb_result(ffi::mdbx_env_open(env, path.as_ptr(), self.flags, 0o600));
+                        lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
 
                     match result {
                         Ok(()) => {
@@ -188,7 +188,7 @@ impl EnvOpenOptions {
                             Ok(entry.insert(env).clone())
                         }
                         Err(e) => {
-                            ffi::mdbx_env_close(env);
+                            ffi::mdb_env_close(env);
                             Err(e.into())
                         }
                     }
@@ -202,7 +202,7 @@ impl EnvOpenOptions {
 pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
-    env: *mut ffi::MDBX_env,
+    env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
 }
 
@@ -248,7 +248,7 @@ impl Env {
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe { lmdb_result(ffi::mdbx_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
+        let result = unsafe { lmdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
 
         drop(name);
 
@@ -300,10 +300,10 @@ impl Env {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
-            lmdb_result(ffi::mdbx_dbi_open(
+            lmdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
                 name_ptr,
-                ffi::MDBX_CREATE,
+                ffi::MDB_CREATE,
                 &mut dbi,
             ))
         };
@@ -360,16 +360,24 @@ impl Env {
         Ok(file)
     }
 
-    pub unsafe fn copy_to_fd(&self, fd: ffi::mdbx_filehandle_t, option: CompactionOption) -> Result<()> {
-        let flags = if let CompactionOption::Enabled = option { ffi::MDBX_CP_COMPACT } else { 0 };
+    pub unsafe fn copy_to_fd(&self, fd: ffi::mdb_filehandle_t, option: CompactionOption) -> Result<()> {
+        let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
 
-        lmdb_result(ffi::mdbx_env_copy2fd(self.0.env, fd, flags))?;
+        lmdb_result(ffi::mdb_env_copy2fd(self.0.env, fd, flags))?;
 
         Ok(())
     }
 
+    #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn force_sync(&self) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdbx_env_sync(self.0.env))? }
+        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
+
+        Ok(())
+    }
+
+    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+    pub fn force_sync(&self) -> Result<()> {
+        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env))? }
 
         Ok(())
     }

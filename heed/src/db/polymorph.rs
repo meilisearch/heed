@@ -2,12 +2,11 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{marker, mem, ptr};
 
-use mdbx_sys as ffi;
-
-use super::advance_key;
-use crate::mdbx_error::lmdb_result;
-use crate::types::DecodeIgnore;
 use crate::*;
+use crate::mdb::error::lmdb_result;
+use crate::mdb::ffi;
+use crate::types::DecodeIgnore;
+use super::advance_key;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -106,11 +105,11 @@ use crate::*;
 /// ```
 #[derive(Copy, Clone)]
 pub struct PolyDatabase {
-    pub(crate) dbi: ffi::MDBX_dbi,
+    pub(crate) dbi: ffi::MDB_dbi,
 }
 
 impl PolyDatabase {
-    pub(crate) fn new(dbi: ffi::MDBX_dbi) -> PolyDatabase {
+    pub(crate) fn new(dbi: ffi::MDB_dbi) -> PolyDatabase {
         PolyDatabase { dbi }
     }
 
@@ -162,7 +161,7 @@ impl PolyDatabase {
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
-            lmdb_result(ffi::mdbx_get(
+            lmdb_result(ffi::mdb_get(
                 txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -856,7 +855,7 @@ impl PolyDatabase {
         let flags = 0;
 
         unsafe {
-            lmdb_result(ffi::mdbx_put(
+            lmdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -919,10 +918,10 @@ impl PolyDatabase {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = ffi::MDBX_APPEND;
+        let flags = ffi::MDB_APPEND;
 
         unsafe {
-            lmdb_result(ffi::mdbx_put(
+            lmdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -983,7 +982,7 @@ impl PolyDatabase {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {
-            lmdb_result(ffi::mdbx_del(
+            lmdb_result(ffi::mdb_del(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -1103,6 +1102,6 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdbx_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
+        unsafe { lmdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }

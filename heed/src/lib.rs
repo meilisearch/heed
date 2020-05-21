@@ -52,8 +52,7 @@
 mod cursor;
 mod db;
 mod env;
-pub mod flags;
-mod mdbx_error;
+mod mdb;
 mod txn;
 
 pub use byteorder;
@@ -61,16 +60,16 @@ pub use heed_types as types;
 pub use zerocopy;
 use heed_traits as traits;
 
-use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
-pub use self::mdbx_error::Error as LmdbError;
+pub use self::mdb::error::Error as LmdbError;
+pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
+use self::cursor::{RoCursor, RwCursor};
+use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
-
-use mdbx_sys as ffi;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
@@ -114,14 +113,3 @@ impl From<io::Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
-
-unsafe fn into_val(value: &[u8]) -> ffi::MDBX_val {
-    ffi::MDBX_val {
-        iov_base: value.as_ptr() as *mut libc::c_void,
-        iov_len: value.len(),
-    }
-}
-
-unsafe fn from_val<'a>(value: ffi::MDBX_val) -> &'a [u8] {
-    std::slice::from_raw_parts(value.iov_base as *const u8, value.iov_len)
-}

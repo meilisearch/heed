@@ -1,21 +1,20 @@
 use std::ops::{Deref, DerefMut};
 use std::{marker, mem, ptr};
 
-use mdbx_sys as ffi;
-
-use crate::mdbx_error::lmdb_result;
 use crate::*;
+use crate::mdb::error::lmdb_result;
+use crate::mdb::ffi;
 
 pub struct RoCursor<'txn> {
-    cursor: *mut ffi::MDBX_cursor,
+    cursor: *mut ffi::MDB_cursor,
     _marker: marker::PhantomData<&'txn ()>,
 }
 
 impl<'txn> RoCursor<'txn> {
-    pub(crate) fn new<T>(txn: &'txn RoTxn<T>, dbi: ffi::MDBX_dbi) -> Result<RoCursor<'txn>> {
-        let mut cursor: *mut ffi::MDBX_cursor = ptr::null_mut();
+    pub(crate) fn new<T>(txn: &'txn RoTxn<T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
+        let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
-        unsafe { lmdb_result(ffi::mdbx_cursor_open(txn.txn, dbi, &mut cursor))? }
+        unsafe { lmdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
 
         Ok(RoCursor {
             cursor,
@@ -29,11 +28,11 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor on the first database key
         let result = unsafe {
-            lmdb_result(ffi::mdbx_cursor_get(
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::MDBX_cursor_op::MDBX_FIRST,
+                ffi::cursor_op::MDB_FIRST,
             ))
         };
 
@@ -54,11 +53,11 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor on the first database key
         let result = unsafe {
-            lmdb_result(ffi::mdbx_cursor_get(
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::MDBX_cursor_op::MDBX_LAST,
+                ffi::cursor_op::MDB_LAST,
             ))
         };
 
@@ -82,11 +81,11 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor to the specified key
         let result = unsafe {
-            lmdb_result(ffi::mdbx_cursor_get(
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 &mut key_val,
                 data_val.as_mut_ptr(),
-                ffi::MDBX_cursor_op::MDBX_SET_RANGE,
+                ffi::cursor_op::MDB_SET_RANGE,
             ))
         };
 
@@ -107,11 +106,11 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor to the next non-dup key
         let result = unsafe {
-            lmdb_result(ffi::mdbx_cursor_get(
+            lmdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::MDBX_cursor_op::MDBX_NEXT,
+                ffi::cursor_op::MDB_NEXT,
             ))
         };
 
@@ -129,7 +128,7 @@ impl<'txn> RoCursor<'txn> {
 
 impl Drop for RoCursor<'_> {
     fn drop(&mut self) {
-        unsafe { ffi::mdbx_cursor_close(self.cursor) }
+        unsafe { ffi::mdb_cursor_close(self.cursor) }
     }
 }
 
@@ -138,7 +137,7 @@ pub struct RwCursor<'txn> {
 }
 
 impl<'txn> RwCursor<'txn> {
-    pub(crate) fn new<T>(txn: &'txn RwTxn<T>, dbi: ffi::MDBX_dbi) -> Result<RwCursor<'txn>> {
+    pub(crate) fn new<T>(txn: &'txn RwTxn<T>, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
         Ok(RwCursor {
             cursor: RoCursor::new(txn, dbi)?,
         })
@@ -150,11 +149,11 @@ impl<'txn> RwCursor<'txn> {
 
         // Modify the pointed data
         let result = unsafe {
-            lmdb_result(ffi::mdbx_cursor_put(
+            lmdb_result(ffi::mdb_cursor_put(
                 self.cursor.cursor,
                 &mut key_val,
                 &mut data_val,
-                ffi::MDBX_CURRENT,
+                ffi::MDB_CURRENT,
             ))
         };
 
@@ -167,7 +166,7 @@ impl<'txn> RwCursor<'txn> {
 
     pub fn del_current(&mut self) -> Result<bool> {
         // Delete the current entry
-        let result = unsafe { lmdb_result(ffi::mdbx_cursor_del(self.cursor.cursor, 0)) };
+        let result = unsafe { lmdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
 
         match result {
             Ok(()) => Ok(true),

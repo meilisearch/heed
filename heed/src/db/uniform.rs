@@ -1,9 +1,8 @@
 use std::marker;
 use std::ops::RangeBounds;
 
-use mdbx_sys as ffi;
-
 use crate::*;
+use crate::mdb::ffi;
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -121,7 +120,7 @@ pub struct Database<KC, DC> {
 }
 
 impl<KC, DC> Database<KC, DC> {
-    pub(crate) fn new(dbi: ffi::MDBX_dbi) -> Database<KC, DC> {
+    pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
         Database {
             dyndb: PolyDatabase::new(dbi),
             marker: std::marker::PhantomData,
