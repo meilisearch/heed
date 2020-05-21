@@ -62,7 +62,7 @@ use heed_traits as traits;
 
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
-pub use self::mdb::error::Error as LmdbError;
+pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
@@ -75,7 +75,7 @@ use std::{error, fmt, io, result};
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
-    Lmdb(LmdbError),
+    Mdb(MdbError),
     Encoding,
     Decoding,
     InvalidDatabaseTyping,
@@ -85,7 +85,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Io(error) => write!(f, "{}", error),
-            Error::Lmdb(error) => write!(f, "{}", error),
+            Error::Mdb(error) => write!(f, "{}", error),
             Error::Encoding => write!(f, "error while encoding"),
             Error::Decoding => write!(f, "error while decoding"),
             Error::InvalidDatabaseTyping => {
@@ -97,11 +97,11 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-impl From<LmdbError> for Error {
-    fn from(error: LmdbError) -> Error {
+impl From<MdbError> for Error {
+    fn from(error: MdbError) -> Error {
         match error {
-            LmdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
-            _ => Error::Lmdb(error),
+            MdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
+            _ => Error::Mdb(error),
         }
     }
 }

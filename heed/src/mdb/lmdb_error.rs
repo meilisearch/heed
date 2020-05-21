@@ -136,7 +136,7 @@ impl fmt::Display for Error {
 
 impl StdError for Error {}
 
-pub fn lmdb_result(err_code: c_int) -> Result<(), Error> {
+pub fn mdb_result(err_code: c_int) -> Result<(), Error> {
     if err_code == ffi::MDB_SUCCESS {
         Ok(())
     } else {

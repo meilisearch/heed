@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 use std::{marker, mem, ptr};
 
 use crate::*;
-use crate::mdb::error::lmdb_result;
+use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 
 pub struct RoCursor<'txn> {
@@ -14,7 +14,7 @@ impl<'txn> RoCursor<'txn> {
     pub(crate) fn new<T>(txn: &'txn RoTxn<T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
-        unsafe { lmdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
+        unsafe { mdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
 
         Ok(RoCursor {
             cursor,
@@ -28,7 +28,7 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor on the first database key
         let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_get(
+            mdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
@@ -53,7 +53,7 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor on the first database key
         let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_get(
+            mdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
@@ -81,7 +81,7 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor to the specified key
         let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_get(
+            mdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 &mut key_val,
                 data_val.as_mut_ptr(),
@@ -106,7 +106,7 @@ impl<'txn> RoCursor<'txn> {
 
         // Move the cursor to the next non-dup key
         let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_get(
+            mdb_result(ffi::mdb_cursor_get(
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
@@ -149,7 +149,7 @@ impl<'txn> RwCursor<'txn> {
 
         // Modify the pointed data
         let result = unsafe {
-            lmdb_result(ffi::mdb_cursor_put(
+            mdb_result(ffi::mdb_cursor_put(
                 self.cursor.cursor,
                 &mut key_val,
                 &mut data_val,
@@ -166,7 +166,7 @@ impl<'txn> RwCursor<'txn> {
 
     pub fn del_current(&mut self) -> Result<bool> {
         // Delete the current entry
-        let result = unsafe { lmdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
+        let result = unsafe { mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
 
         match result {
             Ok(()) => Ok(true),

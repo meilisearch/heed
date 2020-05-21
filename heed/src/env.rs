@@ -11,7 +11,7 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::flags::Flags;
-use crate::mdb::error::lmdb_result;
+use crate::mdb::error::mdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
 use once_cell::sync::OnceCell;
@@ -161,22 +161,22 @@ impl EnvOpenOptions {
 
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
-                    lmdb_result(ffi::mdb_env_create(&mut env))?;
+                    mdb_result(ffi::mdb_env_create(&mut env))?;
 
                     if let Some(size) = self.map_size {
-                        lmdb_result(ffi::mdb_env_set_mapsize(env, size))?;
+                        mdb_result(ffi::mdb_env_set_mapsize(env, size))?;
                     }
 
                     if let Some(readers) = self.max_readers {
-                        lmdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
+                        mdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
                     }
 
                     if let Some(dbs) = self.max_dbs {
-                        lmdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
+                        mdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
                     let result =
-                        lmdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
+                        mdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
 
                     match result {
                         Ok(()) => {
@@ -248,7 +248,7 @@ impl Env {
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe { lmdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
+        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
 
         drop(name);
 
@@ -300,7 +300,7 @@ impl Env {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
         let result = unsafe {
-            lmdb_result(ffi::mdb_dbi_open(
+            mdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
                 name_ptr,
                 ffi::MDB_CREATE,
@@ -363,21 +363,21 @@ impl Env {
     pub unsafe fn copy_to_fd(&self, fd: ffi::mdb_filehandle_t, option: CompactionOption) -> Result<()> {
         let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
 
-        lmdb_result(ffi::mdb_env_copy2fd(self.0.env, fd, flags))?;
+        mdb_result(ffi::mdb_env_copy2fd(self.0.env, fd, flags))?;
 
         Ok(())
     }
 
     #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn force_sync(&self) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
+        unsafe { mdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
 
         Ok(())
     }
 
     #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
     pub fn force_sync(&self) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdb_env_sync(self.0.env))? }
+        unsafe { mdb_result(ffi::mdb_env_sync(self.0.env))? }
 
         Ok(())
     }

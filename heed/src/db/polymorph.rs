@@ -3,7 +3,7 @@ use std::ops::{Bound, RangeBounds};
 use std::{marker, mem, ptr};
 
 use crate::*;
-use crate::mdb::error::lmdb_result;
+use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::types::DecodeIgnore;
 use super::advance_key;
@@ -161,7 +161,7 @@ impl PolyDatabase {
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
-            lmdb_result(ffi::mdb_get(
+            mdb_result(ffi::mdb_get(
                 txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -855,7 +855,7 @@ impl PolyDatabase {
         let flags = 0;
 
         unsafe {
-            lmdb_result(ffi::mdb_put(
+            mdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -921,7 +921,7 @@ impl PolyDatabase {
         let flags = ffi::MDB_APPEND;
 
         unsafe {
-            lmdb_result(ffi::mdb_put(
+            mdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -982,7 +982,7 @@ impl PolyDatabase {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {
-            lmdb_result(ffi::mdb_del(
+            mdb_result(ffi::mdb_del(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -1102,6 +1102,6 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
+        unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }
