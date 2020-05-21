@@ -92,11 +92,7 @@ pub enum Error {
 
 impl Error {
     pub fn not_found(&self) -> bool {
-        if let Error::NotFound = self {
-            true
-        } else {
-            false
-        }
+        *self == Error::NotFound
     }
 
     /// Converts a raw error code to an `Error`.

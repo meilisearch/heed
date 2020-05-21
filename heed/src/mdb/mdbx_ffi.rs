@@ -22,6 +22,7 @@ pub use ffi::mdbx_env_set_maxreaders as mdb_env_set_maxreaders;
 pub use ffi::mdbx_env_sync as mdb_env_sync;
 
 pub use ffi::mdbx_dbi_open as mdb_dbi_open;
+pub use ffi::mdbx_dbi_sequence;
 pub use ffi::mdbx_del as mdb_del;
 pub use ffi::mdbx_drop as mdb_drop;
 pub use ffi::mdbx_get as mdb_get;
