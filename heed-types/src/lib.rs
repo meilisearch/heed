@@ -24,24 +24,24 @@
 //! If you don't want to/cannot deal with `AsBytes`, `Frombytes` or `Unaligned` requirements
 //! we recommend you to use the `SerdeBincode` or `SerdeJson` types and deal with the `Serialize`/`Deserialize` traits.
 //!
-//! [`AsBytes`]: zerocopy::AsBytes
-//! [`FromBytes`]: zerocopy::FromBytes
-//! [`Unaligned`]: zerocopy::Unaligned
+//! [`AsBytes`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.AsBytes.html
+//! [`FromBytes`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.FromBytes.html
+//! [`Unaligned`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.Unaligned.html
 //!
-//! [`Str`]: crate::types::Str
+//! [`Str`]: struct.Str.html
 //! [unit `()`]: https://doc.rust-lang.org/std/primitive.unit.html
-//! [`Unit`]: crate::types::Unit
-//! [`SerdeBincode`]: crate::types::SerdeBincode
-//! [`SerdeJson`]: crate::types::SerdeJson
-//! [`Serialize`]: serde::Serialize
-//! [`Deserialize`]: serde::Deserialize
+//! [`Unit`]: struct.Unit.html
+//! [`SerdeBincode`]: struct.SerdeBincode.html
+//! [`SerdeJson`]: struct.SerdeJson.html
+//! [`Serialize`]: https://docs.rs/serde/1.0.110/serde/trait.Serialize.html
+//! [`Deserialize`]: https://docs.rs/serde/1.0.110/serde/trait.Deserialize.html
 //!
-//! [`CowSlice`]: crate::types::CowSlice
-//! [`CowType`]: crate::types::CowType
-//! [`OwnedSlice`]: crate::types::OwnedSlice
-//! [`OwnedType`]: crate::types::OwnedType
-//! [`UnalignedSlice`]: crate::types::UnalignedSlice
-//! [`UnalignedType`]: crate::types::UnalignedType
+//! [`CowSlice`]: struct.CowSlice.html
+//! [`CowType`]: struct.CowType.html
+//! [`OwnedSlice`]: struct.OwnedSlice.html
+//! [`OwnedType`]: struct.OwnedType.html
+//! [`UnalignedSlice`]: struct.UnalignedSlice.html
+//! [`UnalignedType`]: struct.UnalignedType.html
 
 mod cow_slice;
 mod cow_type;
