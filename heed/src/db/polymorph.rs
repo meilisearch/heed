@@ -2,12 +2,11 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{marker, mem, ptr};
 
-use lmdb_sys as ffi;
-
-use super::advance_key;
-use crate::lmdb_error::lmdb_result;
-use crate::types::DecodeIgnore;
 use crate::*;
+use crate::mdb::error::mdb_result;
+use crate::mdb::ffi;
+use crate::types::DecodeIgnore;
+use super::advance_key;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -54,9 +53,9 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 ///
-/// # Example: Selete ranges of entries
+/// # Example: Select ranges of entries
 ///
-/// Discern also support ranges deletions.
+/// Heed also support ranges deletions.
 /// Same configuration as above, numbers are ordered, therefore it is safe to specify
 /// a range and be able to iterate over and/or delete it.
 ///
@@ -114,6 +113,123 @@ impl PolyDatabase {
         PolyDatabase { dbi }
     }
 
+    /// Retrieve the sequence of a database.
+    ///
+    /// This function allows to retrieve the unique positive integer of this database.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// let db = env.create_poly_database(Some("use-sequence-1"))?;
+    ///
+    /// // The sequence starts at zero
+    /// let rtxn = env.read_txn()?;
+    /// let ret = db.sequence(&rtxn)?;
+    /// assert_eq!(ret, 0);
+    /// rtxn.abort()?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// let incr = db.increase_sequence(&mut wtxn, 32)?;
+    /// assert_eq!(incr, Some(0));
+    /// let incr = db.increase_sequence(&mut wtxn, 28)?;
+    /// assert_eq!(incr, Some(32));
+    /// wtxn.commit()?;
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let ret = db.sequence(&rtxn)?;
+    /// assert_eq!(ret, 60);
+    ///
+    /// # Ok(()) }
+    /// ```
+    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+    pub fn sequence<T>(&self, txn: &RoTxn<T>) -> Result<u64> {
+        let mut value = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdbx_dbi_sequence(
+                txn.txn,
+                self.dbi,
+                value.as_mut_ptr(),
+                0, // increment must be 0 for read-only transactions
+            ))
+        };
+
+        match result {
+            Ok(()) => unsafe { Ok(value.assume_init()) },
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Increment the sequence of a database.
+    ///
+    /// This function allows to create a linear sequence of a unique positive integer
+    /// for this database. Sequence changes become visible outside the current write
+    /// transaction after it is committed, and discarded on abort.
+    ///
+    /// Returns `Some` with the previous value and `None` if increasing the value
+    /// resulted in an overflow an therefore cannot be executed.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// let db = env.create_poly_database(Some("use-sequence-2"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let incr = db.increase_sequence(&mut wtxn, 32)?;
+    /// assert_eq!(incr, Some(0));
+    /// let incr = db.increase_sequence(&mut wtxn, 28)?;
+    /// assert_eq!(incr, Some(32));
+    /// wtxn.commit()?;
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let ret = db.sequence(&rtxn)?;
+    /// assert_eq!(ret, 60);
+    ///
+    /// # Ok(()) }
+    /// ```
+    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+    pub fn increase_sequence<T>(&self, txn: &mut RwTxn<T>, increment: u64) -> Result<Option<u64>> {
+        use crate::mdb::error::Error;
+
+        let mut value = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdbx_dbi_sequence(
+                txn.txn,
+                self.dbi,
+                value.as_mut_ptr(),
+                increment,
+            ))
+        };
+
+        match result {
+            Ok(()) => unsafe { Ok(Some(value.assume_init())) },
+            Err(Error::Other(c)) if c == i32::max_value() => Ok(None), // MDBX_RESULT_TRUE
+            Err(e) => Err(e.into()),
+        }
+    }
+
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
@@ -162,7 +278,7 @@ impl PolyDatabase {
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
-            lmdb_result(ffi::mdb_get(
+            mdb_result(ffi::mdb_get(
                 txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -856,7 +972,7 @@ impl PolyDatabase {
         let flags = 0;
 
         unsafe {
-            lmdb_result(ffi::mdb_put(
+            mdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -919,10 +1035,10 @@ impl PolyDatabase {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = lmdb_sys::MDB_APPEND;
+        let flags = ffi::MDB_APPEND;
 
         unsafe {
-            lmdb_result(ffi::mdb_put(
+            mdb_result(ffi::mdb_put(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -983,7 +1099,7 @@ impl PolyDatabase {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {
-            lmdb_result(ffi::mdb_del(
+            mdb_result(ffi::mdb_del(
                 txn.txn.txn,
                 self.dbi,
                 &mut key_val,
@@ -1103,6 +1219,6 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
-        unsafe { lmdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
+        unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }

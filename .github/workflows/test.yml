@@ -21,13 +21,21 @@ jobs:
             asset_name: meilidb-http-macos-amd64
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Run cargo test
+
+      # Test the LMDB backend
+      - name: Run cargo test LMDB
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          run: cd heed && cargo test --features 'lmdb serde-json' --no-default-features
+
+      # Test the MDBX backend
+      - name: Run cargo test MDBX
+        uses: actions-rs/cargo@v1
+        with:
+          run: cd heed && cargo test --features 'mdbx serde-json' --no-default-features

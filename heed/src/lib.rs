@@ -52,8 +52,7 @@
 mod cursor;
 mod db;
 mod env;
-pub mod flags;
-mod lmdb_error;
+mod mdb;
 mod txn;
 
 pub use byteorder;
@@ -61,22 +60,22 @@ pub use heed_types as types;
 pub use zerocopy;
 use heed_traits as traits;
 
-use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
-pub use self::lmdb_error::Error as LmdbError;
+pub use self::mdb::error::Error as MdbError;
+pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
+use self::cursor::{RoCursor, RwCursor};
+use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
-
-use lmdb_sys as ffi;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
-    Lmdb(LmdbError),
+    Mdb(MdbError),
     Encoding,
     Decoding,
     InvalidDatabaseTyping,
@@ -86,7 +85,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Io(error) => write!(f, "{}", error),
-            Error::Lmdb(error) => write!(f, "{}", error),
+            Error::Mdb(error) => write!(f, "{}", error),
             Error::Encoding => write!(f, "error while encoding"),
             Error::Decoding => write!(f, "error while decoding"),
             Error::InvalidDatabaseTyping => {
@@ -98,11 +97,11 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-impl From<LmdbError> for Error {
-    fn from(error: LmdbError) -> Error {
+impl From<MdbError> for Error {
+    fn from(error: MdbError) -> Error {
         match error {
-            LmdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
-            _ => Error::Lmdb(error),
+            MdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
+            _ => Error::Mdb(error),
         }
     }
 }
@@ -114,14 +113,3 @@ impl From<io::Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
-
-unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
-    ffi::MDB_val {
-        mv_size: value.len(),
-        mv_data: value.as_ptr() as *mut libc::c_void,
-    }
-}
-
-unsafe fn from_val<'a>(value: ffi::MDB_val) -> &'a [u8] {
-    std::slice::from_raw_parts(value.mv_data as *const u8, value.mv_size)
-}

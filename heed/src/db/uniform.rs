@@ -1,9 +1,8 @@
 use std::marker;
 use std::ops::RangeBounds;
 
-use lmdb_sys as ffi;
-
 use crate::*;
+use crate::mdb::ffi;
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -126,6 +125,29 @@ impl<KC, DC> Database<KC, DC> {
             dyndb: PolyDatabase::new(dbi),
             marker: std::marker::PhantomData,
         }
+    }
+
+    /// Retrieve the sequence of a database.
+    ///
+    /// This function allows to retrieve the unique positive integer of this database.
+    /// You can see an example usage on the `PolyDatabase::sequence` method documentation.
+    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+    pub fn sequence<T>(&self, txn: &RoTxn<T>) -> Result<u64> {
+        self.dyndb.sequence(txn)
+    }
+
+    /// Increment the sequence of a database.
+    ///
+    /// This function allows to create a linear sequence of a unique positive integer
+    /// for this database. Sequence changes become visible outside the current write
+    /// transaction after it is committed, and discarded on abort.
+    /// You can see an example usage on the `PolyDatabase::increase_sequence` method documentation.
+    ///
+    /// Returns `Some` with the previous value and `None` if increasing the value
+    /// resulted in an overflow an therefore cannot be executed.
+    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+    pub fn increase_sequence<T>(&self, txn: &mut RwTxn<T>, increment: u64) -> Result<Option<u64>> {
+        self.dyndb.increase_sequence(txn, increment)
     }
 
     /// Retrieves the value associated with a key.

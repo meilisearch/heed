@@ -59,11 +59,7 @@ pub enum Error {
 
 impl Error {
     pub fn not_found(&self) -> bool {
-        if let Error::NotFound = self {
-            true
-        } else {
-            false
-        }
+        *self == Error::NotFound
     }
 
     /// Converts a raw error code to an `Error`.
@@ -136,7 +132,7 @@ impl fmt::Display for Error {
 
 impl StdError for Error {}
 
-pub fn lmdb_result(err_code: c_int) -> Result<(), Error> {
+pub fn mdb_result(err_code: c_int) -> Result<(), Error> {
     if err_code == ffi::MDB_SUCCESS {
         Ok(())
     } else {

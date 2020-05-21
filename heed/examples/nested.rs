@@ -6,12 +6,14 @@ use heed::types::*;
 use heed::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    let path = Path::new("target").join("heed.mdb");
+
+    fs::create_dir_all(&path)?;
 
     let env = EnvOpenOptions::new()
         .map_size(10 * 1024 * 1024 * 1024) // 10GB
         .max_dbs(3000)
-        .open(Path::new("target").join("zerocopy.mdb"))?;
+        .open(path)?;
 
     // here the key will be an str and the data will be a slice of u8
     let db: Database<Str, ByteSlice> = env.create_database(None)?;
@@ -23,7 +25,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // -----
 
-    let grtxn = env.read_txn()?;
     let mut wtxn = env.write_txn()?;
 
     let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
@@ -33,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("nested(1) \"what\": {:?}", ret);
 
     println!("nested(1) abort");
-    nwtxn.abort();
+    nwtxn.abort()?;
 
     let ret = db.get(&wtxn, "what")?;
     println!("parent \"what\": {:?}", ret);
@@ -53,10 +54,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     nnwtxn.commit()?;
     nwtxn.commit()?;
 
-    let ret = db.get(&grtxn, "humm...")?;
-    println!("grand parent (reader) \"humm...\": {:?}", ret);
-    grtxn.abort();
-
     let ret = db.get(&wtxn, "humm...")?;
     println!("parent \"humm...\": {:?}", ret);
 
@@ -67,7 +64,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("parent commit");
     wtxn.commit()?;
-    // wtxn.abort();
 
     // ------
     println!();
