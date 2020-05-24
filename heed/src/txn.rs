@@ -33,8 +33,10 @@ impl<T> RoTxn<T> {
         result.map_err(Into::into)
     }
 
-    pub fn abort(self) -> Result<()> {
-        abort_txn(self.txn)
+    pub fn abort(mut self) -> Result<()> {
+        abort_txn(self.txn)?;
+        self.txn = ptr::null_mut();
+        Ok(())
     }
 }
 
