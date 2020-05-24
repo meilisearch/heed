@@ -216,7 +216,7 @@ impl PolyDatabase {
 
         let result = unsafe {
             mdb_result(ffi::mdbx_dbi_sequence(
-                txn.txn,
+                txn.txn.txn,
                 self.dbi,
                 value.as_mut_ptr(),
                 increment,
