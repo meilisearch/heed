@@ -274,21 +274,49 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
+        let mut parent_wtxn = self.write_txn()?;
+        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
+        parent_wtxn.commit()?;
+        Ok(db)
+    }
+
+    pub fn create_database_with_txn<KC, DC>(
+        &self,
+        name: Option<&str>,
+        parent_wtxn: &mut RwTxn,
+    ) -> Result<Database<KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types))
+        self.raw_create_database(name, Some(types), parent_wtxn)
             .map(Database::new)
     }
 
     pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None).map(PolyDatabase::new)
+        let mut parent_wtxn = self.write_txn()?;
+        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
+        parent_wtxn.commit()?;
+        Ok(db)
+    }
+
+    pub fn create_poly_database_with_txn(
+        &self,
+        name: Option<&str>,
+        parent_wtxn: &mut RwTxn,
+    ) -> Result<PolyDatabase> {
+        self.raw_create_database(name, None, parent_wtxn)
+            .map(PolyDatabase::new)
     }
 
     fn raw_create_database(
         &self,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
+        parent_wtxn: &mut RwTxn,
     ) -> Result<u32> {
-        let wtxn = self.write_txn()?;
+        let wtxn = self.nested_write_txn(parent_wtxn)?;
 
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
