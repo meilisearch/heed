@@ -34,9 +34,9 @@ impl<T> RoTxn<T> {
     }
 
     pub fn abort(mut self) -> Result<()> {
-        abort_txn(self.txn)?;
+        let result = abort_txn(self.txn);
         self.txn = ptr::null_mut();
-        Ok(())
+        result
     }
 }
 
