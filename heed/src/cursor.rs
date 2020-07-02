@@ -143,6 +143,17 @@ impl<'txn> RwCursor<'txn> {
         })
     }
 
+    pub fn del_current(&mut self) -> Result<bool> {
+        // Delete the current entry
+        let result = unsafe { mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
         let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = unsafe { crate::into_val(&data) };
@@ -164,15 +175,21 @@ impl<'txn> RwCursor<'txn> {
         }
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
-        // Delete the current entry
-        let result = unsafe { mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
+    pub fn append(&mut self, key: &[u8], data: &[u8]) -> Result<()> {
+        let mut key_val = unsafe { crate::into_val(&key) };
+        let mut data_val = unsafe { crate::into_val(&data) };
 
-        match result {
-            Ok(()) => Ok(true),
-            Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(e.into()),
-        }
+        // Modify the pointed data
+        let result = unsafe {
+            mdb_result(ffi::mdb_cursor_put(
+                self.cursor.cursor,
+                &mut key_val,
+                &mut data_val,
+                ffi::MDB_APPEND,
+            ))
+        };
+
+        result.map_err(Into::into)
     }
 }
 

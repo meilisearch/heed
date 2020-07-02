@@ -68,6 +68,16 @@ impl<KC, DC> RwIter<'_, KC, DC> {
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
+
+    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RwIter<'txn, KC, DC>
