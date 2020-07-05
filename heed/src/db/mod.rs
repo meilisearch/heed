@@ -55,10 +55,20 @@ pub struct RwIter<'txn, KC, DC> {
 }
 
 impl<KC, DC> RwIter<'_, KC, DC> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
     pub fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
+    /// Write a new value to the current entry.
+    /// The given key must be equal to the one this cursor is pointing at.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// This is intended to be used when the new data is the same size as the old.
+    /// Otherwise it will simply perform a delete of the old record followed by an insert.
     pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
@@ -67,6 +77,20 @@ impl<KC, DC> RwIter<'_, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
     }
 }
 
