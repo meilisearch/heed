@@ -48,8 +48,9 @@ impl<'txn> RoCursor<'txn> {
     }
 
     pub fn move_on_first_dup_of(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-        let mut key_val = mem::MaybeUninit::uninit();
-        let mut data_val = mem::MaybeUninit::uninit();
+        let key_mdb_val =  unsafe { crate::into_val(&key) };
+        let mut key_val = mem::MaybeUninit::new(key_mdb_val);
+        let mut data_val = mem::MaybeUninit::zeroed();
 
         // Move the cursor on the first database key
         let result = unsafe {
@@ -57,7 +58,7 @@ impl<'txn> RoCursor<'txn> {
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::cursor_op::MDB_SET_KEY,
+                ffi::cursor_op::MDB_SET,
             ))
         };
 
@@ -151,8 +152,9 @@ impl<'txn> RoCursor<'txn> {
     }
 
     pub fn move_on_next_dup_of(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-        let mut key_val = mem::MaybeUninit::uninit();
-        let mut data_val = mem::MaybeUninit::uninit();
+        let key_mdb_val =  unsafe { crate::into_val(&key) };
+        let mut key_val = mem::MaybeUninit::new(key_mdb_val);
+        let mut data_val = mem::MaybeUninit::zeroed();
 
         // Move the cursor to the next non-dup key
         let result = unsafe {
