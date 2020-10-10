@@ -8,7 +8,6 @@ pub use ffi::MDB_txn as MDB_txn;
 
 pub use ffi::MDB_APPEND as MDB_APPEND;
 pub use ffi::MDB_CP_COMPACT as MDB_CP_COMPACT;
-pub use ffi::MDB_CREATE as MDB_CREATE;
 pub use ffi::MDB_CURRENT as MDB_CURRENT;
 pub use ffi::MDB_RDONLY as MDB_RDONLY;
 

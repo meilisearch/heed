@@ -10,7 +10,7 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 
-use crate::flags::Flags;
+use crate::flags::{Flags, DBFlags};
 use crate::mdb::error::mdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
@@ -217,25 +217,26 @@ pub enum CompactionOption {
 }
 
 impl Env {
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
+    pub fn open_database<KC, DC>(&self, name: Option<&str>, db_flags: Option<u32>) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
-            .raw_open_database(name, Some(types))?
+            .raw_open_database(name, Some(types), db_flags)?
             .map(Database::new))
     }
 
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
+    pub fn open_poly_database(&self, name: Option<&str>, db_flags: Option<u32>) -> Result<Option<PolyDatabase>> {
+        Ok(self.raw_open_database(name, None, db_flags)?.map(PolyDatabase::new))
     }
 
     fn raw_open_database(
         &self,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
+        db_flags: Option<u32>
     ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
@@ -248,7 +249,7 @@ impl Env {
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
+        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, db_flags.unwrap_or(0) as u32, &mut dbi)) };
 
         drop(name);
 
@@ -269,13 +270,14 @@ impl Env {
         }
     }
 
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
+    pub fn create_database<KC, DC>(&self, name: Option<&str>,
+        db_flags: Option<u32>) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
         let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
+        let db = self.create_database_with_txn(name, &mut parent_wtxn, db_flags)?;
         parent_wtxn.commit()?;
         Ok(db)
     }
@@ -284,19 +286,20 @@ impl Env {
         &self,
         name: Option<&str>,
         parent_wtxn: &mut RwTxn,
+        db_flags: Option<u32>,
     ) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
+        self.raw_create_database(name, Some(types), parent_wtxn, db_flags)
             .map(Database::new)
     }
 
-    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
+    pub fn create_poly_database(&self, name: Option<&str>, db_flags: Option<u32>) -> Result<PolyDatabase> {
         let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
+        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn, db_flags)?;
         parent_wtxn.commit()?;
         Ok(db)
     }
@@ -305,8 +308,9 @@ impl Env {
         &self,
         name: Option<&str>,
         parent_wtxn: &mut RwTxn,
+        db_flags: Option<u32>,
     ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
+        self.raw_create_database(name, None, parent_wtxn, db_flags)
             .map(PolyDatabase::new)
     }
 
@@ -315,6 +319,7 @@ impl Env {
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
         parent_wtxn: &mut RwTxn,
+        db_flags: Option<u32>,
     ) -> Result<u32> {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
 
@@ -331,7 +336,7 @@ impl Env {
             mdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
                 name_ptr,
-                ffi::MDB_CREATE,
+                DBFlags::MdbCreate as u32 | db_flags.unwrap_or(0),
                 &mut dbi,
             ))
         };

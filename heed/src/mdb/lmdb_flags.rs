@@ -13,3 +13,14 @@ pub enum Flags {
     MdbNoRdAhead = lmdb_sys::MDB_NORDAHEAD,
     MdbNoMemInit = lmdb_sys::MDB_NOMEMINIT,
 }
+
+#[repr(u32)]
+pub enum DBFlags {
+    MdbReverseKey = 0x02,
+    MdbDupSort = 0x04,
+    MdbIntegerKey = 0x08,
+    MdbDupFixed = 0x10,
+    MdbIntegerDup = 0x20,
+    MdbReverseDup = 0x40,
+    MdbCreate = 0x40000,
+}
