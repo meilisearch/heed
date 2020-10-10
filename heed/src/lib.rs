@@ -60,7 +60,7 @@ pub use heed_types as types;
 pub use zerocopy;
 use heed_traits as traits;
 
-pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RwIter, RwRange};
+pub use self::db::{Database, PolyDatabase, RoIter, RoIterDup, RoRange, RwIter, RwRange};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions};
 pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;

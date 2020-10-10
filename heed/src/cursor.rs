@@ -47,6 +47,31 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
+    pub fn move_on_first_dup_of(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        let mut key_val = mem::MaybeUninit::uninit();
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        // Move the cursor on the first database key
+        let result = unsafe {
+            mdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                key_val.as_mut_ptr(),
+                data_val.as_mut_ptr(),
+                ffi::cursor_op::MDB_SET_KEY,
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            }
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn move_on_last(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
@@ -111,6 +136,31 @@ impl<'txn> RoCursor<'txn> {
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 ffi::cursor_op::MDB_NEXT,
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let key = unsafe { crate::from_val(key_val.assume_init()) };
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some((key, data)))
+            }
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn move_on_next_dup_of(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        let mut key_val = mem::MaybeUninit::uninit();
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        // Move the cursor to the next non-dup key
+        let result = unsafe {
+            mdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                key_val.as_mut_ptr(),
+                data_val.as_mut_ptr(),
+                ffi::cursor_op::MDB_NEXT_DUP,
             ))
         };
 

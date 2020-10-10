@@ -48,6 +48,39 @@ where
     }
 }
 
+pub struct RoIterDup<'txn, KC, DC> {
+    cursor: RoCursor<'txn>,
+    move_on_first: bool,
+    dup_key: Vec<u8>,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> Iterator for RoIterDup<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_first {
+            self.move_on_first = false;
+            self.cursor.move_on_first_dup_of(&self.dup_key)
+        } else {
+            self.cursor.move_on_next_dup_of(&self.dup_key)
+        };
+
+        match result {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Some(Ok((key, data))),
+                (_, _) => Some(Err(Error::Decoding)),
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
 pub struct RwIter<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     move_on_first: bool,

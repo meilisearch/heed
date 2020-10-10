@@ -401,6 +401,12 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.iter::<T, KC, DC>(txn)
     }
 
+    pub fn iter_dup_of<'a, 'txn, T>(&self, txn: &'txn RoTxn<T>, key: &'a KC::EItem) -> Result<RoIterDup<'txn, KC, DC>> 
+    where KC: BytesEncode<'a>
+    {
+        self.dyndb.iter_dup_of::<T, KC, DC>(txn, key)
+    }
+
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
     ///
     /// ```

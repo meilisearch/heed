@@ -543,6 +543,18 @@ impl PolyDatabase {
         })
     }
 
+    pub fn iter_dup_of<'a, 'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>, key: &'a KC::EItem) -> Result<RoIterDup<'txn, KC, DC>> 
+    where KC: BytesEncode<'a>
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        Ok(RoIterDup {
+            cursor: RoCursor::new(txn, self.dbi)?,
+            move_on_first: true,
+            dup_key: key_bytes.into(),
+            _phantom: marker::PhantomData,
+        })
+    }
+
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
     ///
     /// ```

@@ -39,6 +39,10 @@ pub use ffi::mdb_cursor_put as mdb_cursor_put;
 pub mod cursor_op {
     use super::ffi::{self, MDB_cursor_op};
 
+    pub const MDB_SET_KEY: MDB_cursor_op = ffi::MDB_SET_KEY;
+    pub const MDB_SET: MDB_cursor_op = ffi::MDB_SET;
+    pub const MDB_GET_CURRENT: MDB_cursor_op = ffi::MDB_GET_CURRENT;
+    pub const MDB_NEXT_DUP: MDB_cursor_op = ffi::MDB_NEXT_DUP;
     pub const MDB_FIRST: MDB_cursor_op = ffi::MDB_FIRST;
     pub const MDB_LAST: MDB_cursor_op = ffi::MDB_LAST;
     pub const MDB_SET_RANGE: MDB_cursor_op = ffi::MDB_SET_RANGE;
