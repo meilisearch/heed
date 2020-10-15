@@ -1,6 +1,6 @@
 use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -17,6 +17,13 @@ use crate::mdb::ffi;
 use once_cell::sync::OnceCell;
 
 static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+
+#[derive(Debug)]
+pub struct ReaderListEntry {
+    pub pid: String,
+    pub thread: String,
+    pub txnid: String,
+}
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -230,6 +237,47 @@ impl Env {
 
     pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
         Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
+    }
+
+    #[cfg(feature = "lmdb")]
+    pub fn reader_check(&self) -> Result<usize> {
+        let mut dead: libc::c_int = 0;
+        unsafe {
+            let result = lmdb_sys::mdb_reader_check(self.0.env, &mut dead as *mut _);
+            if  result != 0 {
+                return Err(Error::Mdb(crate::MdbError::Other(result)))
+            }
+        }
+        Ok(dead as _)
+    }
+
+    #[cfg(feature = "lmdb")]
+    pub fn reader_list(&self) -> Result<Vec<ReaderListEntry>> {
+        let env = self.0.env;
+        unsafe extern "C" fn msg_fun(msg: *const ::libc::c_char, ctx: *mut ::libc::c_void) -> ::libc::c_int {
+            let ptr = ctx as *const Mutex<Vec<Vec<String>>>;
+            let entries = Arc::from_raw(ptr);
+            let msg = CStr::from_ptr(msg).to_str().expect("can't convert to str");
+            let res = msg.split_whitespace().map(str::to_string).collect::<Vec<_>>();
+            entries.lock().unwrap().push(res);
+            0
+        }
+
+        let entries: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+
+        unsafe {
+            let result = lmdb_sys::mdb_reader_list(env, Some(msg_fun), Arc::into_raw(entries.clone()) as *mut std::ffi::c_void);
+            if result < 0 {
+                return Err(Error::Mdb(crate::MdbError::Other(result)))
+            }
+        }
+        let entries = entries.lock().unwrap().iter().skip(1).map(|e| ReaderListEntry { pid: e[0].clone(), thread: e[1].clone(), txnid: e[2].clone()  }).collect();
+        Ok(entries)
+    }
+
+    #[cfg(feature = "lmdb")]
+    pub unsafe fn close(self) {
+        lmdb_sys::mdb_env_close(self.0.env);
     }
 
     fn raw_open_database(

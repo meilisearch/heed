@@ -21,8 +21,10 @@ impl<T> RoTxn<T> {
                 ptr::null_mut(),
                 ffi::MDB_RDONLY,
                 &mut txn,
-            ))?
+            ))?;
+                println!("new read transaction: {}", lmdb_sys::mdb_txn_id(txn));
         };
+
 
         Ok(RoTxn { txn, _phantom: marker::PhantomData })
     }
@@ -52,6 +54,9 @@ impl<T> Drop for RoTxn<T> {
 fn abort_txn(txn: *mut ffi::MDB_txn) -> Result<()> {
     // Asserts that the transaction hasn't been already committed.
     assert!(!txn.is_null());
+    unsafe {
+        println!("closing read txn: {}", lmdb_sys::mdb_txn_id(txn));
+    }
     Ok(unsafe { ffi::mdb_txn_abort(txn) })
 }
 
