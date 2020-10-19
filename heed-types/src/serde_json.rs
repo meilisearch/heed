@@ -28,3 +28,7 @@ where
         serde_json::from_slice(bytes).ok()
     }
 }
+
+unsafe impl<T> Send for SerdeJson<T> {}
+
+unsafe impl<T> Sync for SerdeJson<T> {}

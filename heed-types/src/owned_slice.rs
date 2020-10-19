@@ -41,3 +41,7 @@ where
         CowSlice::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }
+
+unsafe impl<T> Send for OwnedSlice<T> {}
+
+unsafe impl<T> Sync for OwnedSlice<T> {}
