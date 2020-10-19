@@ -69,3 +69,7 @@ where
         }
     }
 }
+
+unsafe impl<T> Send for CowType<T> {}
+
+unsafe impl<T> Sync for CowType<T> {}

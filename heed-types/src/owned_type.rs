@@ -46,3 +46,7 @@ where
         CowType::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }
+
+unsafe impl<T> Send for OwnedType<T> {}
+
+unsafe impl<T> Sync for OwnedType<T> {}

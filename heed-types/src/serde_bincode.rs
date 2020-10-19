@@ -28,3 +28,7 @@ where
         bincode::deserialize(bytes).ok()
     }
 }
+
+unsafe impl<T> Send for SerdeBincode<T> {}
+
+unsafe impl<T> Sync for SerdeBincode<T> {}

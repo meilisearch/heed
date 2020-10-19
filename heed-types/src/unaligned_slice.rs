@@ -34,3 +34,7 @@ where
         LayoutVerified::<_, [T]>::new_slice_unaligned(bytes).map(LayoutVerified::into_slice)
     }
 }
+
+unsafe impl<T> Send for UnalignedSlice<T> {}
+
+unsafe impl<T> Sync for UnalignedSlice<T> {}

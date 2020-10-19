@@ -66,3 +66,7 @@ where
         }
     }
 }
+
+unsafe impl<T> Send for CowSlice<T> {}
+
+unsafe impl<T> Sync for CowSlice<T> {}

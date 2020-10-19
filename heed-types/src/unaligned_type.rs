@@ -40,3 +40,7 @@ where
         LayoutVerified::<_, T>::new_unaligned(bytes).map(LayoutVerified::into_ref)
     }
 }
+
+unsafe impl<T> Send for UnalignedType<T> {}
+
+unsafe impl<T> Sync for UnalignedType<T> {}
