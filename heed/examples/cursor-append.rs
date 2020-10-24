@@ -8,7 +8,7 @@ use heed::{Database, EnvOpenOptions};
 // In this test we are checking that we can append ordered entries in one
 // database even if there is multiple databases which already contain entries.
 fn main() -> Result<(), Box<dyn Error>> {
-    let env_path = Path::new("target").join("env1.mdb");
+    let env_path = Path::new("target").join("cursor-append.mdb");
 
     let _ = fs::remove_dir_all(&env_path);
 
