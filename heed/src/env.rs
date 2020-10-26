@@ -14,9 +14,9 @@ use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
 
-static OPENED_ENV: OnceCell<Mutex<HashMap<PathBuf, Env>>> = OnceCell::new();
+static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, Env>>> = Lazy::new(Mutex::default);
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -147,11 +147,9 @@ impl EnvOpenOptions {
     }
 
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
-        let path = path.as_ref();
-        let path = canonicalize_path(path)?;
+        let path = canonicalize_path(path.as_ref())?;
 
-        let mutex = OPENED_ENV.get_or_init(Mutex::default);
-        let mut lock = mutex.lock().unwrap();
+        let mut lock = OPENED_ENV.lock().unwrap();
 
         match lock.entry(path) {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
@@ -196,6 +194,15 @@ impl EnvOpenOptions {
             }
         }
     }
+
+    pub fn close<P: AsRef<Path>>(path: P) -> Result<()> {
+        let path = canonicalize_path(path.as_ref())?;
+
+        let mut lock = OPENED_ENV.lock().unwrap();
+        let _env = lock.remove(&path);
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -209,6 +216,16 @@ struct EnvInner {
 unsafe impl Send for EnvInner {}
 
 unsafe impl Sync for EnvInner {}
+
+impl Drop for EnvInner {
+    fn drop(&mut self) {
+        // We lock the environment map to ensure that no one tries to
+        // open this environment at the same time as we are closing it.
+        let _lock = OPENED_ENV.lock().unwrap();
+
+        unsafe { let _ = ffi::mdb_env_close(self.env); }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub enum CompactionOption {
