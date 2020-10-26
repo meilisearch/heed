@@ -217,6 +217,10 @@ pub enum CompactionOption {
 }
 
 impl Env {
+    pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
+        self.0.env
+    }
+
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
@@ -355,23 +359,23 @@ impl Env {
     }
 
     pub fn write_txn(&self) -> Result<RwTxn> {
-        RwTxn::new(self.0.env)
+        RwTxn::new(self)
     }
 
     pub fn typed_write_txn<T>(&self) -> Result<RwTxn<T>> {
-        RwTxn::<T>::new(self.0.env)
+        RwTxn::<T>::new(self)
     }
 
-    pub fn nested_write_txn<'p, T>(&self, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'p, T>> {
-        RwTxn::nested(self.0.env, parent)
+    pub fn nested_write_txn<'e, 'p: 'e, T>(&'e self, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'e, 'p, T>> {
+        RwTxn::nested(self, parent)
     }
 
     pub fn read_txn(&self) -> Result<RoTxn> {
-        RoTxn::new(self.0.env)
+        RoTxn::new(self)
     }
 
     pub fn typed_read_txn<T>(&self) -> Result<RoTxn<T>> {
-        RoTxn::new(self.0.env)
+        RoTxn::new(self)
     }
 
     // TODO rename into `copy_to_file` for more clarity
