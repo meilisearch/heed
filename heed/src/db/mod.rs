@@ -341,7 +341,7 @@ mod tests {
 
         fs::create_dir_all(Path::new("target").join("prefix_iter_with_byte_255.mdb")).unwrap();
         let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024 * 1024) // 10GB
+            .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
             .open(Path::new("target").join("prefix_iter_with_byte_255.mdb")).unwrap();
         let db = env.create_database::<ByteSlice, Str>(None).unwrap();

@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     fs::create_dir_all(&env_path)?;
     let env = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024 * 1024) // 10GB
+        .map_size(10 * 1024 * 1024) // 10MB
         .max_dbs(3)
         .open(env_path)?;
 

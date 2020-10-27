@@ -11,13 +11,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     fs::create_dir_all(&env1_path)?;
     let env1 = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024 * 1024) // 10GB
+        .map_size(10 * 1024 * 1024) // 10MB
         .max_dbs(3000)
         .open(env1_path)?;
 
     fs::create_dir_all(&env2_path)?;
     let env2 = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024 * 1024) // 10GB
+        .map_size(10 * 1024 * 1024) // 10MB
         .max_dbs(3000)
         .open(env2_path)?;
 
