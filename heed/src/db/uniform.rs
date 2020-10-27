@@ -615,7 +615,7 @@ impl<KC, DC> Database<KC, DC> {
         &self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    ) -> Result<RoPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
@@ -680,7 +680,7 @@ impl<KC, DC> Database<KC, DC> {
         &self,
         txn: &'txn RwTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwRange<'txn, KC, DC>>
+    ) -> Result<RwPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {

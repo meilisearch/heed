@@ -6,7 +6,6 @@ use crate::*;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::types::DecodeIgnore;
-use super::advance_key;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -819,24 +818,17 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    ) -> Result<RoPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
 
-        let start_bytes = prefix_bytes.into_owned();
-
-        let mut end_bytes = start_bytes.clone();
-        advance_key(&mut end_bytes);
-
-        let end_bound = Bound::Excluded(end_bytes);
-        let start_bound = Bound::Included(start_bytes);
-
-        Ok(RoRange {
+        Ok(RoPrefix {
             cursor: RoCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
+            prefix: prefix_bytes,
+            move_on_first: true,
             _phantom: marker::PhantomData,
         })
     }
@@ -899,24 +891,17 @@ impl PolyDatabase {
         &self,
         txn: &'txn RwTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwRange<'txn, KC, DC>>
+    ) -> Result<RwPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
 
-        let start_bytes = prefix_bytes.into_owned();
-
-        let mut end_bytes = start_bytes.clone();
-        advance_key(&mut end_bytes);
-
-        let end_bound = Bound::Excluded(end_bytes);
-        let start_bound = Bound::Included(start_bytes);
-
-        Ok(RwRange {
+        Ok(RwPrefix {
             cursor: RwCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
+            prefix: prefix_bytes,
+            move_on_first: true,
             _phantom: marker::PhantomData,
         })
     }
