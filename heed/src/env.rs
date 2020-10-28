@@ -456,7 +456,7 @@ impl Env {
     ///
     /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
     /// when all references are dropped, the last one will eventually close the environment.
-    pub fn close(self) -> EnvClosingEvent {
+    pub fn prepare_for_closing(self) -> EnvClosingEvent {
         let mut lock = OPENED_ENV.write().unwrap();
         let env = lock.get_mut(&self.0.path);
 
@@ -534,7 +534,7 @@ mod tests {
 
         wtxn.commit().unwrap();
 
-        let signal_event = env.close();
+        let signal_event = env.prepare_for_closing();
 
         eprintln!("waiting for the env to be closed");
         signal_event.wait();
