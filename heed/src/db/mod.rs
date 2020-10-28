@@ -235,3 +235,131 @@ where
         }
     }
 }
+
+pub struct RoPrefix<'txn, KC, DC> {
+    cursor: RoCursor<'txn>,
+    prefix: Vec<u8>,
+    move_on_first: bool,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> Iterator for RoPrefix<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_first {
+            self.move_on_first = false;
+            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+        } else {
+            self.cursor.move_on_next()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+pub struct RwPrefix<'txn, KC, DC> {
+    cursor: RwCursor<'txn>,
+    prefix: Vec<u8>,
+    move_on_first: bool,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<KC, DC> RwPrefix<'_, KC, DC> {
+    pub fn del_current(&mut self) -> Result<bool> {
+        self.cursor.del_current()
+    }
+
+    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+}
+
+impl<'txn, KC, DC> Iterator for RwPrefix<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_first {
+            self.move_on_first = false;
+            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+        } else {
+            self.cursor.move_on_next()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn prefix_iter_with_byte_255() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("prefix_iter_with_byte_255.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("prefix_iter_with_byte_255.mdb")).unwrap();
+        let db = env.create_database::<ByteSlice, Str>(None).unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
+
+        // Lets check that we can prefix_iter on that sequence with the key "255".
+        let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0u8, 0, 0, 255, 104, 101, 108, 108, 111][..], "hello")));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world")));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        drop(iter);
+
+        wtxn.abort().unwrap();
+    }
+}

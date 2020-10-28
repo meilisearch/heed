@@ -6,7 +6,6 @@ use crate::*;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::types::DecodeIgnore;
-use super::advance_key;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -27,7 +26,7 @@ use super::advance_key;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 /// # let env = EnvOpenOptions::new()
-/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
@@ -70,7 +69,7 @@ use super::advance_key;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 /// # let env = EnvOpenOptions::new()
-/// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+/// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
@@ -127,7 +126,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// let db = env.create_poly_database(Some("use-sequence-1"))?;
@@ -190,7 +189,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// let db = env.create_poly_database(Some("use-sequence-2"))?;
@@ -244,7 +243,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// let db = env.create_poly_database(Some("get-poly-i32"))?;
@@ -314,7 +313,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -365,7 +364,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -412,7 +411,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -466,7 +465,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -512,7 +511,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -556,7 +555,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -615,7 +614,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -696,7 +695,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -790,7 +789,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -819,24 +818,17 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    ) -> Result<RoPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
 
-        let start_bytes = prefix_bytes.into_owned();
-
-        let mut end_bytes = start_bytes.clone();
-        advance_key(&mut end_bytes);
-
-        let end_bound = Bound::Excluded(end_bytes);
-        let start_bound = Bound::Included(start_bytes);
-
-        Ok(RoRange {
+        Ok(RoPrefix {
             cursor: RoCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
+            prefix: prefix_bytes,
+            move_on_first: true,
             _phantom: marker::PhantomData,
         })
     }
@@ -857,7 +849,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -899,24 +891,17 @@ impl PolyDatabase {
         &self,
         txn: &'txn RwTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwRange<'txn, KC, DC>>
+    ) -> Result<RwPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
 
-        let start_bytes = prefix_bytes.into_owned();
-
-        let mut end_bytes = start_bytes.clone();
-        advance_key(&mut end_bytes);
-
-        let end_bound = Bound::Excluded(end_bytes);
-        let start_bound = Bound::Included(start_bytes);
-
-        Ok(RwRange {
+        Ok(RwPrefix {
             cursor: RwCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
-            end_bound,
+            prefix: prefix_bytes,
+            move_on_first: true,
             _phantom: marker::PhantomData,
         })
     }
@@ -934,7 +919,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -1000,7 +985,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -1065,7 +1050,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -1134,7 +1119,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -1196,7 +1181,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
@@ -1243,7 +1228,7 @@ impl PolyDatabase {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
     /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024 * 1024) // 10GB
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
