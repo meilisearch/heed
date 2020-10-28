@@ -493,3 +493,54 @@ impl EnvClosingEvent {
         self.0.wait_timeout(timeout);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn close_env() {
+        use std::{fs, thread};
+        use std::time::Duration;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::types::*;
+        use crate::env_closing_event;
+
+        fs::create_dir_all(Path::new("target").join("close-env.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(30)
+            .open(Path::new("target").join("close-env.mdb")).unwrap();
+
+        // Force a thread to keep the env for 1 second.
+        let env_cloned = env.clone();
+        thread::spawn(move || {
+            let _env = env_cloned;
+            thread::sleep(Duration::from_secs(1));
+        });
+
+        let db = env.create_database::<Str, Str>(None).unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, "hello", "hello").unwrap();
+        db.put(&mut wtxn, "world", "world").unwrap();
+
+        // Lets check that we can prefix_iter on that sequence with the key "255".
+        let mut iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some(("hello", "hello")));
+        assert_eq!(iter.next().transpose().unwrap(), Some(("world", "world")));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        drop(iter);
+
+        wtxn.commit().unwrap();
+
+        let signal_event = env.close();
+
+        eprintln!("waiting for the env to be closed");
+        signal_event.wait();
+        eprintln!("env closed successfully");
+
+        // Make sure we don't have a reference to the env
+        assert!(env_closing_event(Path::new("target").join("close-env.mdb")).is_none());
+    }
+}
