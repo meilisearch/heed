@@ -155,7 +155,7 @@ impl EnvOpenOptions {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let path = entry.key();
-                let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+                let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
@@ -174,13 +174,14 @@ impl EnvOpenOptions {
                     }
 
                     let result =
-                        mdb_result(ffi::mdb_env_open(env, path.as_ptr(), self.flags, 0o600));
+                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), self.flags, 0o600));
 
                     match result {
                         Ok(()) => {
                             let inner = EnvInner {
                                 env,
                                 dbi_open_mutex: sync::Mutex::default(),
+                                path: path.clone(),
                             };
                             let env = Env(Arc::new(inner));
                             Ok(entry.insert(env).clone())
@@ -194,15 +195,6 @@ impl EnvOpenOptions {
             }
         }
     }
-
-    pub fn close<P: AsRef<Path>>(path: P) -> Result<()> {
-        let path = canonicalize_path(path.as_ref())?;
-
-        let mut lock = OPENED_ENV.lock().unwrap();
-        let _env = lock.remove(&path);
-
-        Ok(())
-    }
 }
 
 #[derive(Clone)]
@@ -211,6 +203,7 @@ pub struct Env(Arc<EnvInner>);
 struct EnvInner {
     env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    path: PathBuf,
 }
 
 unsafe impl Send for EnvInner {}
@@ -429,5 +422,10 @@ impl Env {
         unsafe { mdb_result(ffi::mdb_env_sync(self.0.env))? }
 
         Ok(())
+    }
+
+    pub fn close(self) {
+        let mut lock = OPENED_ENV.lock().unwrap();
+        let _env = lock.remove(&self.0.path);
     }
 }
