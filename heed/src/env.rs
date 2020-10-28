@@ -4,24 +4,27 @@ use std::ffi::CString;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::{io, ptr, sync};
 #[cfg(windows)]
 use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 
+use once_cell::sync::Lazy;
+use synchronoise::event::SignalEvent;
+
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
-use once_cell::sync::Lazy;
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
 /// noone tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, Option<Env>>>> = Lazy::new(Mutex::default);
+static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, (Option<Env>, Arc<SignalEvent>)>>> = Lazy::new(Mutex::default);
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -157,7 +160,7 @@ impl EnvOpenOptions {
         let mut lock = OPENED_ENV.lock().unwrap();
 
         match lock.entry(path) {
-            Entry::Occupied(entry) => entry.get().clone().ok_or(Error::DatabaseClosing),
+            Entry::Occupied(entry) => entry.get().0.clone().ok_or(Error::DatabaseClosing),
             Entry::Vacant(entry) => {
                 let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -183,13 +186,14 @@ impl EnvOpenOptions {
 
                     match result {
                         Ok(()) => {
+                            let signal_event = Arc::new(SignalEvent::manual(false));
                             let inner = EnvInner {
                                 env,
                                 dbi_open_mutex: sync::Mutex::default(),
                                 path: path.clone(),
                             };
                             let env = Env(Arc::new(inner));
-                            entry.insert(Some(env.clone()));
+                            entry.insert((Some(env.clone()), signal_event));
                             Ok(env)
                         }
                         Err(e) => {
@@ -219,8 +223,15 @@ unsafe impl Sync for EnvInner {}
 impl Drop for EnvInner {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.lock().unwrap();
-        assert!(lock.remove(&self.path).is_none(), "It seems another env closed this env before");
-        unsafe { let _ = ffi::mdb_env_close(self.env); }
+
+        match lock.remove(&self.path) {
+            None => panic!("It seems another env closed this env before"),
+            Some((_, signal_event)) => {
+                unsafe { let _ = ffi::mdb_env_close(self.env); }
+                // We signal to all the waiters that we have closed the env.
+                signal_event.signal();
+            }
+        }
     }
 }
 
@@ -433,27 +444,45 @@ impl Env {
         &self.0.path
     }
 
-    /// Returns wether this call initiate the close of this environment or not.
+    /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
+    /// multiple threads can wait on this event.
     ///
-    /// Make sure that you drop all the copy of the Env you have, the closing is triggered
-    /// when all references are dropped, the last one will effectively close the environment.
-    pub fn close(self) -> bool {
+    /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
+    /// when all references are dropped, the last one will eventually close the environment.
+    pub fn close(self) -> EnvClosingEvent {
         let mut lock = OPENED_ENV.lock().unwrap();
-        let mut env = lock.get_mut(&self.0.path);
+        let env = lock.get_mut(&self.0.path);
 
         match env {
             None => panic!("cannot find the env that we are trying to close"),
-            Some(env) => {
+            Some((env, signal_event)) => {
                 // We remove the env from the global list and replace it with a None.
-                let env = env.take();
+                let _env = env.take();
+                let signal_event = signal_event.clone();
 
                 // we must make sure we release the lock before we drop the env
                 // as the drop of the EnvInner also tries to lock the OPENED_ENV
                 // global and we don't want to trigger a dead-lock.
                 drop(lock);
 
-                env.is_some()
+                EnvClosingEvent(signal_event)
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct EnvClosingEvent(Arc<SignalEvent>);
+
+impl EnvClosingEvent {
+    /// Blocks this thread until another thread close the environment.
+    pub fn wait(&self) {
+        self.0.wait()
+    }
+
+    /// Blocks this thread until either another thread close the environment,
+    /// or until the timeout elapses.
+    pub fn wait_timeout(&self, timeout: Duration) {
+        self.0.wait_timeout(timeout);
     }
 }
