@@ -8,7 +8,7 @@ use crate::{Env, Result};
 
 pub struct RoTxn<'e, T=()> {
     pub(crate) txn: *mut ffi::MDB_txn,
-    _env: &'e Env,
+    pub(crate) env: &'e Env,
     _phantom: marker::PhantomData<T>,
 }
 
@@ -25,7 +25,7 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn { txn, _env: env, _phantom: marker::PhantomData })
+        Ok(RoTxn { txn, env, _phantom: marker::PhantomData })
     }
 
     pub fn commit(mut self) -> Result<()> {
@@ -84,7 +84,7 @@ impl<'e, T> RwTxn<'e, 'e, T> {
         };
 
         Ok(RwTxn {
-            txn: RoTxn { txn, _env: env, _phantom: marker::PhantomData },
+            txn: RoTxn { txn, env, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }
@@ -103,7 +103,7 @@ impl<'e, T> RwTxn<'e, 'e, T> {
         };
 
         Ok(RwTxn {
-            txn: RoTxn { txn, _env: env, _phantom: marker::PhantomData },
+            txn: RoTxn { txn, env, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }

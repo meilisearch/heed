@@ -254,11 +254,12 @@ impl Env {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
             .raw_open_database(name, Some(types))?
-            .map(Database::new))
+            .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
     pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self.raw_open_database(name, None)?.map(PolyDatabase::new))
+        Ok(self.raw_open_database(name, None)?
+                .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
     }
 
     fn raw_open_database(
@@ -320,7 +321,7 @@ impl Env {
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         self.raw_create_database(name, Some(types), parent_wtxn)
-            .map(Database::new)
+            .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
     pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
@@ -336,7 +337,7 @@ impl Env {
         parent_wtxn: &mut RwTxn,
     ) -> Result<PolyDatabase> {
         self.raw_create_database(name, None, parent_wtxn)
-            .map(PolyDatabase::new)
+            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
     }
 
     fn raw_create_database(

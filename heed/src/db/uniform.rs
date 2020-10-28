@@ -120,9 +120,9 @@ pub struct Database<KC, DC> {
 }
 
 impl<KC, DC> Database<KC, DC> {
-    pub(crate) fn new(dbi: ffi::MDB_dbi) -> Database<KC, DC> {
+    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC> {
         Database {
-            dyndb: PolyDatabase::new(dbi),
+            dyndb: PolyDatabase::new(env_ident, dbi),
             marker: std::marker::PhantomData,
         }
     }
@@ -961,7 +961,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn remap_types<KC2, DC2>(&self) -> Database<KC2, DC2> {
-        Database::new(self.dyndb.dbi)
+        Database::new(self.dyndb.env_ident, self.dyndb.dbi)
     }
 
     /// Get an handle on the internal polymorphic database.
