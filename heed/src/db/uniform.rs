@@ -678,7 +678,7 @@ impl<KC, DC> Database<KC, DC> {
     /// ```
     pub fn prefix_iter_mut<'a, 'txn, T>(
         &self,
-        txn: &'txn RwTxn<T>,
+        txn: &'txn mut RwTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where

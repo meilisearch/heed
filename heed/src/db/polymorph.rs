@@ -889,7 +889,7 @@ impl PolyDatabase {
     /// ```
     pub fn prefix_iter_mut<'a, 'txn, T, KC, DC>(
         &self,
-        txn: &'txn RwTxn<T>,
+        txn: &'txn mut RwTxn<T>,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where
