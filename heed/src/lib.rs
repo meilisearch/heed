@@ -61,7 +61,7 @@ pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RoPrefix, RwIter, RwRange, RwPrefix};
-pub use self::env::{CompactionOption, Env, EnvOpenOptions};
+pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
 pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};

@@ -3,7 +3,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use std::{io, ptr, sync};
 #[cfg(windows)]
@@ -24,7 +24,7 @@ use crate::mdb::ffi;
 /// noone tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, (Option<Env>, Arc<SignalEvent>)>>> = Lazy::new(Mutex::default);
+static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, (Option<Env>, Arc<SignalEvent>)>>> = Lazy::new(RwLock::default);
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -157,7 +157,7 @@ impl EnvOpenOptions {
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let path = canonicalize_path(path.as_ref())?;
 
-        let mut lock = OPENED_ENV.lock().unwrap();
+        let mut lock = OPENED_ENV.write().unwrap();
 
         match lock.entry(path) {
             Entry::Occupied(entry) => entry.get().0.clone().ok_or(Error::DatabaseClosing),
@@ -207,6 +207,12 @@ impl EnvOpenOptions {
     }
 }
 
+/// Returns a struct that allows to wait for the effective closing of an environment.
+pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
+    let lock = OPENED_ENV.read().unwrap();
+    lock.get(path.as_ref()).map(|(_env, se)| EnvClosingEvent(se.clone()))
+}
+
 #[derive(Clone)]
 pub struct Env(Arc<EnvInner>);
 
@@ -222,7 +228,7 @@ unsafe impl Sync for EnvInner {}
 
 impl Drop for EnvInner {
     fn drop(&mut self) {
-        let mut lock = OPENED_ENV.lock().unwrap();
+        let mut lock = OPENED_ENV.write().unwrap();
 
         match lock.remove(&self.path) {
             None => panic!("It seems another env closed this env before"),
@@ -451,7 +457,7 @@ impl Env {
     /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
     /// when all references are dropped, the last one will eventually close the environment.
     pub fn close(self) -> EnvClosingEvent {
-        let mut lock = OPENED_ENV.lock().unwrap();
+        let mut lock = OPENED_ENV.write().unwrap();
         let env = lock.get_mut(&self.0.path);
 
         match env {
