@@ -428,6 +428,11 @@ impl Env {
         Ok(())
     }
 
+    /// Returns the canonicalized path where this env lives.
+    pub fn path(&self) -> &Path {
+        &self.0.path
+    }
+
     /// Returns wether this call initiate the close of this environment or not.
     ///
     /// Make sure that you drop all the copy of the Env you have, the closing is triggered
