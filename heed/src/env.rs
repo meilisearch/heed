@@ -16,7 +16,12 @@ use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
 use once_cell::sync::Lazy;
 
-static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, Env>>> = Lazy::new(Mutex::default);
+/// The list of opened environments, the value is an optional environment, it is None
+/// when someone asks to close the environment, closing is a two-phase step, to make sure
+/// noone tries to open the same environment between these two phases.
+///
+/// Trying to open a None marked environment returns an error to the user trying to open it.
+static OPENED_ENV: Lazy<Mutex<HashMap<PathBuf, Option<Env>>>> = Lazy::new(Mutex::default);
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -152,7 +157,7 @@ impl EnvOpenOptions {
         let mut lock = OPENED_ENV.lock().unwrap();
 
         match lock.entry(path) {
-            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Occupied(entry) => entry.get().clone().ok_or(Error::DatabaseClosing),
             Entry::Vacant(entry) => {
                 let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -184,7 +189,8 @@ impl EnvOpenOptions {
                                 path: path.clone(),
                             };
                             let env = Env(Arc::new(inner));
-                            Ok(entry.insert(env).clone())
+                            entry.insert(Some(env.clone()));
+                            Ok(env)
                         }
                         Err(e) => {
                             ffi::mdb_env_close(env);
@@ -212,10 +218,8 @@ unsafe impl Sync for EnvInner {}
 
 impl Drop for EnvInner {
     fn drop(&mut self) {
-        // We lock the environment map to ensure that no one tries to
-        // open this environment at the same time as we are closing it.
-        let _lock = OPENED_ENV.lock().unwrap();
-
+        let mut lock = OPENED_ENV.lock().unwrap();
+        assert!(lock.remove(&self.path).is_none(), "It seems another env closed this env before");
         unsafe { let _ = ffi::mdb_env_close(self.env); }
     }
 }
@@ -424,8 +428,27 @@ impl Env {
         Ok(())
     }
 
-    pub fn close(self) {
+    /// Returns wether this call initiate the close of this environment or not.
+    ///
+    /// Make sure that you drop all the copy of the Env you have, the closing is triggered
+    /// when all references are dropped, the last one will effectively close the environment.
+    pub fn close(self) -> bool {
         let mut lock = OPENED_ENV.lock().unwrap();
-        let _env = lock.remove(&self.0.path);
+        let mut env = lock.get_mut(&self.0.path);
+
+        match env {
+            None => panic!("cannot find the env that we are trying to close"),
+            Some(env) => {
+                // We remove the env from the global list and replace it with a None.
+                let env = env.take();
+
+                // we must make sure we release the lock before we drop the env
+                // as the drop of the EnvInner also tries to lock the OPENED_ENV
+                // global and we don't want to trigger a dead-lock.
+                drop(lock);
+
+                env.is_some()
+            }
+        }
     }
 }
