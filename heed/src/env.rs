@@ -482,15 +482,21 @@ impl Env {
 pub struct EnvClosingEvent(Arc<SignalEvent>);
 
 impl EnvClosingEvent {
-    /// Blocks this thread until another thread close the environment.
+    /// Blocks this thread until the environment is effectively closed.
+    ///
+    /// # Safety
+    ///
+    /// Make sure that you don't have any copy of the environment in the thread
+    /// that is waiting for a close event, if you do, you will have a dead-lock.
     pub fn wait(&self) {
         self.0.wait()
     }
 
-    /// Blocks this thread until either another thread close the environment,
-    /// or until the timeout elapses.
-    pub fn wait_timeout(&self, timeout: Duration) {
-        self.0.wait_timeout(timeout);
+    /// Blocks this thread until either the environment has been closed
+    /// or until the timeout elapses, returns `true` if the environment
+    /// has been effectively closed.
+    pub fn wait_timeout(&self, timeout: Duration) -> bool {
+        self.0.wait_timeout(timeout)
     }
 }
 
