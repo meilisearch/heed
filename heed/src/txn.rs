@@ -4,27 +4,28 @@ use std::ptr;
 
 use crate::mdb::ffi;
 use crate::mdb::error::mdb_result;
-use crate::Result;
+use crate::{Env, Result};
 
-pub struct RoTxn<T=()> {
+pub struct RoTxn<'e, T=()> {
     pub(crate) txn: *mut ffi::MDB_txn,
+    pub(crate) env: &'e Env,
     _phantom: marker::PhantomData<T>,
 }
 
-impl<T> RoTxn<T> {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RoTxn<T>> {
+impl<'e, T> RoTxn<'e, T> {
+    pub(crate) fn new(env: &'e Env) -> Result<RoTxn<'e, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
             mdb_result(ffi::mdb_txn_begin(
-                env,
+                env.env_mut_ptr(),
                 ptr::null_mut(),
                 ffi::MDB_RDONLY,
                 &mut txn,
             ))?
         };
 
-        Ok(RoTxn { txn, _phantom: marker::PhantomData })
+        Ok(RoTxn { txn, env, _phantom: marker::PhantomData })
     }
 
     pub fn commit(mut self) -> Result<()> {
@@ -40,7 +41,7 @@ impl<T> RoTxn<T> {
     }
 }
 
-impl<T> Drop for RoTxn<T> {
+impl<T> Drop for RoTxn<'_, T> {
     fn drop(&mut self) {
         if !self.txn.is_null() {
             let _ = abort_txn(self.txn);
@@ -64,31 +65,45 @@ fn abort_txn(txn: *mut ffi::MDB_txn) -> Result<()> {
     mdb_result(ret).map_err(Into::into)
 }
 
-pub struct RwTxn<'p, T=()> {
-    pub(crate) txn: RoTxn<T>,
+pub struct RwTxn<'e, 'p, T=()> {
+    pub(crate) txn: RoTxn<'e, T>,
     _parent: marker::PhantomData<&'p mut ()>,
 }
 
-impl<T> RwTxn<'_, T> {
-    pub(crate) fn new(env: *mut ffi::MDB_env) -> Result<RwTxn<'static, T>> {
+impl<'e, T> RwTxn<'e, 'e, T> {
+    pub(crate) fn new(env: &'e Env) -> Result<RwTxn<'e, 'e, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        unsafe { mdb_result(ffi::mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn))? };
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr(),
+                ptr::null_mut(),
+                0,
+                &mut txn,
+            ))?
+        };
 
         Ok(RwTxn {
-            txn: RoTxn { txn, _phantom: marker::PhantomData },
+            txn: RoTxn { txn, env, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }
 
-    pub(crate) fn nested<'p>(env: *mut ffi::MDB_env, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'p, T>> {
+    pub(crate) fn nested<'p: 'e>(env: &'e Env, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'e, 'p, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
 
-        unsafe { mdb_result(ffi::mdb_txn_begin(env, parent_ptr, 0, &mut txn))? };
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr(),
+                parent_ptr,
+                0,
+                &mut txn,
+            ))?
+        };
 
         Ok(RwTxn {
-            txn: RoTxn { txn, _phantom: marker::PhantomData },
+            txn: RoTxn { txn, env, _phantom: marker::PhantomData },
             _parent: marker::PhantomData,
         })
     }
@@ -102,8 +117,8 @@ impl<T> RwTxn<'_, T> {
     }
 }
 
-impl<T> Deref for RwTxn<'_, T> {
-    type Target = RoTxn<T>;
+impl<'e, 'p, T> Deref for RwTxn<'e, 'p, T> {
+    type Target = RoTxn<'e, T>;
 
     fn deref(&self) -> &Self::Target {
         &self.txn

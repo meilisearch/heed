@@ -61,7 +61,7 @@ pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::db::{Database, PolyDatabase, RoIter, RoRange, RoPrefix, RwIter, RwRange, RwPrefix};
-pub use self::env::{CompactionOption, Env, EnvOpenOptions};
+pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
 pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};
@@ -79,6 +79,7 @@ pub enum Error {
     Encoding,
     Decoding,
     InvalidDatabaseTyping,
+    DatabaseClosing,
 }
 
 impl fmt::Display for Error {
@@ -86,11 +87,14 @@ impl fmt::Display for Error {
         match self {
             Error::Io(error) => write!(f, "{}", error),
             Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding => write!(f, "error while encoding"),
-            Error::Decoding => write!(f, "error while decoding"),
+            Error::Encoding => f.write_str("error while encoding"),
+            Error::Decoding => f.write_str("error while decoding"),
             Error::InvalidDatabaseTyping => {
-                write!(f, "database was previously opened with different types")
-            }
+                f.write_str("database was previously opened with different types")
+            },
+            Error::DatabaseClosing => {
+                f.write_str("database is in a closing phase, you can't open it at the same time")
+            },
         }
     }
 }
