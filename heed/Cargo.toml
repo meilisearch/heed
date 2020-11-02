@@ -31,6 +31,11 @@ serde = { version = "1.0.105", features = ["derive"] }
 [features]
 default = ["lmdb", "serde-bincode", "serde-json"]
 
+# The NO_TLS flag is automatically set on Env opening and
+# RoTxn implements the Sync trait. This allow the user to reference
+# a read-only transaction from multiple threads at the same time.
+sync-read-txn = []
+
 # Choose between using the MDBX key-value store or LMDB
 # MDBX is a fork of LMDB: https://github.com/erthink/libmdbx
 #
