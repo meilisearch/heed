@@ -964,6 +964,16 @@ impl<KC, DC> Database<KC, DC> {
         Database::new(self.dyndb.env_ident, self.dyndb.dbi)
     }
 
+    /// Change the key codec type of this uniform database, specifying the new codec.
+    pub fn remap_key_type<KC2>(&self) -> Database<KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this uniform database, specifying the new codec.
+    pub fn remap_data_type<DC2>(&self) -> Database<KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+
     /// Get an handle on the internal polymorphic database.
     ///
     /// Using this method is useful when you want to skip deserializing of the value,
