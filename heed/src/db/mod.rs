@@ -22,6 +22,27 @@ pub struct RoIter<'txn, KC, DC> {
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
+impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RoIter<'txn, KC2, DC2> {
+        RoIter {
+            cursor: self.cursor,
+            move_on_first: self.move_on_first,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RoIter<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RoIter<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+}
+
 impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
 where
     KC: BytesDecode<'txn>,
@@ -54,7 +75,7 @@ pub struct RwIter<'txn, KC, DC> {
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<KC, DC> RwIter<'_, KC, DC> {
+impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     /// Delete the entry the cursor is currently pointing to.
     ///
     /// Returns `true` if the entry was successfully deleted.
@@ -92,6 +113,25 @@ impl<KC, DC> RwIter<'_, KC, DC> {
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwIter<'txn, KC2, DC2> {
+        RwIter {
+            cursor: self.cursor,
+            move_on_first: self.move_on_first,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RwIter<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RwIter<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RwIter<'txn, KC, DC>
@@ -125,6 +165,28 @@ pub struct RoRange<'txn, KC, DC> {
     start_bound: Option<Bound<Vec<u8>>>,
     end_bound: Bound<Vec<u8>>,
     _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
+        RoRange {
+            cursor: self.cursor,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RoRange<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RoRange<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
@@ -177,7 +239,7 @@ pub struct RwRange<'txn, KC, DC> {
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<KC, DC> RwRange<'_, KC, DC> {
+impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     pub fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
@@ -190,6 +252,26 @@ impl<KC, DC> RwRange<'_, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2> {
+        RwRange {
+            cursor: self.cursor,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RwRange<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RwRange<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
     }
 }
 
@@ -243,6 +325,28 @@ pub struct RoPrefix<'txn, KC, DC> {
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
+impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, KC2, DC2> {
+        RoPrefix {
+            cursor: self.cursor,
+            prefix: self.prefix,
+            move_on_first: self.move_on_first,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RoPrefix<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+}
+
 impl<'txn, KC, DC> Iterator for RoPrefix<'txn, KC, DC>
 where
     KC: BytesDecode<'txn>,
@@ -282,7 +386,7 @@ pub struct RwPrefix<'txn, KC, DC> {
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<KC, DC> RwPrefix<'_, KC, DC> {
+impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
     pub fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
@@ -295,6 +399,26 @@ impl<KC, DC> RwPrefix<'_, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwPrefix<'txn, KC2, DC2> {
+        RwPrefix {
+            cursor: self.cursor,
+            prefix: self.prefix,
+            move_on_first: self.move_on_first,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
     }
 }
 
