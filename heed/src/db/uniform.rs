@@ -222,19 +222,19 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
     /// db.put(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lt(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lt(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_lt(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(27))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lt<'a, 'txn, T>(
+    pub fn get_lower_than<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
@@ -243,7 +243,7 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lt::<T, KC, DC>(txn, key)
+        self.dyndb.get_lower_than::<T, KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair greater than the given one in this database.

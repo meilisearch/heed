@@ -334,19 +334,19 @@ impl PolyDatabase {
     /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
     /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_lt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lt<'a, 'txn, T, KC, DC>(
+    pub fn get_lower_than<'a, 'txn, T, KC, DC>(
         &self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
