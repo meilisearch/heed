@@ -246,6 +246,61 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.get_lt::<T, KC, DC>(txn, key)
     }
 
+    /// Retrieves the key/value pair greater than the given one in this database.
+    ///
+    /// If the database if empty or there is no key greater than the given one,
+    /// then `None` is returned.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEU32 = U32<BigEndian>;
+    ///
+    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    ///
+    /// let ret = db.get_gt(&wtxn, &BEU32::new(0))?;
+    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    ///
+    /// let ret = db.get_gt(&wtxn, &BEU32::new(42))?;
+    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    ///
+    /// let ret = db.get_gt(&wtxn, &BEU32::new(43))?;
+    /// assert_eq!(ret, None);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn get_gt<'a, 'txn, T>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        key: &'a KC::EItem,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesEncode<'a> + BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        self.dyndb.get_gt::<T, KC, DC>(txn, key)
+    }
+
     /// Retrieves the first key/value pair of this database.
     ///
     /// If the database if empty, then `None` is returned.
