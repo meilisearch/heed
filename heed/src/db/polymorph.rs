@@ -402,19 +402,19 @@ impl PolyDatabase {
     /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
     /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_gt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_gt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_gt::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_gt<'a, 'txn, T, KC, DC>(
+    pub fn get_greater_than<'a, 'txn, T, KC, DC>(
         &self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,

@@ -277,19 +277,19 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
     /// db.put(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_gt(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_gt(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_gt(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_gt<'a, 'txn, T>(
+    pub fn get_greater_than<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
@@ -298,7 +298,7 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_gt::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than::<T, KC, DC>(txn, key)
     }
 
     /// Retrieves the first key/value pair of this database.
