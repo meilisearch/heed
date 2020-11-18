@@ -371,6 +371,78 @@ impl PolyDatabase {
         }
     }
 
+    /// Retrieves the key/value pair lower than or equal the given one in this database.
+    ///
+    /// If the database if empty or there is no key lower than or equal to the given one,
+    /// then `None` is returned.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEU32 = U32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("get-lte-u32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    ///
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
+    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    ///
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    ///
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(26))?;
+    /// assert_eq!(ret, None);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn get_lower_than_or_equal_to<'a, 'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        key: &'a KC::EItem,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesEncode<'a> + BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let result = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
+            Ok(Some((key, data))) if key == &key_bytes[..] => Ok(Some((key, data))),
+            Ok(_) => cursor.move_on_prev(),
+            Err(e) => Err(e),
+        };
+
+        match result {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Retrieves the key/value pair greater than the given one in this database.
     ///
     /// If the database if empty or there is no key greater than the given one,
@@ -439,6 +511,72 @@ impl PolyDatabase {
                 (_, _) => Err(Error::Decoding),
             },
             None => Ok(None),
+        }
+    }
+
+    /// Retrieves the key/value pair greater than or equal the given one in this database.
+    ///
+    /// If the database if empty or there is no key greater than or equal to the given one,
+    /// then `None` is returned.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEU32 = U32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    ///
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
+    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    ///
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
+    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    ///
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(44))?;
+    /// assert_eq!(ret, None);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn get_greater_than_or_equal_to<'a, 'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        key: &'a KC::EItem,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesEncode<'a> + BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
