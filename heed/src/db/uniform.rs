@@ -1194,6 +1194,11 @@ impl<KC, DC> Database<KC, DC> {
         self.remap_types::<KC, DC2>()
     }
 
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(&self) -> Database<KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
+
     /// Get an handle on the internal polymorphic database.
     ///
     /// Using this method is useful when you want to skip deserializing of the value,
