@@ -41,6 +41,11 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     pub fn remap_data_type<DC2>(self) -> RoIter<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
     }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RoIter<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
@@ -132,6 +137,11 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     pub fn remap_data_type<DC2>(self) -> RwIter<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
     }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RwIter<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RwIter<'txn, KC, DC>
@@ -186,6 +196,11 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     /// Change the data codec type of this iterator, specifying the new codec.
     pub fn remap_data_type<DC2>(self) -> RoRange<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RoRange<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
@@ -273,6 +288,11 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     pub fn remap_data_type<DC2>(self) -> RwRange<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
     }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RwRange<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RwRange<'txn, KC, DC>
@@ -344,6 +364,11 @@ impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
     /// Change the data codec type of this iterator, specifying the new codec.
     pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RoPrefix<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
@@ -419,6 +444,11 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
     /// Change the data codec type of this iterator, specifying the new codec.
     pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, KC, DC2> {
         self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RwPrefix<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
