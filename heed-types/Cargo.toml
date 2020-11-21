@@ -11,8 +11,8 @@ edition = "2018"
 [dependencies]
 bincode = { version = "1.2.1", optional = true }
 heed-traits = { version = "0.7.0", path = "../heed-traits" }
-serde = { version = "1.0.105", optional = true }
-serde_json = { version = "1.0.49", optional = true }
+serde = { version = "1.0.117", optional = true }
+serde_json = { version = "1.0.59", optional = true }
 zerocopy = "0.3.0"
 
 [features]
