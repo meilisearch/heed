@@ -2,8 +2,8 @@
 //!
 //! How to choose the right type to store things in this database?
 //! For specific types you can choose:
-//!   - [`Str`] to store [`str`]s
-//!   - [`Unit`] to store [unit `()`] types
+//!   - [`Str`] to store [`str`](primitive@str)s
+//!   - [`Unit`] to store `()` types
 //!   - [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
 //!
 //! But if you want to store big types that can be efficiently deserialized then
@@ -24,24 +24,13 @@
 //! If you don't want to/cannot deal with `AsBytes`, `Frombytes` or `Unaligned` requirements
 //! we recommend you to use the `SerdeBincode` or `SerdeJson` types and deal with the `Serialize`/`Deserialize` traits.
 //!
-//! [`AsBytes`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.AsBytes.html
-//! [`FromBytes`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.FromBytes.html
-//! [`Unaligned`]: https://docs.rs/zerocopy/0.3.0/zerocopy/trait.Unaligned.html
+//! [`AsBytes`]: zerocopy::AsBytes
+//! [`FromBytes`]: zerocopy::FromBytes
+//! [`Unaligned`]: zerocopy::Unaligned
 //!
-//! [`Str`]: struct.Str.html
-//! [unit `()`]: https://doc.rust-lang.org/std/primitive.unit.html
-//! [`Unit`]: struct.Unit.html
-//! [`SerdeBincode`]: struct.SerdeBincode.html
-//! [`SerdeJson`]: struct.SerdeJson.html
-//! [`Serialize`]: https://docs.rs/serde/1.0.110/serde/trait.Serialize.html
-//! [`Deserialize`]: https://docs.rs/serde/1.0.110/serde/trait.Deserialize.html
+//! [`Serialize`]: serde::Serialize
+//! [`Deserialize`]: serde::Deserialize
 //!
-//! [`CowSlice`]: struct.CowSlice.html
-//! [`CowType`]: struct.CowType.html
-//! [`OwnedSlice`]: struct.OwnedSlice.html
-//! [`OwnedType`]: struct.OwnedType.html
-//! [`UnalignedSlice`]: struct.UnalignedSlice.html
-//! [`UnalignedType`]: struct.UnalignedType.html
 
 mod cow_slice;
 mod cow_type;
@@ -70,7 +59,7 @@ pub use self::unit::Unit;
 /// Describes a slice of bytes `[u8]` that is totally
 /// borrowed and doesn't depends on any [memory alignment].
 ///
-/// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
+/// [memory alignment]: std::mem::align_of()
 pub type ByteSlice = UnalignedSlice<u8>;
 
 /// A convenient struct made to ignore the type when decoding it.

@@ -9,8 +9,8 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
 /// If you need to store a type that does depend on memory alignment
 /// and that can be big it is recommended to use the [`CowType`].
 ///
-/// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
-/// [`CowType`]: crate::types::CowType
+/// [memory alignment]: std::mem::align_of()
+/// [`CowType`]: crate::CowType
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: 'a> BytesEncode<'a> for UnalignedSlice<T>

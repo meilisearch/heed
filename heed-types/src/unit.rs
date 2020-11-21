@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 use heed_traits::{BytesDecode, BytesEncode};
 
-/// Describes the [unit `()`] type.
-///
-/// [unit `()`]: https://doc.rust-lang.org/std/primitive.unit.html
+/// Describes the `()` type.
 pub struct Unit;
 
 impl BytesEncode<'_> for Unit {

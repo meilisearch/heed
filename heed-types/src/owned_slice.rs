@@ -15,9 +15,9 @@ use heed_traits::{BytesDecode, BytesEncode};
 /// The [`CowType`] is recommended for borrowed types (types that holds
 /// references to the original slice).
 ///
-/// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
-/// [`UnalignedSlice`]: crate::types::UnalignedSlice
-/// [`CowType`]: crate::types::CowType
+/// [memory alignment]: std::mem::align_of()
+/// [`UnalignedSlice`]: crate::UnalignedSlice
+/// [`CowType`]: crate::CowType
 pub struct OwnedSlice<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: 'a> BytesEncode<'a> for OwnedSlice<T>

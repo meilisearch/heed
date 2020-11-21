@@ -19,13 +19,13 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 /// To store slices, you must look at the [`CowSlice`],
 /// [`OwnedSlice`] or [`UnalignedSlice`] types.
 ///
-/// [memory aligned]: https://doc.rust-lang.org/std/mem/fn.align_of.html
-/// [`Cow`]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
-/// [`UnalignedType`]: crate::types::UnalignedType
-/// [`OwnedType`]: crate::types::OwnedType
-/// [`UnalignedSlice`]: crate::types::UnalignedSlice
-/// [`OwnedSlice`]: crate::types::OwnedSlice
-/// [`CowSlice`]: crate::types::CowSlice
+/// [memory aligned]: std::mem::align_of()
+/// [`Cow`]: std::borrow::Cow
+/// [`UnalignedType`]: crate::UnalignedType
+/// [`OwnedType`]: crate::OwnedType
+/// [`UnalignedSlice`]: crate::UnalignedSlice
+/// [`OwnedSlice`]: crate::OwnedSlice
+/// [`CowSlice`]: crate::CowSlice
 pub struct CowType<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: 'a> BytesEncode<'a> for CowType<T>

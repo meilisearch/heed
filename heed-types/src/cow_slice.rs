@@ -16,10 +16,10 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified};
 /// if you don't want to be bored with the [`Cow`] type you can
 /// use the [`OwnedSlice`].
 ///
-/// [memory aligned]: https://doc.rust-lang.org/std/mem/fn.align_of.html
-/// [`Cow`]: https://doc.rust-lang.org/std/borrow/enum.Cow.html
-/// [`UnalignedSlice`]: crate::types::UnalignedSlice
-/// [`OwnedSlice`]: crate::types::OwnedSlice
+/// [memory aligned]: std::mem::align_of()
+/// [`Cow`]: std::borrow::Cow
+/// [`UnalignedSlice`]: crate::UnalignedSlice
+/// [`OwnedSlice`]: crate::OwnedSlice
 pub struct CowSlice<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: 'a> BytesEncode<'a> for CowSlice<T>
