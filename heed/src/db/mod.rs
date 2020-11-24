@@ -72,6 +72,29 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_first {
+            self.cursor.move_on_last()
+        } else {
+            match (self.cursor.current(), self.cursor.move_on_last()) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Some(Ok((key, data))),
+                (_, _) => Some(Err(Error::Decoding)),
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 pub struct RwIter<'txn, KC, DC> {
@@ -157,6 +180,29 @@ where
             self.cursor.move_on_first()
         } else {
             self.cursor.move_on_next()
+        };
+
+        match result {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Some(Ok((key, data))),
+                (_, _) => Some(Err(Error::Decoding)),
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_first {
+            self.cursor.move_on_last()
+        } else {
+            match (self.cursor.current(), self.cursor.move_on_last()) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
         };
 
         match result {
@@ -513,6 +559,69 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world")));
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
+
+        wtxn.abort().unwrap();
+    }
+
+    #[test]
+    fn iter_last() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("iter_last.mdb")).unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &1_i32.to_be_bytes(), &()).unwrap();
+        db.put(&mut wtxn, &2_i32.to_be_bytes(), &()).unwrap();
+        db.put(&mut wtxn, &3_i32.to_be_bytes(), &()).unwrap();
+        db.put(&mut wtxn, &4_i32.to_be_bytes(), &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+
+        let mut iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+
+        let mut iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let mut iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &1_i32.to_be_bytes(), &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+
+        let mut iter = db.iter(&wtxn).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
 
         wtxn.abort().unwrap();
     }
