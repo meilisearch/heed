@@ -16,6 +16,14 @@ pub fn advance_key(bytes: &mut Vec<u8>) {
     }
 }
 
+fn retreat_key(bytes: &mut Vec<u8>) {
+    match bytes.last_mut() {
+        Some(&mut 0) => { bytes.pop(); },
+        Some(last) => *last -= 1,
+        None => panic!("Vec is empty and must not be"),
+    }
+}
+
 pub struct RoIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_first: bool,
@@ -262,14 +270,15 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
             self.move_on_start = false;
-            match &self.start_bound {
+            match &mut self.start_bound {
                 Bound::Included(start) => {
-                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                    self.cursor.move_on_key_greater_than_or_equal_to(start)
                 },
                 Bound::Excluded(start) => {
-                    let mut start = start.clone();
-                    advance_key(&mut start);
-                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                    advance_key(start);
+                    let result = self.cursor.move_on_key_greater_than_or_equal_to(start);
+                    retreat_key(start);
+                    result
                 },
                 Bound::Unbounded => self.cursor.move_on_first(),
             }
@@ -417,15 +426,16 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
             self.move_on_start = false;
-            match &self.start_bound {
+            match &mut self.start_bound {
                 Bound::Included(start) => {
-                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
-                }
+                    self.cursor.move_on_key_greater_than_or_equal_to(start)
+                },
                 Bound::Excluded(start) => {
-                    let mut start = start.clone();
-                    advance_key(&mut start);
-                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
-                }
+                    advance_key(start);
+                    let result = self.cursor.move_on_key_greater_than_or_equal_to(start);
+                    retreat_key(start);
+                    result
+                },
                 Bound::Unbounded => self.cursor.move_on_first(),
             }
         } else {
