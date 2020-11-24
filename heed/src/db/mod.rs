@@ -218,7 +218,8 @@ where
 
 pub struct RoRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
-    start_bound: Option<Bound<Vec<u8>>>,
+    move_on_start: bool,
+    start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
@@ -228,6 +229,7 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
         RoRange {
             cursor: self.cursor,
+            move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
             _phantom: marker::PhantomData::default(),
@@ -258,23 +260,28 @@ where
     type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = match self.start_bound.take() {
-            Some(Bound::Included(start)) => {
-                self.cursor.move_on_key_greater_than_or_equal_to(&start)
+        let result = if self.move_on_start {
+            self.move_on_start = false;
+            match &self.start_bound {
+                Bound::Included(start) => {
+                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                },
+                Bound::Excluded(start) => {
+                    let mut start = start.clone();
+                    advance_key(&mut start);
+                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                },
+                Bound::Unbounded => self.cursor.move_on_first(),
             }
-            Some(Bound::Excluded(mut start)) => {
-                advance_key(&mut start);
-                self.cursor.move_on_key_greater_than_or_equal_to(&start)
-            }
-            Some(Bound::Unbounded) => self.cursor.move_on_first(),
-            None => self.cursor.move_on_next(),
+        } else {
+            self.cursor.move_on_next()
         };
 
         match result {
             Ok(Some((key, data))) => {
-                let must_be_returned = match self.end_bound {
-                    Bound::Included(ref end) => key <= end,
-                    Bound::Excluded(ref end) => key < end,
+                let must_be_returned = match &self.end_bound {
+                    Bound::Included(end) => key <= end,
+                    Bound::Excluded(end) => key < end,
                     Bound::Unbounded => true,
                 };
 
@@ -291,11 +298,69 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        fn move_on_end<'txn>(
+            cursor: &mut RoCursor<'txn>,
+            end_bound: &Bound<Vec<u8>>,
+        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+        {
+            match end_bound {
+                Bound::Included(end) => {
+                    match cursor.move_on_key_greater_than_or_equal_to(end) {
+                        Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
+                        Ok(_) => cursor.move_on_prev(),
+                        Err(e) => Err(e),
+                    }
+                },
+                Bound::Excluded(end) => {
+                    cursor
+                        .move_on_key_greater_than_or_equal_to(end)
+                        .and_then(|_| cursor.move_on_prev())
+                },
+                Bound::Unbounded => cursor.move_on_last(),
+            }
+        }
+
+        let result = if self.move_on_start {
+            move_on_end(&mut self.cursor, &self.end_bound)
+        } else {
+            match (self.cursor.current(), move_on_end(&mut self.cursor, &self.end_bound)) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.start_bound {
+                    Bound::Included(start) => key >= start,
+                    Bound::Excluded(start) => key > start,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 pub struct RwRange<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
-    start_bound: Option<Bound<Vec<u8>>>,
+    move_on_start: bool,
+    start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
@@ -319,6 +384,7 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2> {
         RwRange {
             cursor: self.cursor,
+            move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
             _phantom: marker::PhantomData::default(),
@@ -349,16 +415,21 @@ where
     type Item = Result<(KC::DItem, DC::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = match self.start_bound.take() {
-            Some(Bound::Included(start)) => {
-                self.cursor.move_on_key_greater_than_or_equal_to(&start)
+        let result = if self.move_on_start {
+            self.move_on_start = false;
+            match &self.start_bound {
+                Bound::Included(start) => {
+                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                }
+                Bound::Excluded(start) => {
+                    let mut start = start.clone();
+                    advance_key(&mut start);
+                    self.cursor.move_on_key_greater_than_or_equal_to(&start)
+                }
+                Bound::Unbounded => self.cursor.move_on_first(),
             }
-            Some(Bound::Excluded(mut start)) => {
-                advance_key(&mut start);
-                self.cursor.move_on_key_greater_than_or_equal_to(&start)
-            }
-            Some(Bound::Unbounded) => self.cursor.move_on_first(),
-            None => self.cursor.move_on_next(),
+        } else {
+            self.cursor.move_on_next()
         };
 
         match result {
@@ -378,6 +449,63 @@ where
                     None
                 }
             }
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        fn move_on_end<'txn>(
+            cursor: &mut RwCursor<'txn>,
+            end_bound: &Bound<Vec<u8>>,
+        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+        {
+            match end_bound {
+                Bound::Included(end) => {
+                    match cursor.move_on_key_greater_than_or_equal_to(end) {
+                        Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
+                        Ok(_) => cursor.move_on_prev(),
+                        Err(e) => Err(e),
+                    }
+                },
+                Bound::Excluded(end) => {
+                    cursor
+                        .move_on_key_greater_than_or_equal_to(end)
+                        .and_then(|_| cursor.move_on_prev())
+                },
+                Bound::Unbounded => cursor.move_on_last(),
+            }
+        }
+
+        let result = if self.move_on_start {
+            move_on_end(&mut self.cursor, &self.end_bound)
+        } else {
+            match (self.cursor.current(), move_on_end(&mut self.cursor, &self.end_bound)) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.start_bound {
+                    Bound::Included(start) => key >= start,
+                    Bound::Excluded(start) => key > start,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -569,43 +697,45 @@ mod tests {
         use std::path::Path;
         use crate::EnvOpenOptions;
         use crate::types::*;
+        use crate::{zerocopy::I32, byteorder::BigEndian};
 
         fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
             .open(Path::new("target").join("iter_last.mdb")).unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1_i32.to_be_bytes(), &()).unwrap();
-        db.put(&mut wtxn, &2_i32.to_be_bytes(), &()).unwrap();
-        db.put(&mut wtxn, &3_i32.to_be_bytes(), &()).unwrap();
-        db.put(&mut wtxn, &4_i32.to_be_bytes(), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.last().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
 
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.last().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
 
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&2_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&3_i32.to_be_bytes()[..], ())));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&4_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
         assert_eq!(iter.next().transpose().unwrap(), None);
         assert_eq!(iter.last().transpose().unwrap(), None);
 
@@ -613,14 +743,103 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1_i32.to_be_bytes(), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.last().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
 
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some((&1_i32.to_be_bytes()[..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+    }
+
+    #[test]
+    fn range_iter_last() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::{zerocopy::I32, byteorder::BigEndian};
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("iter_last.mdb")).unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        type BEI32 = I32<BigEndian>;
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
+
+        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
+
+        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let range = BEI32::new(2)..=BEI32::new(4);
+        let mut iter = db.range(&wtxn, &range).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
+
+        let range = BEI32::new(2)..BEI32::new(4);
+        let mut iter = db.range(&wtxn, &range).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(3), ())));
+
+        let range = BEI32::new(2)..BEI32::new(4);
+        let mut iter = db.range(&wtxn, &range).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let range = BEI32::new(2)..BEI32::new(2);
+        let iter = db.range(&wtxn, &range).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let range = BEI32::new(2)..=BEI32::new(1);
+        let iter = db.range(&wtxn, &range).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
+
+        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         wtxn.abort().unwrap();

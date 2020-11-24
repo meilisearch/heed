@@ -971,7 +971,8 @@ impl PolyDatabase {
 
         Ok(RoRange {
             cursor: RoCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
+            move_on_start: true,
+            start_bound,
             end_bound,
             _phantom: marker::PhantomData,
         })
@@ -1067,7 +1068,8 @@ impl PolyDatabase {
 
         Ok(RwRange {
             cursor: RwCursor::new(txn, self.dbi)?,
-            start_bound: Some(start_bound),
+            move_on_start: true,
+            start_bound: start_bound,
             end_bound,
             _phantom: marker::PhantomData,
         })
