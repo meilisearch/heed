@@ -52,6 +52,7 @@
 mod cursor;
 mod db;
 mod env;
+mod iter;
 mod lazy_decode;
 mod mdb;
 mod txn;
@@ -62,10 +63,10 @@ pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::db::{Database, PolyDatabase};
-pub use self::db::{RoIter, RoRevIter, RwIter, RwRevIter};
-pub use self::db::{RoRange, RoRevRange, RwRange, RwRevRange};
-pub use self::db::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
 pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
+pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
+pub use self::iter::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
+pub use self::iter::{RoRange, RoRevRange, RwRange, RwRevRange};
 pub use self::lazy_decode::{LazyDecode, Lazy};
 pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;

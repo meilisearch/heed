@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
-use std::{marker, mem, ptr};
+use std::{mem, ptr};
 
 use crate::*;
 use crate::mdb::error::mdb_result;
@@ -829,11 +829,7 @@ impl PolyDatabase {
     pub fn iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        Ok(RoIter {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -888,31 +884,19 @@ impl PolyDatabase {
     pub fn iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        Ok(RwIter {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
     pub fn rev_iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        Ok(RoRevIter {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
     pub fn rev_iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        Ok(RwRevIter {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -989,13 +973,7 @@ impl PolyDatabase {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        Ok(RoRange {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            move_on_start: true,
-            start_bound,
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -1086,13 +1064,7 @@ impl PolyDatabase {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        Ok(RwRange {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            move_on_start: true,
-            start_bound,
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
     pub fn rev_range<'a, 'txn, T, KC, DC, R>(
@@ -1130,13 +1102,7 @@ impl PolyDatabase {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        Ok(RoRevRange {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            move_on_end: true,
-            start_bound,
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
     pub fn rev_range_mut<'a, 'txn, T, KC, DC, R>(
@@ -1174,13 +1140,7 @@ impl PolyDatabase {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        Ok(RwRevRange {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            move_on_end: true,
-            start_bound,
-            end_bound,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1236,13 +1196,7 @@ impl PolyDatabase {
 
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-
-        Ok(RoPrefix {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            prefix: prefix_bytes,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1311,13 +1265,7 @@ impl PolyDatabase {
 
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-
-        Ok(RwPrefix {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            prefix: prefix_bytes,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
     pub fn rev_prefix_iter<'a, 'txn, T, KC, DC>(
@@ -1332,13 +1280,7 @@ impl PolyDatabase {
 
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-
-        Ok(RoRevPrefix {
-            cursor: RoCursor::new(txn, self.dbi)?,
-            prefix: prefix_bytes,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        })
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
     pub fn rev_prefix_iter_mut<'a, 'txn, T, KC, DC>(
@@ -1353,13 +1295,7 @@ impl PolyDatabase {
 
         let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-
-        Ok(RwRevPrefix {
-            cursor: RwCursor::new(txn, self.dbi)?,
-            prefix: prefix_bytes,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        })
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Insert a key-value pairs in this database.
