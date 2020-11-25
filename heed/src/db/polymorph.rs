@@ -895,6 +895,26 @@ impl PolyDatabase {
         })
     }
 
+    pub fn rev_iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        Ok(RoRevIter {
+            cursor: RoCursor::new(txn, self.dbi)?,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn rev_iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        Ok(RwRevIter {
+            cursor: RwCursor::new(txn, self.dbi)?,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        })
+    }
+
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
     ///
     /// Comparisons are made by using the bytes representation of the key.
