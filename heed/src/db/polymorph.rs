@@ -1447,6 +1447,47 @@ impl PolyDatabase {
         RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
+    /// Return a reversed lexicographically ordered iterator of all key-value pairs
+    /// in this database that starts with the given prefix.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    ///
+    /// let mut iter = db.rev_prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_prefix_iter<'a, 'txn, T, KC, DC>(
         &self,
         txn: &'txn RoTxn<T>,
@@ -1462,6 +1503,60 @@ impl PolyDatabase {
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
+    /// Return a mutable lexicographically ordered iterator of all key-value pairs
+    /// in this database that starts with the given prefix.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    ///
+    /// let mut iter = db.rev_prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// let ret = iter.del_current()?;
+    /// assert!(ret);
+    ///
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// let ret = iter.put_current("i-am-twenty-eight", &BEI32::new(28000))?;
+    /// assert!(ret);
+    ///
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    ///
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
+    /// assert_eq!(ret, None);
+    ///
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
+    /// assert_eq!(ret, Some(BEI32::new(28000)));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_prefix_iter_mut<'a, 'txn, T, KC, DC>(
         &self,
         txn: &'txn mut RwTxn<T>,
