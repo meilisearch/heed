@@ -45,6 +45,7 @@ pub mod cursor_op {
     pub const MDB_SET_RANGE: MDB_cursor_op = ffi::MDB_SET_RANGE;
     pub const MDB_PREV: MDB_cursor_op = ffi::MDB_PREV;
     pub const MDB_NEXT: MDB_cursor_op = ffi::MDB_NEXT;
+    pub const MDB_GET_CURRENT: MDB_cursor_op = ffi::MDB_GET_CURRENT;
 }
 
 pub unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
