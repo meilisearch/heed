@@ -1107,6 +1107,152 @@ where
     }
 }
 
+pub struct RoRevPrefix<'txn, KC, DC> {
+    cursor: RoCursor<'txn>,
+    prefix: Vec<u8>,
+    move_on_last: bool,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RoRevPrefix<'txn, KC2, DC2> {
+        RoRevPrefix {
+            cursor: self.cursor,
+            prefix: self.prefix,
+            move_on_last: self.move_on_last,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RoRevPrefix<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RoRevPrefix<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RoRevPrefix<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
+}
+
+impl<'txn, KC, DC> Iterator for RoRevPrefix<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_last {
+            self.move_on_last = false;
+            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+        } else {
+            self.cursor.move_on_prev()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+pub struct RwRevPrefix<'txn, KC, DC> {
+    cursor: RwCursor<'txn>,
+    prefix: Vec<u8>,
+    move_on_last: bool,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
+    pub fn del_current(&mut self) -> Result<bool> {
+        self.cursor.del_current()
+    }
+
+    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwRevPrefix<'txn, KC2, DC2> {
+        RwRevPrefix {
+            cursor: self.cursor,
+            prefix: self.prefix,
+            move_on_last: self.move_on_last,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RwRevPrefix<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RwRevPrefix<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RwRevPrefix<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
+}
+
+impl<'txn, KC, DC> Iterator for RwRevPrefix<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_last {
+            self.move_on_last = false;
+            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+        } else {
+            self.cursor.move_on_prev()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

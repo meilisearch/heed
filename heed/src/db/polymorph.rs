@@ -1320,6 +1320,48 @@ impl PolyDatabase {
         })
     }
 
+    pub fn rev_prefix_iter<'a, 'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        prefix: &'a KC::EItem,
+    ) -> Result<RoRevPrefix<'txn, KC, DC>>
+    where
+        KC: BytesEncode<'a>,
+    {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+
+        Ok(RoRevPrefix {
+            cursor: RoCursor::new(txn, self.dbi)?,
+            prefix: prefix_bytes,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn rev_prefix_iter_mut<'a, 'txn, T, KC, DC>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+        prefix: &'a KC::EItem,
+    ) -> Result<RwRevPrefix<'txn, KC, DC>>
+    where
+        KC: BytesEncode<'a>,
+    {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+
+        Ok(RwRevPrefix {
+            cursor: RwCursor::new(txn, self.dbi)?,
+            prefix: prefix_bytes,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        })
+    }
+
     /// Insert a key-value pairs in this database.
     ///
     /// ```
