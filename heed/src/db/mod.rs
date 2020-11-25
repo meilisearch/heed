@@ -260,6 +260,28 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     }
 }
 
+fn move_on_range_end<'txn>(
+    cursor: &mut RoCursor<'txn>,
+    end_bound: &Bound<Vec<u8>>,
+) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+{
+    match end_bound {
+        Bound::Included(end) => {
+            match cursor.move_on_key_greater_than_or_equal_to(end) {
+                Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
+                Ok(_) => cursor.move_on_prev(),
+                Err(e) => Err(e),
+            }
+        },
+        Bound::Excluded(end) => {
+            cursor
+                .move_on_key_greater_than_or_equal_to(end)
+                .and_then(|_| cursor.move_on_prev())
+        },
+        Bound::Unbounded => cursor.move_on_last(),
+    }
+}
+
 impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
 where
     KC: BytesDecode<'txn>,
@@ -309,32 +331,10 @@ where
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        fn move_on_end<'txn>(
-            cursor: &mut RoCursor<'txn>,
-            end_bound: &Bound<Vec<u8>>,
-        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-        {
-            match end_bound {
-                Bound::Included(end) => {
-                    match cursor.move_on_key_greater_than_or_equal_to(end) {
-                        Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
-                        Ok(_) => cursor.move_on_prev(),
-                        Err(e) => Err(e),
-                    }
-                },
-                Bound::Excluded(end) => {
-                    cursor
-                        .move_on_key_greater_than_or_equal_to(end)
-                        .and_then(|_| cursor.move_on_prev())
-                },
-                Bound::Unbounded => cursor.move_on_last(),
-            }
-        }
-
         let result = if self.move_on_start {
-            move_on_end(&mut self.cursor, &self.end_bound)
+            move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (self.cursor.current(), move_on_end(&mut self.cursor, &self.end_bound)) {
+            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 },
@@ -465,32 +465,10 @@ where
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        fn move_on_end<'txn>(
-            cursor: &mut RwCursor<'txn>,
-            end_bound: &Bound<Vec<u8>>,
-        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-        {
-            match end_bound {
-                Bound::Included(end) => {
-                    match cursor.move_on_key_greater_than_or_equal_to(end) {
-                        Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
-                        Ok(_) => cursor.move_on_prev(),
-                        Err(e) => Err(e),
-                    }
-                },
-                Bound::Excluded(end) => {
-                    cursor
-                        .move_on_key_greater_than_or_equal_to(end)
-                        .and_then(|_| cursor.move_on_prev())
-                },
-                Bound::Unbounded => cursor.move_on_last(),
-            }
-        }
-
         let result = if self.move_on_start {
-            move_on_end(&mut self.cursor, &self.end_bound)
+            move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (self.cursor.current(), move_on_end(&mut self.cursor, &self.end_bound)) {
+            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 },
@@ -520,6 +498,19 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+}
+
+fn move_on_prefix_end<'txn>(
+    cursor: &mut RoCursor<'txn>,
+    prefix: &mut Vec<u8>,
+) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+{
+    advance_key(prefix);
+    let result = cursor
+        .move_on_key_greater_than_or_equal_to(prefix)
+        .and_then(|_| cursor.move_on_prev());
+    retreat_key(prefix);
+    result
 }
 
 pub struct RoPrefix<'txn, KC, DC> {
@@ -588,23 +579,10 @@ where
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        fn move_on_end<'txn>(
-            cursor: &mut RoCursor<'txn>,
-            prefix: &mut Vec<u8>,
-        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-        {
-            advance_key(prefix);
-            let result = cursor
-                .move_on_key_greater_than_or_equal_to(prefix)
-                .and_then(|_| cursor.move_on_prev());
-            retreat_key(prefix);
-            result
-        }
-
         let result = if self.move_on_first {
-            move_on_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_end(&mut self.cursor, &mut self.prefix)) {
+            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 },
@@ -710,23 +688,10 @@ where
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        fn move_on_end<'txn>(
-            cursor: &mut RwCursor<'txn>,
-            prefix: &mut Vec<u8>,
-        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-        {
-            advance_key(prefix);
-            let result = cursor
-                .move_on_key_greater_than_or_equal_to(prefix)
-                .and_then(|_| cursor.move_on_prev());
-            retreat_key(prefix);
-            result
-        }
-
         let result = if self.move_on_first {
-            move_on_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_end(&mut self.cursor, &mut self.prefix)) {
+            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 },
