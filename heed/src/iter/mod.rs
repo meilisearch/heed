@@ -253,4 +253,50 @@ mod tests {
 
         wtxn.abort().unwrap();
     }
+
+    #[test]
+    fn rev_prefix_iter_last() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 0, 254, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 0, 254, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 254, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let iter = db.rev_prefix_iter(&wtxn, &[0, 0, 1]).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 1,   0, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.rev_prefix_iter(&wtxn, &[0, 0, 1]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 1,   0, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+    }
 }

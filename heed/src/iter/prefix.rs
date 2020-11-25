@@ -297,6 +297,37 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_last {
+            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+        } else {
+            let current = self.cursor.current();
+            let start = self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix);
+            match (current, start) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 pub struct RwRevPrefix<'txn, KC, DC> {
@@ -364,6 +395,37 @@ where
             move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
             self.cursor.move_on_prev()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_last {
+            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+        } else {
+            let current = self.cursor.current();
+            let start = self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix);
+            match (current, start) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
         };
 
         match result {
