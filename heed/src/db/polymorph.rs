@@ -1153,6 +1153,46 @@ impl PolyDatabase {
         RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
+    /// Return a reversed lexicographically ordered iterator of a range of key-value
+    /// pairs in this database.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let mut iter = db.rev_range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_range<'a, 'txn, T, KC, DC, R>(
         &self,
         txn: &'txn RoTxn<T>,
@@ -1191,6 +1231,59 @@ impl PolyDatabase {
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
+    /// Return a mutable reversed lexicographically ordered iterator of a range of
+    /// key-value pairs in this database.
+    ///
+    /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let mut range = db.rev_range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
+    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let ret = range.del_current()?;
+    /// assert!(ret);
+    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// let ret = range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")?;
+    /// assert!(ret);
+    ///
+    /// assert_eq!(range.next().transpose()?, None);
+    /// drop(range);
+    ///
+    ///
+    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_range_mut<'a, 'txn, T, KC, DC, R>(
         &self,
         txn: &'txn mut RwTxn<T>,
