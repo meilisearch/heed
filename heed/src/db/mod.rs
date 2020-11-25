@@ -586,6 +586,48 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        fn move_on_end<'txn>(
+            cursor: &mut RoCursor<'txn>,
+            prefix: &mut Vec<u8>,
+        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+        {
+            advance_key(prefix);
+            let result = cursor
+                .move_on_key_greater_than_or_equal_to(prefix)
+                .and_then(|_| cursor.move_on_prev());
+            retreat_key(prefix);
+            result
+        }
+
+        let result = if self.move_on_first {
+            move_on_end(&mut self.cursor, &mut self.prefix)
+        } else {
+            match (self.cursor.current(), move_on_end(&mut self.cursor, &mut self.prefix)) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 pub struct RwPrefix<'txn, KC, DC> {
@@ -666,6 +708,48 @@ where
             Err(e) => Some(Err(e)),
         }
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        fn move_on_end<'txn>(
+            cursor: &mut RwCursor<'txn>,
+            prefix: &mut Vec<u8>,
+        ) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+        {
+            advance_key(prefix);
+            let result = cursor
+                .move_on_key_greater_than_or_equal_to(prefix)
+                .and_then(|_| cursor.move_on_prev());
+            retreat_key(prefix);
+            result
+        }
+
+        let result = if self.move_on_first {
+            move_on_end(&mut self.cursor, &mut self.prefix)
+        } else {
+            match (self.cursor.current(), move_on_end(&mut self.cursor, &mut self.prefix)) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                if key.starts_with(&self.prefix) {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -689,12 +773,12 @@ mod tests {
         db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
-        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], "world").unwrap();
 
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((&[0u8, 0, 0, 255, 104, 101, 108, 108, 111][..], "hello")));
-        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world")));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[  0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world")));
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
 
@@ -850,6 +934,52 @@ mod tests {
 
         let mut iter = db.range(&wtxn, &(..)).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+    }
+
+    #[test]
+    fn prefix_iter_last() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 254, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 254, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let iter = db.prefix_iter(&wtxn, &[0, 0, 1]).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 1,   0, 119, 111, 114, 108, 100][..], ())));
+
+        let mut iter = db.prefix_iter(&wtxn, &[0, 0, 1]).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 1,   0, 119, 111, 114, 108, 100][..], ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         wtxn.abort().unwrap();
