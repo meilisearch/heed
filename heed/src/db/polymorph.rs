@@ -1089,7 +1089,95 @@ impl PolyDatabase {
         Ok(RwRange {
             cursor: RwCursor::new(txn, self.dbi)?,
             move_on_start: true,
-            start_bound: start_bound,
+            start_bound,
+            end_bound,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn rev_range<'a, 'txn, T, KC, DC, R>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        range: &'a R,
+    ) -> Result<RoRevRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode<'a>,
+        R: RangeBounds<KC::EItem>,
+    {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        Ok(RoRevRange {
+            cursor: RoCursor::new(txn, self.dbi)?,
+            move_on_end: true,
+            start_bound,
+            end_bound,
+            _phantom: marker::PhantomData,
+        })
+    }
+
+    pub fn rev_range_mut<'a, 'txn, T, KC, DC, R>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+        range: &'a R,
+    ) -> Result<RwRevRange<'txn, KC, DC>>
+    where
+        KC: BytesEncode<'a>,
+        R: RangeBounds<KC::EItem>,
+    {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        Ok(RwRevRange {
+            cursor: RwCursor::new(txn, self.dbi)?,
+            move_on_end: true,
+            start_bound,
             end_bound,
             _phantom: marker::PhantomData,
         })

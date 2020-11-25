@@ -700,6 +700,196 @@ where
     }
 }
 
+pub struct RoRevRange<'txn, KC, DC> {
+    cursor: RoCursor<'txn>,
+    move_on_end: bool,
+    start_bound: Bound<Vec<u8>>,
+    end_bound: Bound<Vec<u8>>,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RoRevRange<'txn, KC2, DC2> {
+        RoRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RoRevRange<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RoRevRange<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RoRevRange<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
+}
+
+impl<'txn, KC, DC> Iterator for RoRevRange<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_end {
+            self.move_on_end = false;
+            match &mut self.end_bound {
+                Bound::Included(end) => {
+                    match self.cursor.move_on_key_greater_than_or_equal_to(end) {
+                        Ok(Some((key, _))) if key > end => self.cursor.move_on_prev(),
+                        Ok(opt) => Ok(opt),
+                        Err(e) => Err(e),
+                    }
+                },
+                Bound::Excluded(end) => {
+                    self.cursor
+                        .move_on_key_greater_than_or_equal_to(end)
+                        .and_then(|_| self.cursor.move_on_prev())
+                },
+                Bound::Unbounded => self.cursor.move_on_last(),
+            }
+        } else {
+            self.cursor.move_on_prev()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.start_bound {
+                    Bound::Included(start) => key >= start,
+                    Bound::Excluded(start) => key > start,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            }
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+pub struct RwRevRange<'txn, KC, DC> {
+    cursor: RwCursor<'txn>,
+    move_on_end: bool,
+    start_bound: Bound<Vec<u8>>,
+    end_bound: Bound<Vec<u8>>,
+    _phantom: marker::PhantomData<(KC, DC)>,
+}
+
+impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
+    pub fn del_current(&mut self) -> Result<bool> {
+        self.cursor.del_current()
+    }
+
+    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwRevRange<'txn, KC2, DC2> {
+        RwRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData::default(),
+        }
+    }
+
+    /// Change the key codec type of this iterator, specifying the new codec.
+    pub fn remap_key_type<KC2>(self) -> RwRevRange<'txn, KC2, DC> {
+        self.remap_types::<KC2, DC>()
+    }
+
+    /// Change the data codec type of this iterator, specifying the new codec.
+    pub fn remap_data_type<DC2>(self) -> RwRevRange<'txn, KC, DC2> {
+        self.remap_types::<KC, DC2>()
+    }
+
+    /// Wrap the data bytes into a lazy decoder.
+    pub fn lazily_decode_data(self) -> RwRevRange<'txn, KC, LazyDecode<DC>> {
+        self.remap_types::<KC, LazyDecode<DC>>()
+    }
+}
+
+impl<'txn, KC, DC> Iterator for RwRevRange<'txn, KC, DC>
+where
+    KC: BytesDecode<'txn>,
+    DC: BytesDecode<'txn>,
+{
+    type Item = Result<(KC::DItem, DC::DItem)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.move_on_end {
+            self.move_on_end = false;
+            match &mut self.end_bound {
+                Bound::Included(end) => {
+                    match self.cursor.move_on_key_greater_than_or_equal_to(end) {
+                        Ok(Some((key, _))) if key > end => self.cursor.move_on_prev(),
+                        Ok(opt) => Ok(opt),
+                        Err(e) => Err(e),
+                    }
+                },
+                Bound::Excluded(end) => {
+                    self.cursor
+                        .move_on_key_greater_than_or_equal_to(end)
+                        .and_then(|_| self.cursor.move_on_prev())
+                },
+                Bound::Unbounded => self.cursor.move_on_last(),
+            }
+        } else {
+            self.cursor.move_on_prev()
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.start_bound {
+                    Bound::Included(start) => key >= start,
+                    Bound::Excluded(start) => key > start,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            }
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
 fn move_on_prefix_end<'txn>(
     cursor: &mut RoCursor<'txn>,
     prefix: &mut Vec<u8>,
