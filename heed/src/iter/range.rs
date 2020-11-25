@@ -27,6 +27,25 @@ fn move_on_range_end<'txn>(
     }
 }
 
+fn move_on_range_start<'txn>(
+    cursor: &mut RoCursor<'txn>,
+    start_bound: &mut Bound<Vec<u8>>,
+) -> Result<Option<(&'txn [u8], &'txn [u8])>>
+{
+    match start_bound {
+        Bound::Included(start) => {
+            cursor.move_on_key_greater_than_or_equal_to(start)
+        },
+        Bound::Excluded(start) => {
+            advance_key(start);
+            let result = cursor.move_on_key_greater_than_or_equal_to(start);
+            retreat_key(start);
+            result
+        },
+        Bound::Unbounded => cursor.move_on_first(),
+    }
+}
+
 pub struct RoRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_start: bool,
@@ -88,18 +107,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
             self.move_on_start = false;
-            match &mut self.start_bound {
-                Bound::Included(start) => {
-                    self.cursor.move_on_key_greater_than_or_equal_to(start)
-                },
-                Bound::Excluded(start) => {
-                    advance_key(start);
-                    let result = self.cursor.move_on_key_greater_than_or_equal_to(start);
-                    retreat_key(start);
-                    result
-                },
-                Bound::Unbounded => self.cursor.move_on_first(),
-            }
+            move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
             self.cursor.move_on_next()
         };
@@ -237,18 +245,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
             self.move_on_start = false;
-            match &mut self.start_bound {
-                Bound::Included(start) => {
-                    self.cursor.move_on_key_greater_than_or_equal_to(start)
-                },
-                Bound::Excluded(start) => {
-                    advance_key(start);
-                    let result = self.cursor.move_on_key_greater_than_or_equal_to(start);
-                    retreat_key(start);
-                    result
-                },
-                Bound::Unbounded => self.cursor.move_on_first(),
-            }
+            move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
             self.cursor.move_on_next()
         };
@@ -372,21 +369,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_end {
             self.move_on_end = false;
-            match &mut self.end_bound {
-                Bound::Included(end) => {
-                    match self.cursor.move_on_key_greater_than_or_equal_to(end) {
-                        Ok(Some((key, _))) if key > end => self.cursor.move_on_prev(),
-                        Ok(opt) => Ok(opt),
-                        Err(e) => Err(e),
-                    }
-                },
-                Bound::Excluded(end) => {
-                    self.cursor
-                        .move_on_key_greater_than_or_equal_to(end)
-                        .and_then(|_| self.cursor.move_on_prev())
-                },
-                Bound::Unbounded => self.cursor.move_on_last(),
-            }
+            move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
             self.cursor.move_on_prev()
         };
@@ -408,6 +391,43 @@ where
                     None
                 }
             }
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_end {
+            move_on_range_start(&mut self.cursor, &mut self.start_bound)
+        } else {
+            let current = self.cursor.current();
+            let start = move_on_range_start(&mut self.cursor, &mut self.start_bound);
+            match (current, start) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.end_bound {
+                    Bound::Included(end) => key <= end,
+                    Bound::Excluded(end) => key < end,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -489,21 +509,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_end {
             self.move_on_end = false;
-            match &mut self.end_bound {
-                Bound::Included(end) => {
-                    match self.cursor.move_on_key_greater_than_or_equal_to(end) {
-                        Ok(Some((key, _))) if key > end => self.cursor.move_on_prev(),
-                        Ok(opt) => Ok(opt),
-                        Err(e) => Err(e),
-                    }
-                },
-                Bound::Excluded(end) => {
-                    self.cursor
-                        .move_on_key_greater_than_or_equal_to(end)
-                        .and_then(|_| self.cursor.move_on_prev())
-                },
-                Bound::Unbounded => self.cursor.move_on_last(),
-            }
+            move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
             self.cursor.move_on_prev()
         };
@@ -525,6 +531,43 @@ where
                     None
                 }
             }
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        let result = if self.move_on_end {
+            move_on_range_start(&mut self.cursor, &mut self.start_bound)
+        } else {
+            let current = self.cursor.current();
+            let start = move_on_range_start(&mut self.cursor, &mut self.start_bound);
+            match (current, start) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                },
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => {
+                let must_be_returned = match &self.end_bound {
+                    Bound::Included(end) => key <= end,
+                    Bound::Excluded(end) => key < end,
+                    Bound::Unbounded => true,
+                };
+
+                if must_be_returned {
+                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                        (Some(key), Some(data)) => Some(Ok((key, data))),
+                        (_, _) => Some(Err(Error::Decoding)),
+                    }
+                } else {
+                    None
+                }
+            },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }

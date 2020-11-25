@@ -299,4 +299,53 @@ mod tests {
 
         wtxn.abort().unwrap();
     }
+
+    #[test]
+    fn rev_range_iter_last() {
+        use std::fs;
+        use std::path::Path;
+        use crate::EnvOpenOptions;
+        use crate::{zerocopy::I32, byteorder::BigEndian};
+        use crate::types::*;
+
+        fs::create_dir_all(Path::new("target").join("range_iter_last.mdb")).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(Path::new("target").join("range_iter_last.mdb")).unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        type BEI32 = I32<BigEndian>;
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.rev_range(&wtxn, &(BEI32::new(1)..=BEI32::new(3))).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
+
+        let mut iter = db.rev_range(&wtxn, &(BEI32::new(0)..BEI32::new(4))).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
+
+        let mut iter = db.rev_range(&wtxn, &(BEI32::new(0)..=BEI32::new(5))).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let iter = db.rev_range(&wtxn, &(BEI32::new(0)..=BEI32::new(5))).unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
+
+        let mut iter = db.rev_range(&wtxn, &(BEI32::new(4)..=BEI32::new(4))).unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort().unwrap();
+    }
 }
