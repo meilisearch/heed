@@ -887,12 +887,98 @@ impl PolyDatabase {
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
+    /// Returns a reversed lexicographically ordered iterator of all key-value pairs in this database.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    ///
+    /// let mut iter = db.rev_iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
+    /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
+    /// in this database.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    ///
+    /// let mut iter = db.rev_iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let ret = iter.del_current()?;
+    /// assert!(ret);
+    ///
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// let ret = iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")?;
+    /// assert!(ret);
+    ///
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    ///
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
+    /// assert_eq!(ret, None);
+    ///
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
+    /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn rev_iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
