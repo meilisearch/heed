@@ -1,15 +1,13 @@
 //! Crate `heed` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
 //!
 //! It provides you a way to store types in LMDB without any limit and with a minimal overhead as possible,
-//! relying on the [zerocopy] library to avoid copying bytes when that's unnecessary and the [serde] library
+//! relying on the [zerocopy] library to avoid copying bytes when that's unnecessary and the serde library
 //! when this is unavoidable.
 //!
 //! The Lightning Memory-Mapped Database (LMDB) directly maps files parts into main memory, combined
 //! with the zerocopy library allows us to safely zero-copy parse and serialize Rust types into LMDB.
 //!
 //! [LMDB]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
-//! [zerocopy]: https://docs.rs/zerocopy
-//! [serde]: https://docs.rs/serde
 //!
 //! # Examples
 //!

@@ -17,12 +17,12 @@ use zerocopy::{AsBytes, FromBytes};
 /// To store slices, you must look at the [`CowSlice`],
 /// [`OwnedSlice`] or [`UnalignedSlice`] types.
 ///
-/// [memory alignment]: https://doc.rust-lang.org/std/mem/fn.align_of.html
-/// [`UnalignedType`]: crate::types::UnalignedType
-/// [`CowType`]: crate::types::CowType
-/// [`UnalignedSlice`]: crate::types::UnalignedSlice
-/// [`OwnedSlice`]: crate::types::OwnedSlice
-/// [`CowSlice`]: crate::types::CowSlice
+/// [memory alignment]: std::mem::align_of()
+/// [`UnalignedType`]: crate::UnalignedType
+/// [`CowType`]: crate::CowType
+/// [`UnalignedSlice`]: crate::UnalignedSlice
+/// [`OwnedSlice`]: crate::OwnedSlice
+/// [`CowSlice`]: crate::CowSlice
 pub struct OwnedType<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: 'a> BytesEncode<'a> for OwnedType<T>
