@@ -66,6 +66,7 @@ fn get_file_fd(file: &File) -> std::os::unix::io::RawFd {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
