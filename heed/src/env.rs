@@ -85,16 +85,7 @@ impl EnvOpenOptions {
     }
 
     pub fn map_size(&mut self, size: usize) -> &mut Self {
-        if size % page_size::get() != 0 {
-            panic!(
-                "map size ({}) must be a multiple of the system page size ({})",
-                size,
-                page_size::get()
-            );
-        }
-
         self.map_size = Some(size);
-
         self
     }
 
@@ -171,6 +162,13 @@ impl EnvOpenOptions {
                     mdb_result(ffi::mdb_env_create(&mut env))?;
 
                     if let Some(size) = self.map_size {
+                        if size % page_size::get() != 0 {
+                            let msg = format!(
+                                "map size ({}) must be a multiple of the system page size ({})",
+                                size, page_size::get()
+                            );
+                            return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
+                        }
                         mdb_result(ffi::mdb_env_set_mapsize(env, size))?;
                     }
 
