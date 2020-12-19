@@ -48,7 +48,7 @@
 //! ```
 
 mod cursor;
-mod db;
+mod database;
 mod env;
 mod iter;
 mod lazy_decode;
@@ -60,7 +60,7 @@ pub use heed_types as types;
 pub use zerocopy;
 use heed_traits as traits;
 
-pub use self::db::{Database, PolyDatabase};
+pub use self::database::Database;
 pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
 pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::iter::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
@@ -74,6 +74,9 @@ use self::cursor::{RoCursor, RwCursor};
 use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
+
+/// A `Database` that isn't typed in the sense that it get and put raw bytes.
+pub type PolyDatabase = Database<types::ByteSlice, types::ByteSlice>;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
