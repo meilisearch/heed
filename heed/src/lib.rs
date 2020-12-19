@@ -75,9 +75,6 @@ use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
 
-/// A `Database` that isn't typed in the sense that it get and put raw bytes.
-pub type PolyDatabase = Database<types::ByteSlice, types::ByteSlice>;
-
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
