@@ -75,6 +75,9 @@ use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
 
+/// An helper type alias for [`Database`]s that are not typed and returns raw bytes.
+pub type UntypedDatabase = Database<types::ByteSlice, types::ByteSlice>;
+
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
