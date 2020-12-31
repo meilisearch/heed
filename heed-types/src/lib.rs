@@ -71,8 +71,8 @@ pub struct DecodeIgnore;
 impl heed_traits::BytesDecode<'_> for DecodeIgnore {
     type DItem = ();
 
-    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
-        Some(())
+    fn bytes_decode(_bytes: &[u8]) -> Result<Self::DItem, Box<dyn std::error::Error>> {
+        Ok(())
     }
 }
 

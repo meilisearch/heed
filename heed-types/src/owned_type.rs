@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::error::Error;
 
 use crate::CowType;
 use heed_traits::{BytesDecode, BytesEncode};
@@ -31,8 +32,8 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+        Ok(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
     }
 }
 
@@ -42,7 +43,7 @@ where
 {
     type DItem = T;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
+    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, Box<dyn Error>> {
         CowType::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }

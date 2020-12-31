@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::error::Error;
 
 use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
@@ -19,8 +20,8 @@ where
 {
     type EItem = [T];
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<[T] as AsBytes>::as_bytes(item)))
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+        Ok(Cow::Borrowed(<[T] as AsBytes>::as_bytes(item)))
     }
 }
 
@@ -30,8 +31,10 @@ where
 {
     type DItem = &'a [T];
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        LayoutVerified::<_, [T]>::new_slice_unaligned(bytes).map(LayoutVerified::into_slice)
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+        Ok(LayoutVerified::<_, [T]>::new_slice_unaligned(bytes)
+         .map(LayoutVerified::into_slice)
+         .ok_or("The provided bytes do not satisfy the alignment requirements.")?)
     }
 }
 

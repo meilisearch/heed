@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::error::Error;
 use std::{mem, ptr};
 
 use crate::aligned_to;
@@ -34,8 +35,8 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+        Ok(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
     }
 }
 
@@ -45,9 +46,9 @@ where
 {
     type DItem = Cow<'a, T>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
         match LayoutVerified::<_, T>::new(bytes) {
-            Some(layout) => Some(Cow::Borrowed(layout.into_ref())),
+            Some(layout) => Ok(Cow::Borrowed(layout.into_ref())),
             None => {
                 let len = bytes.len();
                 let elem_size = mem::size_of::<T>();
@@ -60,11 +61,11 @@ where
                     unsafe {
                         let dst = data.as_mut_ptr() as *mut u8;
                         ptr::copy_nonoverlapping(bytes.as_ptr(), dst, len);
-                        return Some(Cow::Owned(data.assume_init()));
+                        return Ok(Cow::Owned(data.assume_init()));
                     }
                 }
 
-                None
+                Err("The provided bytes do not satisfy the alignment requirements.")?
             }
         }
     }

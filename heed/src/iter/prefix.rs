@@ -74,8 +74,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -103,8 +104,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -137,8 +139,8 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(|e| Error::Encoding(e))?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(|e| Error::Encoding(e))?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -187,8 +189,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -216,8 +219,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -286,8 +290,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -317,8 +322,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -351,8 +357,8 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(|e| Error::Encoding(e))?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(|e| Error::Encoding(e))?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -401,8 +407,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -432,8 +439,9 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) => Some(Err(Error::Decoding(e))),
+                        (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
