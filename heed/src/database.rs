@@ -1,8 +1,12 @@
-use std::marker;
+use std::ops::Bound;
+use std::borrow::Cow;
+use std::{marker, mem, ptr};
 use std::ops::RangeBounds;
 
 use crate::*;
+use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
+use crate::types::DecodeIgnore;
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -115,16 +119,14 @@ use crate::mdb::ffi;
 /// # Ok(()) }
 /// ```
 pub struct Database<KC, DC> {
-    pub(crate) dyndb: PolyDatabase,
+    env_ident: usize,
+    dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(KC, DC)>,
 }
 
 impl<KC, DC> Database<KC, DC> {
     pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database {
-            dyndb: PolyDatabase::new(env_ident, dbi),
-            marker: std::marker::PhantomData,
-        }
+        Database { env_ident, dbi, marker: std::marker::PhantomData }
     }
 
     /// Retrieve the sequence of a database.
@@ -133,7 +135,23 @@ impl<KC, DC> Database<KC, DC> {
     /// You can see an example usage on the `PolyDatabase::sequence` method documentation.
     #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
     pub fn sequence<T>(&self, txn: &RoTxn<T>) -> Result<u64> {
-        self.dyndb.sequence(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut value = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdbx_dbi_sequence(
+                txn.txn,
+                self.dbi,
+                value.as_mut_ptr(),
+                0, // increment must be 0 for read-only transactions
+            ))
+        };
+
+        match result {
+            Ok(()) => unsafe { Ok(value.assume_init()) },
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Increment the sequence of a database.
@@ -147,7 +165,26 @@ impl<KC, DC> Database<KC, DC> {
     /// resulted in an overflow an therefore cannot be executed.
     #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
     pub fn increase_sequence<T>(&self, txn: &mut RwTxn<T>, increment: u64) -> Result<Option<u64>> {
-        self.dyndb.increase_sequence(txn, increment)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        use crate::mdb::error::Error;
+
+        let mut value = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdbx_dbi_sequence(
+                txn.txn.txn,
+                self.dbi,
+                value.as_mut_ptr(),
+                increment,
+            ))
+        };
+
+        match result {
+            Ok(()) => unsafe { Ok(Some(value.assume_init())) },
+            Err(Error::Other(c)) if c == i32::max_value() => Ok(None), // MDBX_RESULT_TRUE
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Retrieves the value associated with a key.
@@ -188,7 +225,31 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get::<T, KC, DC>(txn, key)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdb_get(
+                txn.txn,
+                self.dbi,
+                &mut key_val,
+                data_val.as_mut_ptr(),
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+                Ok(Some(data))
+            }
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Retrieves the key/value pair lower than the given one in this database.
@@ -243,7 +304,20 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than::<T, KC, DC>(txn, key)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        cursor.move_on_key_greater_than_or_equal_to(&key_bytes)?;
+
+        match cursor.move_on_prev() {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Retrieves the key/value pair lower than or equal to the given one in this database.
@@ -298,7 +372,24 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than_or_equal_to::<T, KC, DC>(txn, key)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let result = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
+            Ok(Some((key, data))) if key == &key_bytes[..] => Ok(Some((key, data))),
+            Ok(_) => cursor.move_on_prev(),
+            Err(e) => Err(e),
+        };
+
+        match result {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Retrieves the key/value pair greater than the given one in this database.
@@ -353,7 +444,23 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than::<T, KC, DC>(txn, key)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let entry = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes)? {
+            Some((key, data)) if key > &key_bytes[..] => Some((key, data)),
+            Some((_key, _data)) => cursor.move_on_next()?,
+            None => None,
+        };
+
+        match entry {
+            Some((key, data)) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            None => Ok(None),
+        }
     }
 
     /// Retrieves the key/value pair greater than or equal to the given one in this database.
@@ -408,7 +515,18 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -451,7 +569,17 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.first::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_first() {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Retrieves the last key/value pair of this database.
@@ -494,7 +622,17 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.last::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_last() {
+            Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
+                (Some(key), Some(data)) => Ok(Some((key, data))),
+                (_, _) => Err(Error::Decoding),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Returns the number of elements in this database.
@@ -536,7 +674,21 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
-        self.dyndb.len(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut count = 0;
+
+        match cursor.move_on_first()? {
+            Some(_) => count += 1,
+            None => return Ok(0),
+        }
+
+        while let Some(_) = cursor.move_on_next()? {
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     /// Returns `true` if and only if this database is empty.
@@ -578,7 +730,12 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
-        self.dyndb.is_empty(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_first()? {
+            Some(_) => Ok(false),
+            None => Ok(true),
+        }
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
@@ -618,7 +775,8 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
-        self.dyndb.iter::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -671,7 +829,8 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
-        self.dyndb.iter_mut::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
@@ -711,7 +870,8 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value\
@@ -765,7 +925,8 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn rev_iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter_mut::<T, KC, DC>(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -816,7 +977,33 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -881,7 +1068,33 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range_mut::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a reversed lexicographically ordered iterator of a range of key-value
@@ -933,7 +1146,33 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of a range of
@@ -998,7 +1237,33 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range_mut::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Included(bytes.into_owned())
+            }
+            Bound::Excluded(bound) => {
+                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                Bound::Excluded(bytes.into_owned())
+            }
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1050,7 +1315,10 @@ impl<KC, DC> Database<KC, DC> {
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter::<T, KC, DC>(txn, prefix)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1115,7 +1383,10 @@ impl<KC, DC> Database<KC, DC> {
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1167,7 +1438,10 @@ impl<KC, DC> Database<KC, DC> {
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter::<T, KC, DC>(txn, prefix)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
@@ -1232,7 +1506,10 @@ impl<KC, DC> Database<KC, DC> {
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = prefix_bytes.into_owned();
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Insert a key-value pairs in this database.
@@ -1273,7 +1550,26 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.put::<T, KC, DC>(txn, key, data)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let flags = 0;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
+        }
+
+        Ok(())
     }
 
     /// Append the given key/data pair to the end of the database.
@@ -1317,7 +1613,26 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.append::<T, KC, DC>(txn, key, data)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let flags = ffi::MDB_APPEND;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
+        }
+
+        Ok(())
     }
 
     /// Deletes a key-value pairs in this database.
@@ -1365,7 +1680,25 @@ impl<KC, DC> Database<KC, DC> {
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.delete::<T, KC>(txn, key)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+
+        let result = unsafe {
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                ptr::null_mut(),
+            ))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Deletes a range of key-value pairs in this database.
@@ -1421,7 +1754,17 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.delete_range::<T, KC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let mut count = 0;
+        let mut iter = self.remap_data_type::<DecodeIgnore>().range_mut(txn, range)?;
+
+        while let Some(_) = iter.next() {
+            iter.del_current()?;
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     /// Deletes all key/value pairs in this database.
@@ -1465,7 +1808,8 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
-        self.dyndb.clear(txn)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 
     /// Change the codec types of this uniform database, specifying the codecs.
@@ -1482,7 +1826,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PolyDatabase};
+    /// use heed::Database;
     /// use heed::types::*;
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
@@ -1509,7 +1853,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn remap_types<KC2, DC2>(&self) -> Database<KC2, DC2> {
-        Database::new(self.dyndb.env_ident, self.dyndb.dbi)
+        Database::new(self.env_ident, self.dbi)
     }
 
     /// Change the key codec type of this uniform database, specifying the new codec.
@@ -1526,63 +1870,13 @@ impl<KC, DC> Database<KC, DC> {
     pub fn lazily_decode_data(&self) -> Database<KC, LazyDecode<DC>> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
-
-    /// Get an handle on the internal polymorphic database.
-    ///
-    /// Using this method is useful when you want to skip deserializing of the value,
-    /// by specifying that the value is of type `DecodeIgnore` for example.
-    ///
-    /// [`DecodeIgnore`]: crate::types::DecodeIgnore
-    ///
-    /// # Safety
-    ///
-    /// It is up to you to ensure that the data read and written using the polymorphic
-    /// handle correspond to the the typed, uniform one. If an invalid write is made,
-    /// it can corrupt the database from the eyes of heed.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use std::fs;
-    /// # use std::path::Path;
-    /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
-    /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024) // 10MB
-    /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
-    ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
-    /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
-    ///
-    /// // Check if a key exists and skip potentially expensive deserializing
-    /// let ret = db.as_polymorph().get::<_, OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
-    /// assert!(ret.is_some());
-    ///
-    /// wtxn.commit()?;
-    /// # Ok(()) }
-    /// ```
-    pub fn as_polymorph(&self) -> &PolyDatabase {
-        &self.dyndb
-    }
 }
 
 impl<KC, DC> Clone for Database<KC, DC> {
     fn clone(&self) -> Database<KC, DC> {
         Database {
-            dyndb: self.dyndb,
+            env_ident: self.env_ident,
+            dbi: self.dbi,
             marker: marker::PhantomData,
         }
     }

@@ -16,7 +16,7 @@ use synchronoise::event::SignalEvent;
 
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
-use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use crate::{Database, Error, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
 
 /// The list of opened environments, the value is an optional environment, it is None
@@ -230,7 +230,7 @@ pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
     path: PathBuf,
 }
 
@@ -271,19 +271,14 @@ impl Env {
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
-            .raw_open_database(name, Some(types))?
+            .raw_open_database(name, types)?
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
-    }
-
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self.raw_open_database(name, None)?
-                .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
     }
 
     fn raw_open_database(
         &self,
         name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
+        types: (TypeId, TypeId),
     ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
@@ -338,30 +333,14 @@ impl Env {
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
+        self.raw_create_database(name, types, parent_wtxn)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
-    }
-
-    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
-    }
-
-    pub fn create_poly_database_with_txn(
-        &self,
-        name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
-    ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
     }
 
     fn raw_create_database(
         &self,
         name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
+        types: (TypeId, TypeId),
         parent_wtxn: &mut RwTxn,
     ) -> Result<u32> {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
