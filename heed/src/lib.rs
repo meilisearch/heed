@@ -61,7 +61,6 @@ pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::database::Database;
-pub use self::env::CustomKeyCmp;
 pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
 pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::iter::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
@@ -69,7 +68,7 @@ pub use self::iter::{RoRange, RoRevRange, RwRange, RwRevRange};
 pub use self::lazy_decode::{LazyDecode, Lazy};
 pub use self::mdb::error::Error as MdbError;
 pub use self::mdb::flags;
-pub use self::traits::{BytesDecode, BytesEncode};
+pub use self::traits::{BytesDecode, BytesEncode, CustomKeyCmp};
 pub use self::txn::{RoTxn, RwTxn};
 use self::cursor::{RoCursor, RwCursor};
 use self::mdb::ffi::{into_val, from_val};

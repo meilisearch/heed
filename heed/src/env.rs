@@ -17,7 +17,7 @@ use synchronoise::event::SignalEvent;
 
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
-use crate::{Database, Error, Result, RoTxn, RwTxn};
+use crate::{Database, CustomKeyCmp, Error, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
 
 /// The list of opened environments, the value is an optional environment, it is None
@@ -260,6 +260,8 @@ pub enum CompactionOption {
     Disabled,
 }
 
+/// An helping function that transforms the LMDB types into Rust types (`MDB_val` into slices)
+/// and vice versa, the Rust types into C types (`Ordering` into an integer).
 extern "C" fn custom_key_cmp_wrapper<C: CustomKeyCmp>(
     a: *const ffi::MDB_val,
     b: *const ffi::MDB_val,
@@ -272,10 +274,6 @@ extern "C" fn custom_key_cmp_wrapper<C: CustomKeyCmp>(
         Ordering::Equal => 0,
         Ordering::Greater => 1,
     }
-}
-
-pub trait CustomKeyCmp {
-    fn compare(a: &[u8], b: &[u8]) -> Ordering;
 }
 
 enum DummyCustomKeyCmp {}
