@@ -13,6 +13,8 @@ pub trait BytesDecode<'a> {
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem>;
 }
 
-pub trait CustomKeyCmp {
-    fn compare(a: &[u8], b: &[u8]) -> Ordering;
+pub trait CustomKeyCmp<'a> {
+    type Key: 'a;
+
+    fn compare(a: Self::Key, b: Self::Key) -> Ordering;
 }

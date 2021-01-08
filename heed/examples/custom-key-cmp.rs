@@ -4,17 +4,19 @@ use std::cmp::Ordering;
 use std::path::Path;
 
 use heed::types::*;
-use heed::{Database, EnvOpenOptions, CustomKeyCmp};
+use heed::{EnvOpenOptions, CustomKeyCmp};
 
 enum StringAsIntCmp {}
 
 // This function takes two strings which represent positive numbers,
 // parses them into i32s and compare the parsed value.
 // Therefore "-1000" < "-100" must be true even without '0' padding.
-impl CustomKeyCmp for StringAsIntCmp {
-    fn compare(a: &[u8], b: &[u8]) -> Ordering {
-        let a: i32 = str::from_utf8(a).unwrap().parse().unwrap();
-        let b: i32 = str::from_utf8(b).unwrap().parse().unwrap();
+impl<'a> CustomKeyCmp<'a> for StringAsIntCmp {
+    type Key = &'a str;
+
+    fn compare(a: Self::Key, b: Self::Key) -> Ordering {
+        let a: i32 = a.parse().unwrap_or(0);
+        let b: i32 = b.parse().unwrap_or(0);
         a.cmp(&b)
     }
 }
@@ -32,7 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max_dbs(3)
         .open(env_path)?;
 
-    let db: Database<Str, Unit> = env.create_database_with_custom_key_cmp::<_, _, StringAsIntCmp>(None)?;
+    // Here we try to create and then open a database we the same syntax
+    // to check that the function signatures are valid.
+    env.create_database_with_custom_key_cmp::<Str, Unit, StringAsIntCmp, _>(None)?;
+    let db = env.open_database_with_custom_key_cmp::<Str, Unit, StringAsIntCmp, _>(None)?.unwrap();
 
     let mut wtxn = env.write_txn()?;
 
