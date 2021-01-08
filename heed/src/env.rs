@@ -19,7 +19,6 @@ use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::{Database, CustomKeyCmp, Error, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
-use crate::BytesDecode;
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -263,20 +262,13 @@ pub enum CompactionOption {
 
 /// An helping function that transforms the LMDB types into Rust types (`MDB_val` into slices)
 /// and vice versa, the Rust types into C types (`Ordering` into an integer).
-extern "C" fn custom_key_cmp_wrapper<'a, KC, C, K>(
+extern "C" fn custom_key_cmp_wrapper<C: CustomKeyCmp>(
     a: *const ffi::MDB_val,
     b: *const ffi::MDB_val,
 ) -> i32
-where
-    KC: BytesDecode<'a, DItem = K>,
-    C: CustomKeyCmp<'a, Key = K>,
 {
     let a = unsafe { ffi::from_val(*a) };
     let b = unsafe { ffi::from_val(*b) };
-
-    let a = KC::bytes_decode(a).unwrap();
-    let b = KC::bytes_decode(b).unwrap();
-
     match C::compare(a, b) {
         Ordering::Less => -1,
         Ordering::Equal => 0,
@@ -284,13 +276,11 @@ where
     }
 }
 
-struct DummyCustomKeyCmp<K>(std::marker::PhantomData<K>);
+enum DummyCustomKeyCmp {}
 
-impl<'a, K: 'a> CustomKeyCmp<'a> for DummyCustomKeyCmp<K> {
-    type Key = K;
-
-    fn compare(_a: Self::Key, _b: Self::Key) -> Ordering {
-        Ordering::Equal
+impl CustomKeyCmp for DummyCustomKeyCmp {
+    fn compare(a: &[u8], b: &[u8]) -> Ordering {
+        a.cmp(b)
     }
 }
 
@@ -301,39 +291,39 @@ impl Env {
 
     pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
     where
-        KC: 'static + for<'a> BytesDecode<'a>,
+        KC: 'static,
         DC: 'static,
     {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
-            .raw_open_database::<KC, DC, DummyCustomKeyCmp<KC::DItem>, _>(name, false)?
+            .raw_open_database::<DummyCustomKeyCmp>(name, types, false)?
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
-    pub fn open_database_with_custom_key_cmp<'a, KC, DC, C, K>(
+    pub fn open_database_with_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,
     ) -> Result<Option<Database<KC, DC>>>
     where
-        KC: 'static + BytesDecode<'a, DItem = K>,
+        KC: 'static,
         DC: 'static,
-        C: CustomKeyCmp<'a, Key = K>,
+        C: CustomKeyCmp,
     {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
-            .raw_open_database::<KC, DC, C, _>(name, true)?
+            .raw_open_database::<C>(name, types, true)?
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
-    fn raw_open_database<'a, KC, DC, C, K>(
+    fn raw_open_database<C>(
         &self,
         name: Option<&str>,
+        types: (TypeId, TypeId),
         use_custom_key_cmp: bool,
     ) -> Result<Option<u32>>
     where
-        KC: 'static + BytesDecode<'a, DItem = K>,
-        DC: 'static,
-        C: CustomKeyCmp<'a, Key = K>,
+        C: CustomKeyCmp,
     {
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -363,7 +353,7 @@ impl Env {
                         mdb_result(ffi::mdb_set_compare(
                             rtxn.txn,
                             dbi,
-                            Some(custom_key_cmp_wrapper::<KC, C, K>),
+                            Some(custom_key_cmp_wrapper::<C>),
                         ))?;
                     }
                 }
@@ -386,7 +376,7 @@ impl Env {
 
     pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
     where
-        KC: 'static + for<'a> BytesDecode<'a>,
+        KC: 'static,
         DC: 'static,
     {
         let mut parent_wtxn = self.write_txn()?;
@@ -395,17 +385,17 @@ impl Env {
         Ok(db)
     }
 
-    pub fn create_database_with_custom_key_cmp<'a, KC, DC, C, K>(
+    pub fn create_database_with_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,
     ) -> Result<Database<KC, DC>>
     where
-        KC: 'static + BytesDecode<'a, DItem = K>,
+        KC: 'static,
         DC: 'static,
-        C: CustomKeyCmp<'a, Key = K>,
+        C: CustomKeyCmp,
     {
         let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn_and_custom_key_cmp::<_, _, C, _>(name, &mut parent_wtxn)?;
+        let db = self.create_database_with_txn_and_custom_key_cmp::<_, _, C>(name, &mut parent_wtxn)?;
         parent_wtxn.commit()?;
         Ok(db)
     }
@@ -416,39 +406,39 @@ impl Env {
         parent_wtxn: &mut RwTxn,
     ) -> Result<Database<KC, DC>>
     where
-        KC: 'static + for<'a> BytesDecode<'a>,
+        KC: 'static,
         DC: 'static,
     {
-        self.raw_create_database::<KC, DC, DummyCustomKeyCmp<KC::DItem>, _>(name, parent_wtxn, false)
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        self.raw_create_database::<DummyCustomKeyCmp>(name, types, parent_wtxn, false)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
-    pub fn create_database_with_txn_and_custom_key_cmp<'a, KC, DC, C, K>(
+    pub fn create_database_with_txn_and_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,
         parent_wtxn: &mut RwTxn,
     ) -> Result<Database<KC, DC>>
     where
-        KC: 'static + BytesDecode<'a, DItem = K>,
+        KC: 'static,
         DC: 'static,
-        C: CustomKeyCmp<'a, Key = K>,
+        C: CustomKeyCmp,
     {
-        self.raw_create_database::<KC, DC, C, _>(name, parent_wtxn, true)
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        self.raw_create_database::<C>(name, types, parent_wtxn, true)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
-    fn raw_create_database<'a, KC, DC, C, K>(
+    fn raw_create_database<C>(
         &self,
         name: Option<&str>,
+        types: (TypeId, TypeId),
         parent_wtxn: &mut RwTxn,
         use_custom_key_cmp: bool,
     ) -> Result<u32>
     where
-        KC: 'static + BytesDecode<'a, DItem = K>,
-        DC: 'static,
-        C: CustomKeyCmp<'a, Key = K>,
+        C: CustomKeyCmp,
     {
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         let wtxn = self.nested_write_txn(parent_wtxn)?;
 
         let mut dbi = 0;
@@ -478,7 +468,7 @@ impl Env {
                         mdb_result(ffi::mdb_set_compare(
                             wtxn.txn.txn,
                             dbi,
-                            Some(custom_key_cmp_wrapper::<KC, C, K>),
+                            Some(custom_key_cmp_wrapper::<C>),
                         ))?;
                     }
                 }
