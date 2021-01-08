@@ -1,10 +1,12 @@
 use lmdb_sys as ffi;
 
+pub use ffi::MDB_cmp_func as MDB_cmp_func;
 pub use ffi::MDB_cursor as MDB_cursor;
 pub use ffi::MDB_dbi as MDB_dbi;
 pub use ffi::MDB_env as MDB_env;
 pub use ffi::mdb_filehandle_t as mdb_filehandle_t;
 pub use ffi::MDB_txn as MDB_txn;
+pub use ffi::MDB_val as MDB_val;
 
 pub use ffi::MDB_APPEND as MDB_APPEND;
 pub use ffi::MDB_CP_COMPACT as MDB_CP_COMPACT;
@@ -26,6 +28,7 @@ pub use ffi::mdb_del as mdb_del;
 pub use ffi::mdb_drop as mdb_drop;
 pub use ffi::mdb_get as mdb_get;
 pub use ffi::mdb_put as mdb_put;
+pub use ffi::mdb_set_compare as mdb_set_compare;
 
 pub use ffi::mdb_txn_abort as mdb_txn_abort;
 pub use ffi::mdb_txn_begin as mdb_txn_begin;

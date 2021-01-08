@@ -1,4 +1,5 @@
 use std::any::TypeId;
+use std::cmp::Ordering;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
 use std::fs::File;
@@ -230,7 +231,7 @@ pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId, bool)>>,
     path: PathBuf,
 }
 
@@ -259,6 +260,32 @@ pub enum CompactionOption {
     Disabled,
 }
 
+extern "C" fn custom_key_cmp_wrapper<C: CustomKeyCmp>(
+    a: *const ffi::MDB_val,
+    b: *const ffi::MDB_val,
+) -> i32
+{
+    let a = unsafe { ffi::from_val(*a) };
+    let b = unsafe { ffi::from_val(*b) };
+    match C::compare(a, b) {
+        Ordering::Less => -1,
+        Ordering::Equal => 0,
+        Ordering::Greater => 1,
+    }
+}
+
+pub trait CustomKeyCmp {
+    fn compare(a: &[u8], b: &[u8]) -> Ordering;
+}
+
+enum DummyCustomKeyCmp {}
+
+impl CustomKeyCmp for DummyCustomKeyCmp {
+    fn compare(a: &[u8], b: &[u8]) -> Ordering {
+        a.cmp(b)
+    }
+}
+
 impl Env {
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.0.env
@@ -271,15 +298,34 @@ impl Env {
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         Ok(self
-            .raw_open_database(name, types)?
+            .raw_open_database::<DummyCustomKeyCmp>(name, types, false)?
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
-    fn raw_open_database(
+    pub fn open_database_with_custom_key_cmp<KC, DC, C>(
+        &self,
+        name: Option<&str>,
+    ) -> Result<Option<Database<KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+        C: CustomKeyCmp,
+    {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        Ok(self
+            .raw_open_database::<C>(name, types, true)?
+            .map(|db| Database::new(self.env_mut_ptr() as _, db)))
+    }
+
+    fn raw_open_database<C>(
         &self,
         name: Option<&str>,
         types: (TypeId, TypeId),
-    ) -> Result<Option<u32>> {
+        use_custom_key_cmp: bool,
+    ) -> Result<Option<u32>>
+    where
+        C: CustomKeyCmp,
+    {
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -291,17 +337,35 @@ impl Env {
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
+        let result = unsafe {
+            mdb_result(ffi::mdb_dbi_open(
+                rtxn.txn,
+                name_ptr,
+                0,
+                &mut dbi,
+            ))
+        };
 
         drop(name);
 
         match result {
             Ok(()) => {
+                if use_custom_key_cmp {
+                    unsafe {
+                        mdb_result(ffi::mdb_set_compare(
+                            rtxn.txn,
+                            dbi,
+                            Some(custom_key_cmp_wrapper::<C>),
+                        ))?;
+                    }
+                }
+
                 rtxn.commit()?;
 
-                let old_types = lock.entry(dbi).or_insert(types);
+                let settings = (types.0, types.1, use_custom_key_cmp);
+                let old_settings = lock.entry(dbi).or_insert(settings);
 
-                if *old_types == types {
+                if *old_settings == settings {
                     Ok(Some(dbi))
                 } else {
                     Err(Error::InvalidDatabaseTyping)
@@ -323,6 +387,21 @@ impl Env {
         Ok(db)
     }
 
+    pub fn create_database_with_custom_key_cmp<KC, DC, C>(
+        &self,
+        name: Option<&str>,
+    ) -> Result<Database<KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+        C: CustomKeyCmp,
+    {
+        let mut parent_wtxn = self.write_txn()?;
+        let db = self.create_database_with_txn_and_custom_key_cmp::<_, _, C>(name, &mut parent_wtxn)?;
+        parent_wtxn.commit()?;
+        Ok(db)
+    }
+
     pub fn create_database_with_txn<KC, DC>(
         &self,
         name: Option<&str>,
@@ -333,16 +412,35 @@ impl Env {
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, types, parent_wtxn)
+        self.raw_create_database::<DummyCustomKeyCmp>(name, types, parent_wtxn, false)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
-    fn raw_create_database(
+    pub fn create_database_with_txn_and_custom_key_cmp<KC, DC, C>(
+        &self,
+        name: Option<&str>,
+        parent_wtxn: &mut RwTxn,
+    ) -> Result<Database<KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+        C: CustomKeyCmp,
+    {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        self.raw_create_database::<C>(name, types, parent_wtxn, true)
+            .map(|db| Database::new(self.env_mut_ptr() as _, db))
+    }
+
+    fn raw_create_database<C>(
         &self,
         name: Option<&str>,
         types: (TypeId, TypeId),
         parent_wtxn: &mut RwTxn,
-    ) -> Result<u32> {
+        use_custom_key_cmp: bool,
+    ) -> Result<u32>
+    where
+        C: CustomKeyCmp,
+    {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
 
         let mut dbi = 0;
@@ -367,11 +465,22 @@ impl Env {
 
         match result {
             Ok(()) => {
+                if use_custom_key_cmp {
+                    unsafe {
+                        mdb_result(ffi::mdb_set_compare(
+                            wtxn.txn.txn,
+                            dbi,
+                            Some(custom_key_cmp_wrapper::<C>),
+                        ))?;
+                    }
+                }
+
                 wtxn.commit()?;
 
-                let old_types = lock.entry(dbi).or_insert(types);
+                let settings = (types.0, types.1, use_custom_key_cmp);
+                let old_settings = lock.entry(dbi).or_insert(settings);
 
-                if *old_types == types {
+                if *old_settings == settings {
                     Ok(dbi)
                 } else {
                     Err(Error::InvalidDatabaseTyping)

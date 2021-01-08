@@ -61,6 +61,7 @@ pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::database::Database;
+pub use self::env::CustomKeyCmp;
 pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
 pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::iter::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};

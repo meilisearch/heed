@@ -1,10 +1,12 @@
 use mdbx_sys as ffi;
 
+pub use ffi::MDBX_cmp_func as MDBX_cmp_func;
 pub use ffi::MDBX_cursor as MDB_cursor;
 pub use ffi::MDBX_dbi as MDB_dbi;
 pub use ffi::MDBX_env as MDB_env;
 pub use ffi::mdbx_filehandle_t as mdb_filehandle_t;
 pub use ffi::MDBX_txn as MDB_txn;
+pub use ffi::MDBX_val as MDB_val;
 
 pub use ffi::MDBX_APPEND as MDB_APPEND;
 pub use ffi::MDBX_CP_COMPACT as MDB_CP_COMPACT;
@@ -27,6 +29,7 @@ pub use ffi::mdbx_del as mdb_del;
 pub use ffi::mdbx_drop as mdb_drop;
 pub use ffi::mdbx_get as mdb_get;
 pub use ffi::mdbx_put as mdb_put;
+pub use ffi::mdbx_set_compare as mdb_set_compare;
 
 pub use ffi::mdbx_txn_abort as mdb_txn_abort;
 pub use ffi::mdbx_txn_begin as mdb_txn_begin;
