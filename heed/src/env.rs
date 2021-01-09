@@ -300,6 +300,7 @@ impl Env {
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
+    #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn open_database_with_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,
@@ -385,6 +386,7 @@ impl Env {
         Ok(db)
     }
 
+    #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn create_database_with_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,
@@ -414,6 +416,7 @@ impl Env {
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
+    #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn create_database_with_txn_and_custom_key_cmp<KC, DC, C>(
         &self,
         name: Option<&str>,

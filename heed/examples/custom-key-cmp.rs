@@ -21,6 +21,7 @@ impl CustomKeyCmp for StringAsIntCmp {
 
 // In this test we are checking that we can use
 // a custom key comparison function at database creation.
+#[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("custom-key-cmp.mdb");
 
@@ -52,5 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(iter.next().transpose()?, Some(("100", ())));
     drop(iter);
 
+    Ok(())
+}
+
+#[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
