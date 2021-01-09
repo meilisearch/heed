@@ -1,6 +1,6 @@
 use mdbx_sys as ffi;
 
-pub use ffi::MDBX_cmp_func as MDBX_cmp_func;
+pub use ffi::MDBX_cmp_func as MDB_cmp_func;
 pub use ffi::MDBX_cursor as MDB_cursor;
 pub use ffi::MDBX_dbi as MDB_dbi;
 pub use ffi::MDBX_env as MDB_env;
@@ -29,7 +29,6 @@ pub use ffi::mdbx_del as mdb_del;
 pub use ffi::mdbx_drop as mdb_drop;
 pub use ffi::mdbx_get as mdb_get;
 pub use ffi::mdbx_put as mdb_put;
-pub use ffi::mdbx_set_compare as mdb_set_compare;
 
 pub use ffi::mdbx_txn_abort as mdb_txn_abort;
 pub use ffi::mdbx_txn_begin as mdb_txn_begin;
@@ -61,4 +60,15 @@ pub unsafe fn into_val(value: &[u8]) -> ffi::MDBX_val {
 
 pub unsafe fn from_val<'a>(value: ffi::MDBX_val) -> &'a [u8] {
     std::slice::from_raw_parts(value.iov_base as *const u8, value.iov_len)
+}
+
+// We create this function just to be compatible with LMDB, it is not meant to be used
+// as the only functions that uses this function are only available for the `lmdb` feature.
+pub unsafe extern "C" fn mdb_set_compare(
+    _txn: *mut MDB_txn,
+    _dbi: MDB_dbi,
+    _cmp: MDB_cmp_func,
+) -> i32
+{
+    super::error::Error::Invalid.to_err_code()
 }
