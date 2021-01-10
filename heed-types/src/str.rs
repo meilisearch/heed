@@ -1,6 +1,9 @@
-use crate::UnalignedSlice;
-use heed_traits::{BytesDecode, BytesEncode};
 use std::borrow::Cow;
+use std::str;
+
+use heed_traits::{BytesDecode, BytesEncode};
+
+use crate::UnalignedSlice;
 
 /// Describes an [`str`].
 pub struct Str;
@@ -17,6 +20,6 @@ impl<'a> BytesDecode<'a> for Str {
     type DItem = &'a str;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        std::str::from_utf8(bytes).ok()
+        str::from_utf8(bytes).ok()
     }
 }

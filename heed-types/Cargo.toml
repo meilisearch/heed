@@ -10,10 +10,10 @@ edition = "2018"
 
 [dependencies]
 bincode = { version = "1.2.1", optional = true }
+bytemuck = { version = "1.5.0", features = ["extern_crate_alloc"] }
 heed-traits = { version = "0.7.0", path = "../heed-traits" }
 serde = { version = "1.0.117", optional = true }
 serde_json = { version = "1.0.59", optional = true }
-zerocopy = "0.3.0"
 
 [features]
 default = ["serde-bincode", "serde-json"]

@@ -55,9 +55,9 @@ mod lazy_decode;
 mod mdb;
 mod txn;
 
+pub use bytemuck;
 pub use byteorder;
 pub use heed_types as types;
-pub use zerocopy;
 use heed_traits as traits;
 
 pub use self::database::Database;

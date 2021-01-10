@@ -18,19 +18,6 @@
 //! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignement is always valid |
 //! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignement is always valid |
 //!
-//! Note that **all** those types above must implement [`AsBytes`] and [`FromBytes`]. <br/>
-//! The `UnalignedSlice/Type` types also need to implement the [`Unaligned`] trait.
-//!
-//! If you don't want to/cannot deal with `AsBytes`, `Frombytes` or `Unaligned` requirements
-//! we recommend you to use the `SerdeBincode` or `SerdeJson` types and deal with the `Serialize`/`Deserialize` traits.
-//!
-//! [`AsBytes`]: zerocopy::AsBytes
-//! [`FromBytes`]: zerocopy::FromBytes
-//! [`Unaligned`]: zerocopy::Unaligned
-//!
-//! [`Serialize`]: serde::Serialize
-//! [`Deserialize`]: serde::Deserialize
-//!
 
 mod cow_slice;
 mod cow_type;
@@ -81,7 +68,3 @@ pub use self::serde_bincode::SerdeBincode;
 
 #[cfg(feature = "serde-json")]
 pub use self::serde_json::SerdeJson;
-
-fn aligned_to(bytes: &[u8], align: usize) -> bool {
-    (bytes as *const _ as *const () as usize) % align == 0
-}
