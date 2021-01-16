@@ -18,7 +18,7 @@ use crate::*;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let dir = tempfile::tempdir()?;
@@ -65,7 +65,7 @@ use crate::*;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let dir = tempfile::tempdir()?;
@@ -182,7 +182,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -237,7 +237,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -292,7 +292,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -347,7 +347,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -401,7 +401,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -444,7 +444,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -483,7 +483,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -525,7 +525,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -567,7 +567,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -607,7 +607,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -660,7 +660,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -701,7 +701,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -759,7 +759,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -811,7 +811,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -876,7 +876,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -928,7 +928,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -993,7 +993,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1045,7 +1045,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1110,7 +1110,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1162,7 +1162,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1224,7 +1224,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1273,7 +1273,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1321,7 +1321,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1374,7 +1374,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1432,7 +1432,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -1479,7 +1479,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::{Database, PolyDatabase};
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
