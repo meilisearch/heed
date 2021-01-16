@@ -72,10 +72,10 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), ()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
@@ -106,7 +106,7 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), ()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
@@ -137,29 +137,29 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), ()).unwrap();
 
         // Lets check that we properly get the last entry.
-        let iter = db.range(&wtxn, &(..)).unwrap();
+        let iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
 
-        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        let mut iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
 
-        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        let mut iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        let mut iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
@@ -168,40 +168,40 @@ mod tests {
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         let range = BEI32::new(2)..=BEI32::new(4);
-        let mut iter = db.range(&wtxn, &range).unwrap();
+        let mut iter = db.range(&wtxn, range).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(4), ())));
 
         let range = BEI32::new(2)..BEI32::new(4);
-        let mut iter = db.range(&wtxn, &range).unwrap();
+        let mut iter = db.range(&wtxn, range).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(3), ())));
 
         let range = BEI32::new(2)..BEI32::new(4);
-        let mut iter = db.range(&wtxn, &range).unwrap();
+        let mut iter = db.range(&wtxn, range).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         let range = BEI32::new(2)..BEI32::new(2);
-        let iter = db.range(&wtxn, &range).unwrap();
+        let iter = db.range(&wtxn, range).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         let range = BEI32::new(2)..=BEI32::new(1);
-        let iter = db.range(&wtxn, &range).unwrap();
+        let iter = db.range(&wtxn, range).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), None);
 
         wtxn.abort().unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), ()).unwrap();
 
         // Lets check that we properly get the last entry.
-        let iter = db.range(&wtxn, &(..)).unwrap();
+        let iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
 
-        let mut iter = db.range(&wtxn, &(..)).unwrap();
+        let mut iter = db.range(&wtxn, ..).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
@@ -224,10 +224,10 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], ()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
@@ -270,10 +270,10 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], ()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1,   0, 119, 111, 114, 108, 100], ()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
@@ -318,31 +318,31 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
-        db.put(&mut wtxn, &BEI32::new(4), &()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(1), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(2), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(3), ()).unwrap();
+        db.put(&mut wtxn, &BEI32::new(4), ()).unwrap();
 
         // Lets check that we properly get the last entry.
-        let iter = db.rev_range(&wtxn, &(BEI32::new(1)..=BEI32::new(3))).unwrap();
+        let iter = db.rev_range(&wtxn, BEI32::new(1)..=BEI32::new(3)).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
 
-        let mut iter = db.rev_range(&wtxn, &(BEI32::new(0)..BEI32::new(4))).unwrap();
+        let mut iter = db.rev_range(&wtxn, BEI32::new(0)..BEI32::new(4)).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
 
-        let mut iter = db.rev_range(&wtxn, &(BEI32::new(0)..=BEI32::new(5))).unwrap();
+        let mut iter = db.rev_range(&wtxn, BEI32::new(0)..=BEI32::new(5)).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(3), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(2), ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(1), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        let iter = db.rev_range(&wtxn, &(BEI32::new(0)..=BEI32::new(5))).unwrap();
+        let iter = db.rev_range(&wtxn, BEI32::new(0)..=BEI32::new(5)).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), Some((BEI32::new(1), ())));
 
-        let mut iter = db.rev_range(&wtxn, &(BEI32::new(4)..=BEI32::new(4))).unwrap();
+        let mut iter = db.rev_range(&wtxn, BEI32::new(4)..=BEI32::new(4)).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((BEI32::new(4), ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 

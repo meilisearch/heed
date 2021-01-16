@@ -7,13 +7,13 @@ use std::borrow::Cow;
 /// It can borrow bytes from the original slice.
 pub struct SerdeJson<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: 'a> BytesEncode<'a> for SerdeJson<T>
+impl<T> BytesEncode for SerdeJson<T>
 where
     T: Serialize,
 {
-    type EItem = T;
+    type EItem<'a> = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode<'a, 'b>(item: &'b Self::EItem<'a>) -> Option<Cow<'a, [u8]>> {
         serde_json::to_vec(item).map(Cow::Owned).ok()
     }
 }

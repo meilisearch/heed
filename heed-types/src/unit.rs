@@ -4,10 +4,10 @@ use heed_traits::{BytesDecode, BytesEncode};
 /// Describes the `()` type.
 pub struct Unit;
 
-impl BytesEncode<'_> for Unit {
-    type EItem = ();
+impl BytesEncode for Unit {
+    type EItem<'a> = ();
 
-    fn bytes_encode(_item: &Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode<'a, 'b>(_item: &'b Self::EItem<'a>) -> Option<Cow<'a, [u8]>> {
         Some(Cow::Borrowed(&[]))
     }
 }

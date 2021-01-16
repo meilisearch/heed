@@ -1,3 +1,5 @@
+#![feature(generic_associated_types)]
+
 //! Types that can be used to serialize and deserialize types inside databases.
 //!
 //! How to choose the right type to store things in this database?

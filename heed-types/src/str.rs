@@ -8,11 +8,11 @@ use crate::UnalignedSlice;
 /// Describes an [`str`].
 pub struct Str;
 
-impl BytesEncode<'_> for Str {
-    type EItem = str;
+impl BytesEncode for Str {
+    type EItem<'a> = &'a str;
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
-        UnalignedSlice::<u8>::bytes_encode(item.as_bytes())
+    fn bytes_encode<'a, 'b>(item: &'b Self::EItem<'a>) -> Option<Cow<'a, [u8]>> {
+        UnalignedSlice::<u8>::bytes_encode(&item.as_bytes())
     }
 }
 

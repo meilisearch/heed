@@ -1,9 +1,11 @@
+#![feature(generic_associated_types)]
+
 use std::borrow::Cow;
 
-pub trait BytesEncode<'a> {
-    type EItem: ?Sized + 'a;
+pub trait BytesEncode {
+    type EItem<'a>;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<'a, [u8]>>;
+    fn bytes_encode<'a, 'b>(item: &'b Self::EItem<'a>) -> Option<Cow<'a, [u8]>>;
 }
 
 pub trait BytesDecode<'a> {

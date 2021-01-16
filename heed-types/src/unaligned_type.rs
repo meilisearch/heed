@@ -19,11 +19,11 @@ use bytemuck::{Pod, bytes_of, try_from_bytes};
 /// [`CowSlice`]: crate::CowSlice
 pub struct UnalignedType<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: Pod + 'a> BytesEncode<'a> for UnalignedType<T> {
-    type EItem = T;
+impl<T: Pod> BytesEncode for UnalignedType<T> {
+    type EItem<'a> = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(bytes_of(item)))
+    fn bytes_encode<'a, 'b>(item: &'b Self::EItem<'a>) -> Option<Cow<'a, [u8]>> {
+        Some(Cow::Owned(bytes_of(item).to_vec()))
     }
 }
 
