@@ -22,7 +22,7 @@ use crate::types::DecodeIgnore;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -69,7 +69,7 @@ use crate::types::DecodeIgnore;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -265,7 +265,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -333,7 +333,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -405,7 +405,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -476,7 +476,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -541,7 +541,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -594,7 +594,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -643,7 +643,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -699,7 +699,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -746,7 +746,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -787,7 +787,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -841,7 +841,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -883,7 +883,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -939,7 +939,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1017,7 +1017,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1108,7 +1108,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1186,7 +1186,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1277,7 +1277,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1332,7 +1332,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1400,7 +1400,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1455,7 +1455,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1520,7 +1520,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1583,7 +1583,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1645,7 +1645,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1716,7 +1716,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1780,7 +1780,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1828,7 +1828,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;

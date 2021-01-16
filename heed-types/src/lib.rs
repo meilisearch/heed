@@ -27,6 +27,7 @@ mod str;
 mod unaligned_slice;
 mod unaligned_type;
 mod unit;
+pub mod integer;
 
 #[cfg(feature = "serde-bincode")]
 mod serde_bincode;
@@ -36,6 +37,7 @@ mod serde_json;
 
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
+pub use self::integer::*;
 pub use self::owned_slice::OwnedSlice;
 pub use self::owned_type::OwnedType;
 pub use self::str::Str;
