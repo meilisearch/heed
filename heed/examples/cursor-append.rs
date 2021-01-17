@@ -24,8 +24,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
 
     // We fill the first database with entries.
-    first.put(&mut wtxn, "I am here", "to test things")?;
-    first.put(&mut wtxn, "I am here too", "for the same purpose")?;
+    first.put(&mut wtxn, &"I am here", &"to test things")?;
+    first.put(&mut wtxn, &"I am here too", &"for the same purpose")?;
 
     // We try to append ordered entries in the second database.
     let mut iter = second.iter_mut(&mut wtxn)?;
