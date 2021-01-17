@@ -22,14 +22,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
 
     // We fill the db database with entries.
-    db.put(&mut wtxn, "I am here", "to test things")?;
-    db.put(&mut wtxn, "I am here too", "for the same purpose")?;
+    db.put(&mut wtxn, &"I am here", &"to test things")?;
+    db.put(&mut wtxn, &"I am here too", &"for the same purpose")?;
 
     wtxn.commit()?;
 
     let mut wtxn = env.write_txn()?;
     db.clear(&mut wtxn)?;
-    db.put(&mut wtxn, "And I come back", "to test things")?;
+    db.put(&mut wtxn, &"And I come back", &"to test things")?;
 
     let mut iter = db.iter(&wtxn)?;
     assert_eq!(iter.next().transpose()?, Some(("And I come back", "to test things")));

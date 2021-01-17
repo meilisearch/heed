@@ -4,7 +4,7 @@ use heed_traits::{BytesDecode, BytesEncode};
 /// Describes the `()` type.
 pub struct Unit;
 
-impl BytesEncode<'_> for Unit {
+impl BytesEncode for Unit {
     type EItem = ();
 
     fn bytes_encode(_item: &Self::EItem) -> Option<Cow<[u8]>> {

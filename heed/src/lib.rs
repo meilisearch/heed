@@ -29,20 +29,20 @@
 //!
 //! // opening a write transaction
 //! let mut wtxn = env.write_txn()?;
-//! db.put(&mut wtxn, "seven", &7)?;
-//! db.put(&mut wtxn, "zero", &0)?;
-//! db.put(&mut wtxn, "five", &5)?;
-//! db.put(&mut wtxn, "three", &3)?;
+//! db.put(&mut wtxn, &"seven", &7)?;
+//! db.put(&mut wtxn, &"zero", &0)?;
+//! db.put(&mut wtxn, &"five", &5)?;
+//! db.put(&mut wtxn, &"three", &3)?;
 //! wtxn.commit()?;
 //!
 //! // opening a read transaction
 //! // to check if those values are now available
 //! let mut rtxn = env.read_txn()?;
 //!
-//! let ret = db.get(&rtxn, "zero")?;
+//! let ret = db.get(&rtxn, &"zero")?;
 //! assert_eq!(ret, Some(0));
 //!
-//! let ret = db.get(&rtxn, "five")?;
+//! let ret = db.get(&rtxn, &"five")?;
 //! assert_eq!(ret, Some(5));
 //! # Ok(()) }
 //! ```
@@ -76,7 +76,7 @@ use self::mdb::ffi::{into_val, from_val};
 use std::{error, fmt, io, result};
 
 /// An helper type alias for [`Database`]s that are not typed and returns raw bytes.
-pub type UntypedDatabase = Database<types::ByteSlice, types::ByteSlice>;
+pub type UntypedDatabase = Database<types::ByteSlice<'static>, types::ByteSlice<'static>>;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]

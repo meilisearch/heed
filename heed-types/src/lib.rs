@@ -51,7 +51,7 @@ pub use self::unit::Unit;
 /// borrowed and doesn't depends on any [memory alignment].
 ///
 /// [memory alignment]: std::mem::align_of()
-pub type ByteSlice = UnalignedSlice<u8>;
+pub type ByteSlice<'a> = UnalignedSlice<'a, u8>;
 
 /// A convenient struct made to ignore the type when decoding it.
 ///

@@ -121,10 +121,10 @@ impl EnvOpenOptions {
     ///
     /// // opening a write transaction
     /// let mut wtxn = env.write_txn()?;
-    /// db.put(&mut wtxn, "seven", &7)?;
-    /// db.put(&mut wtxn, "zero", &0)?;
-    /// db.put(&mut wtxn, "five", &5)?;
-    /// db.put(&mut wtxn, "three", &3)?;
+    /// db.put(&mut wtxn, &"seven", &7)?;
+    /// db.put(&mut wtxn, &"zero", &0)?;
+    /// db.put(&mut wtxn, &"five", &5)?;
+    /// db.put(&mut wtxn, &"three", &3)?;
     /// wtxn.commit()?;
     ///
     /// // Force the OS to flush the buffers (see Flags::MdbNoSync and Flags::MdbNoMetaSync).
@@ -134,10 +134,10 @@ impl EnvOpenOptions {
     /// // to check if those values are now available
     /// let mut rtxn = env.read_txn()?;
     ///
-    /// let ret = db.get(&rtxn, "zero")?;
+    /// let ret = db.get(&rtxn, &"zero")?;
     /// assert_eq!(ret, Some(0));
     ///
-    /// let ret = db.get(&rtxn, "five")?;
+    /// let ret = db.get(&rtxn, &"five")?;
     /// assert_eq!(ret, Some(5));
     /// # Ok(()) }
     /// ```
@@ -519,8 +519,8 @@ mod tests {
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, "hello", "hello").unwrap();
-        db.put(&mut wtxn, "world", "world").unwrap();
+        db.put(&mut wtxn, &"hello", &"hello").unwrap();
+        db.put(&mut wtxn, &"world", &"world").unwrap();
 
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.iter(&wtxn).unwrap();
