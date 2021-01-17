@@ -100,6 +100,7 @@ impl EnvOpenOptions {
     }
 
     /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
+    ///
     /// ```
     /// use std::fs;
     /// use std::path::Path;

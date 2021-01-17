@@ -4,7 +4,7 @@
 //! For specific types you can choose:
 //!   - [`Str`] to store [`str`](primitive@str)s
 //!   - [`Unit`] to store `()` types
-//!   - [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
+//!   - [`SerdeBincode`] or [`SerdeJson`] to store [`serde::Serialize`]/[`serde::Deserialize`] types
 //!
 //! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:

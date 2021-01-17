@@ -4,7 +4,7 @@ use std::{str, marker};
 use heed_traits::{BytesDecode, BytesEncode};
 use bytemuck::try_cast_slice;
 
-/// Describes an [`str`].
+/// Describes an [`prim@str`].
 pub struct Str<'a> {
     _phantom: marker::PhantomData<&'a ()>,
 }
