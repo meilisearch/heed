@@ -72,19 +72,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // it is prefered to use zerocopy when possible
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod)]
     #[repr(C)]
     struct ZeroBytes {
         bytes: [u8; 12],
     }
-
-    unsafe impl Zeroable for ZeroBytes {
-        fn zeroed() -> Self {
-            ZeroBytes { bytes: Default::default() }
-        }
-    }
-
-    unsafe impl Pod for ZeroBytes { }
 
     let db: Database<Str, UnalignedType<ZeroBytes>> =
         env.create_database(Some("zerocopy-struct"))?;
