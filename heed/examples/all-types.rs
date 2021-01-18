@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    // it is prefered to use zerocopy when possible
+    // it is prefered to use bytemuck when possible
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod)]
     #[repr(C)]
     struct ZeroBytes {
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let db: Database<Str, UnalignedType<ZeroBytes>> =
-        env.create_database(Some("zerocopy-struct"))?;
+        env.create_database(Some("simple-struct"))?;
 
     let mut wtxn = env.write_txn()?;
 

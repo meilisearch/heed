@@ -108,13 +108,13 @@ impl EnvOpenOptions {
     /// use heed::flags::Flags;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe {
     ///     env_builder.flag(Flags::MdbNoTls);
     ///     env_builder.flag(Flags::MdbNoMetaSync);
     /// }
-    /// let env = env_builder.open(Path::new("target").join("zerocopy.mdb"))?;
+    /// let env = env_builder.open(Path::new("target").join("database.mdb"))?;
     ///
     /// // we will open the default unamed database
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
