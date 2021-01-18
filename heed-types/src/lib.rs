@@ -18,6 +18,8 @@
 //! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignement is always valid |
 //! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignement is always valid |
 //!
+//! [`Serialize`]: serde::Serialize
+//! [`Deserialize`]: serde::Deserialize
 
 mod cow_slice;
 mod cow_type;

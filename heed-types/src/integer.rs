@@ -65,9 +65,9 @@ the platform's native endianness.
 `", stringify!($name), "` implements [`Zeroable`], and [`Pod`],
 making it useful for parsing and serialization.
 
-[`new`]: crate::byteorder::", stringify!($name), "::new
-[`get`]: crate::byteorder::", stringify!($name), "::get
-[`set`]: crate::byteorder::", stringify!($name), "::set
+[`new`]: crate::integer::", stringify!($name), "::new
+[`get`]: crate::integer::", stringify!($name), "::get
+[`set`]: crate::integer::", stringify!($name), "::set
 [`Zeroable`]: bytemuck::Zeroable
 [`Pod`]: bytemuck::Pod"),
             #[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]

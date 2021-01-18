@@ -5,7 +5,7 @@ use heed_traits::{BytesDecode, BytesEncode};
 
 use crate::UnalignedSlice;
 
-/// Describes an [`str`].
+/// Describes an [`prim@str`].
 pub struct Str;
 
 impl BytesEncode<'_> for Str {
