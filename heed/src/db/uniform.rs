@@ -1543,7 +1543,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;

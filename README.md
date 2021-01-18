@@ -1,5 +1,5 @@
 # heed
-A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, uses zerocopy internally.
+A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, uses bytemuck internally.
 
 [![License](https://img.shields.io/badge/license-MIT-green)](#LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/heed)](https://crates.io/crates/heed)

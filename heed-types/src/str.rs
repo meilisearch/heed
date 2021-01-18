@@ -2,16 +2,14 @@ use std::borrow::Cow;
 
 use heed_traits::{BytesDecode, BytesEncode};
 
-use crate::UnalignedSlice;
-
-/// Describes an [`str`].
+/// Describes an [`prim@str`].
 pub struct Str;
 
 impl BytesEncode<'_> for Str {
     type EItem = str;
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
-        UnalignedSlice::<u8>::bytes_encode(item.as_bytes())
+        Some(Cow::Borrowed(item.as_bytes()))
     }
 }
 

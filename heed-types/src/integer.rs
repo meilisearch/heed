@@ -23,7 +23,7 @@
 use std::fmt::{self, Binary, Debug, Display, Formatter, LowerHex, Octal, UpperHex};
 use std::marker::PhantomData;
 
-use bytemuck::{Zeroable, Pod};
+use bytemuck::{Pod, Zeroable};
 use byteorder::ByteOrder;
 
 macro_rules! impl_fmt_trait {
@@ -65,9 +65,9 @@ the platform's native endianness.
 `", stringify!($name), "` implements [`Zeroable`], and [`Pod`],
 making it useful for parsing and serialization.
 
-[`new`]: crate::byteorder::", stringify!($name), "::new
-[`get`]: crate::byteorder::", stringify!($name), "::get
-[`set`]: crate::byteorder::", stringify!($name), "::set
+[`new`]: crate::integer::", stringify!($name), "::new
+[`get`]: crate::integer::", stringify!($name), "::get
+[`set`]: crate::integer::", stringify!($name), "::set
 [`Zeroable`]: bytemuck::Zeroable
 [`Pod`]: bytemuck::Pod"),
             #[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
@@ -182,8 +182,8 @@ define_type!(An, I128, i128, 128, 16, read_i128, write_i128, signed);
 
 #[cfg(test)]
 mod tests {
+    use bytemuck::{bytes_of, bytes_of_mut, Pod};
     use byteorder::NativeEndian;
-    use bytemuck::{Pod, bytes_of, bytes_of_mut};
 
     use super::*;
 

@@ -2,9 +2,9 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+use bytemuck::{Pod, Zeroable};
 use heed::byteorder::BE;
 use heed::types::*;
-use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
 use heed::EnvOpenOptions;
 use serde::{Deserialize, Serialize};
 
@@ -65,14 +65,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    // it is prefered to use zerocopy when possible
-    #[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Unaligned)]
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Pod, Zeroable)]
     #[repr(C)]
     struct ZeroBytes {
         bytes: [u8; 12],
     }
 
-    let db = env.create_poly_database(Some("zerocopy-struct"))?;
+    let db = env.create_poly_database(Some("nocopy-struct"))?;
 
     let mut wtxn = env.write_txn()?;
 

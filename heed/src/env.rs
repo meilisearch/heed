@@ -102,7 +102,7 @@ impl EnvOpenOptions {
         self
     }
 
-    /// Set one or more LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html>).
+    /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
     /// ```
     /// use std::fs;
     /// use std::path::Path;
@@ -111,7 +111,7 @@ impl EnvOpenOptions {
     /// use heed::flags::Flags;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe {
     ///     env_builder.flag(Flags::MdbNoTls);

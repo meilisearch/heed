@@ -1,10 +1,7 @@
 use std::borrow::Cow;
-use std::{mem, ptr};
 
+use bytemuck::{bytes_of, bytes_of_mut, try_from_bytes, AnyBitPattern, NoUninit, PodCastError};
 use heed_traits::{BytesDecode, BytesEncode};
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
-
-use crate::aligned_to;
 
 /// Describes a type that must be [memory aligned] and
 /// will be reallocated if it is not.
@@ -29,44 +26,26 @@ use crate::aligned_to;
 /// [`CowSlice`]: crate::CowSlice
 pub struct CowType<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: 'a> BytesEncode<'a> for CowType<T>
-where
-    T: AsBytes,
-{
+impl<'a, T: NoUninit> BytesEncode<'a> for CowType<T> {
     type EItem = T;
 
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+        Some(Cow::Borrowed(bytes_of(item)))
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for CowType<T>
-where
-    T: FromBytes + Copy,
-{
+impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for CowType<T> {
     type DItem = Cow<'a, T>;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        match LayoutVerified::<_, T>::new(bytes) {
-            Some(layout) => Some(Cow::Borrowed(layout.into_ref())),
-            None => {
-                let len = bytes.len();
-                let elem_size = mem::size_of::<T>();
-
-                // ensure that it is the alignment that is wrong
-                // and the length is valid
-                if len == elem_size && !aligned_to(bytes, mem::align_of::<T>()) {
-                    let mut data = mem::MaybeUninit::<T>::uninit();
-
-                    unsafe {
-                        let dst = data.as_mut_ptr() as *mut u8;
-                        ptr::copy_nonoverlapping(bytes.as_ptr(), dst, len);
-                        return Some(Cow::Owned(data.assume_init()));
-                    }
-                }
-
-                None
+        match try_from_bytes(bytes) {
+            Ok(item) => Some(Cow::Borrowed(item)),
+            Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned) => {
+                let mut item = T::zeroed();
+                bytes_of_mut(&mut item).copy_from_slice(bytes);
+                Some(Cow::Owned(item))
             }
+            Err(_) => None,
         }
     }
 }

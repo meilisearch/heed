@@ -65,7 +65,6 @@ mod tests {
     fn iter_last() {
         use crate::byteorder::BigEndian;
         use crate::types::*;
-        use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
@@ -130,7 +129,6 @@ mod tests {
     fn range_iter_last() {
         use crate::byteorder::BigEndian;
         use crate::types::*;
-        use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
@@ -363,7 +361,6 @@ mod tests {
     fn rev_range_iter_last() {
         use crate::byteorder::BigEndian;
         use crate::types::*;
-        use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();

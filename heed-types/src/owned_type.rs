@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
+use bytemuck::{bytes_of, AnyBitPattern, NoUninit};
 use heed_traits::{BytesDecode, BytesEncode};
-use zerocopy::{AsBytes, FromBytes};
 
 use crate::CowType;
 
@@ -26,21 +26,15 @@ use crate::CowType;
 /// [`CowSlice`]: crate::CowSlice
 pub struct OwnedType<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: 'a> BytesEncode<'a> for OwnedType<T>
-where
-    T: AsBytes,
-{
+impl<'a, T: NoUninit> BytesEncode<'a> for OwnedType<T> {
     type EItem = T;
 
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<T as AsBytes>::as_bytes(item)))
+        Some(Cow::Borrowed(bytes_of(item)))
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for OwnedType<T>
-where
-    T: FromBytes + Copy,
-{
+impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for OwnedType<T> {
     type DItem = T;
 
     fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
