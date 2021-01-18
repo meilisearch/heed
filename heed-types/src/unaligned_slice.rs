@@ -13,7 +13,7 @@ use bytemuck::{Pod, try_cast_slice};
 /// [`CowType`]: crate::CowType
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: Pod + 'a> BytesEncode<'a> for UnalignedSlice<T> {
+impl<'a, T: Pod> BytesEncode<'a> for UnalignedSlice<T> {
     type EItem = [T];
 
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
@@ -21,7 +21,7 @@ impl<'a, T: Pod + 'a> BytesEncode<'a> for UnalignedSlice<T> {
     }
 }
 
-impl<'a, T: Pod + 'a> BytesDecode<'a> for UnalignedSlice<T> {
+impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<T> {
     type DItem = &'a [T];
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {

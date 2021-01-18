@@ -26,7 +26,7 @@ use bytemuck::{Pod, PodCastError, bytes_of, bytes_of_mut, try_from_bytes};
 /// [`CowSlice`]: crate::CowSlice
 pub struct CowType<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: Pod + 'a> BytesEncode<'a> for CowType<T> {
+impl<'a, T: Pod> BytesEncode<'a> for CowType<T> {
     type EItem = T;
 
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
@@ -34,7 +34,7 @@ impl<'a, T: Pod + 'a> BytesEncode<'a> for CowType<T> {
     }
 }
 
-impl<'a, T: Pod + 'a> BytesDecode<'a> for CowType<T> {
+impl<'a, T: Pod> BytesDecode<'a> for CowType<T> {
     type DItem = Cow<'a, T>;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
