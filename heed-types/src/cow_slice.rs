@@ -34,8 +34,8 @@ impl<'a, T: Pod> BytesDecode<'a> for CowSlice<T> {
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
         match try_cast_slice(bytes) {
             Ok(items) => Some(Cow::Borrowed(items)),
-            Err(PodCastError::SizeMismatch) => None,
-            Err(_) => Some(Cow::Owned(pod_collect_to_vec(bytes))),
+            Err(PodCastError::AlignmentMismatch) => Some(Cow::Owned(pod_collect_to_vec(bytes))),
+            Err(_) => None,
         }
     }
 }

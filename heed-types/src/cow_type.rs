@@ -40,12 +40,12 @@ impl<'a, T: Pod> BytesDecode<'a> for CowType<T> {
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
         match try_from_bytes(bytes) {
             Ok(item) => Some(Cow::Borrowed(item)),
-            Err(PodCastError::SizeMismatch) => None,
-            Err(_) => {
+            Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned) => {
                 let mut item = T::zeroed();
                 bytes_of_mut(&mut item).copy_from_slice(bytes);
                 Some(Cow::Owned(item))
             },
+            Err(_) => None,
         }
     }
 }
