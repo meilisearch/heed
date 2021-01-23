@@ -4,7 +4,7 @@ use std::path::Path;
 
 use heed::byteorder::BE;
 use heed::types::*;
-use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
+use heed::bytemuck::{Pod, Zeroable};
 use heed::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
@@ -71,15 +71,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    // it is prefered to use zerocopy when possible
-    #[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Unaligned)]
+    // it is prefered to use bytemuck when possible
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod)]
     #[repr(C)]
     struct ZeroBytes {
         bytes: [u8; 12],
     }
 
     let db: Database<Str, UnalignedType<ZeroBytes>> =
-        env.create_database(Some("zerocopy-struct"))?;
+        env.create_database(Some("simple-struct"))?;
 
     let mut wtxn = env.write_txn()?;
 

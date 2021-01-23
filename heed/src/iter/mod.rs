@@ -59,8 +59,8 @@ mod tests {
         use std::fs;
         use std::path::Path;
         use crate::EnvOpenOptions;
+        use crate::byteorder::BigEndian;
         use crate::types::*;
-        use crate::{zerocopy::I32, byteorder::BigEndian};
 
         fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
         let env = EnvOpenOptions::new()
@@ -124,7 +124,7 @@ mod tests {
         use std::fs;
         use std::path::Path;
         use crate::EnvOpenOptions;
-        use crate::{zerocopy::I32, byteorder::BigEndian};
+        use crate::byteorder::BigEndian;
         use crate::types::*;
 
         fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
@@ -305,7 +305,7 @@ mod tests {
         use std::fs;
         use std::path::Path;
         use crate::EnvOpenOptions;
-        use crate::{zerocopy::I32, byteorder::BigEndian};
+        use crate::byteorder::BigEndian;
         use crate::types::*;
 
         fs::create_dir_all(Path::new("target").join("range_iter_last.mdb")).unwrap();
