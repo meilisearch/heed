@@ -164,5 +164,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", rets);
 
+    // We also try to create a range for of str
+    let db: Database<ByteSlice, Unit> = env.create_database(Some("bytes-range"))?;
+
+    let mut wtxn = env.write_txn()?;
+    let _ret = db.put(&mut wtxn, &&[1][..], &())?;
+    let _ret = db.put(&mut wtxn, &&[2][..], &())?;
+    let _ret = db.put(&mut wtxn, &&[3][..], &())?;
+    let _ret = db.put(&mut wtxn, &&[4][..], &())?;
+
+    // or iterate over ranges too!!!
+    let range = &[1][..]..=&[10][..];
+    let rets: Result<Vec<(&[u8], _)>, _> = db.range(&wtxn, range)?.collect();
+
+    println!("{:?}", rets);
+
     Ok(())
 }
