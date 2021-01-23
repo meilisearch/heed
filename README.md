@@ -1,5 +1,5 @@
 # heed
-A fully typed [LMDB]/[MDBX] wrapper with minimum overhead, uses zerocopy internally.
+A fully typed [LMDB]/[MDBX] wrapper with minimum overhead, uses bytemuck internally.
 
 [![Build Status](https://dev.azure.com/renaultcle/heed/_apis/build/status/Kerollmops.heed?branchName=master)](https://dev.azure.com/renaultcle/heed/_build/latest?definitionId=1&branchName=master)
 [![Dependency Status](https://deps.rs/repo/github/Kerollmops/heed/status.svg)](https://deps.rs/repo/github/Kerollmops/heed)

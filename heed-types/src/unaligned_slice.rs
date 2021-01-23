@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use heed_traits::{BytesDecode, BytesEncode};
-use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
+use bytemuck::{Pod, try_cast_slice};
 
 /// Describes a type that is totally borrowed and doesn't
 /// depends on any [memory alignment].
@@ -13,25 +13,19 @@ use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned};
 /// [`CowType`]: crate::CowType
 pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: 'a> BytesEncode<'a> for UnalignedSlice<T>
-where
-    T: AsBytes + Unaligned,
-{
+impl<'a, T: Pod> BytesEncode<'a> for UnalignedSlice<T> {
     type EItem = [T];
 
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(<[T] as AsBytes>::as_bytes(item)))
+        try_cast_slice(item).map(Cow::Borrowed).ok()
     }
 }
 
-impl<'a, T: 'a> BytesDecode<'a> for UnalignedSlice<T>
-where
-    T: FromBytes + Unaligned,
-{
+impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<T> {
     type DItem = &'a [T];
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        LayoutVerified::<_, [T]>::new_slice_unaligned(bytes).map(LayoutVerified::into_slice)
+        try_cast_slice(bytes).ok()
     }
 }
 
