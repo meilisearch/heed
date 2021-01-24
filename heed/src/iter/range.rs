@@ -122,8 +122,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -157,8 +157,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -203,8 +203,8 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         KC: BytesEncode,
         DC: BytesEncode,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -260,8 +260,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -295,8 +295,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -384,8 +384,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -421,8 +421,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -467,8 +467,8 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         KC: BytesEncode,
         DC: BytesEncode,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -524,8 +524,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -561,8 +561,8 @@ where
 
                 if must_be_returned {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
