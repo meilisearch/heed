@@ -11,17 +11,17 @@ use bytemuck::{Pod, try_cast_slice};
 ///
 /// [memory alignment]: std::mem::align_of()
 /// [`CowType`]: crate::CowType
-pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
+pub struct UnalignedSlice<'a, T>(std::marker::PhantomData<&'a T>);
 
-impl<'a, T: Pod> BytesEncode<'a> for UnalignedSlice<T> {
-    type EItem = [T];
+impl<'a, T: Pod> BytesEncode for UnalignedSlice<'a, T> {
+    type EItem = &'a [T];
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
         try_cast_slice(item).map(Cow::Borrowed).ok()
     }
 }
 
-impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<T> {
+impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<'_, T> {
     type DItem = &'a [T];
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
@@ -29,6 +29,6 @@ impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<T> {
     }
 }
 
-unsafe impl<T> Send for UnalignedSlice<T> {}
+unsafe impl<T> Send for UnalignedSlice<'_, T> {}
 
-unsafe impl<T> Sync for UnalignedSlice<T> {}
+unsafe impl<T> Sync for UnalignedSlice<'_, T> {}

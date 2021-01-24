@@ -18,17 +18,17 @@ use heed_traits::{BytesDecode, BytesEncode};
 /// [`Cow`]: std::borrow::Cow
 /// [`UnalignedSlice`]: crate::UnalignedSlice
 /// [`OwnedSlice`]: crate::OwnedSlice
-pub struct CowSlice<T>(std::marker::PhantomData<T>);
+pub struct CowSlice<'a, T>(std::marker::PhantomData<&'a T>);
 
-impl<'a, T: Pod> BytesEncode<'a> for CowSlice<T> {
-    type EItem = [T];
+impl<'a, T: Pod> BytesEncode for CowSlice<'a, T> {
+    type EItem = &'a [T];
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
         try_cast_slice(item).map(Cow::Borrowed).ok()
     }
 }
 
-impl<'a, T: Pod> BytesDecode<'a> for CowSlice<T> {
+impl<'a, T: Pod> BytesDecode<'a> for CowSlice<'_, T> {
     type DItem = Cow<'a, [T]>;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
@@ -40,6 +40,6 @@ impl<'a, T: Pod> BytesDecode<'a> for CowSlice<T> {
     }
 }
 
-unsafe impl<T> Send for CowSlice<T> {}
+unsafe impl<T> Send for CowSlice<'_, T> {}
 
-unsafe impl<T> Sync for CowSlice<T> {}
+unsafe impl<T> Sync for CowSlice<'_, T> {}

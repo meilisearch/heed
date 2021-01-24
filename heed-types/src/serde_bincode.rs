@@ -7,13 +7,13 @@ use std::borrow::Cow;
 /// It can borrow bytes from the original slice.
 pub struct SerdeBincode<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: 'a> BytesEncode<'a> for SerdeBincode<T>
+impl<T> BytesEncode for SerdeBincode<T>
 where
     T: Serialize,
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
         bincode::serialize(item).map(Cow::Owned).ok()
     }
 }

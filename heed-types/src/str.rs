@@ -1,22 +1,23 @@
 use std::borrow::Cow;
-use std::str;
+use std::{str, marker};
 
 use heed_traits::{BytesDecode, BytesEncode};
-
-use crate::UnalignedSlice;
+use bytemuck::try_cast_slice;
 
 /// Describes an [`prim@str`].
-pub struct Str;
+pub struct Str<'a> {
+    _phantom: marker::PhantomData<&'a ()>,
+}
 
-impl BytesEncode<'_> for Str {
-    type EItem = str;
+impl<'a> BytesEncode for Str<'a> {
+    type EItem = &'a str;
 
     fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
-        UnalignedSlice::<u8>::bytes_encode(item.as_bytes())
+        try_cast_slice(item.as_bytes()).map(Cow::Borrowed).ok()
     }
 }
 
-impl<'a> BytesDecode<'a> for Str {
+impl<'a> BytesDecode<'a> for Str<'_> {
     type DItem = &'a str;
 
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {

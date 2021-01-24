@@ -38,8 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut wtxn1 = env1.write_txn()?;
 
-    db1.put(&mut wtxn1, "what", &[4, 5][..])?;
-    db1.get(&wtxn1, "what")?;
+    db1.put(&mut wtxn1, &"what", &&[4, 5][..])?;
+    db1.get(&wtxn1, &"what")?;
     wtxn1.commit()?;
 
     let rtxn2 = env2.read_txn()?;

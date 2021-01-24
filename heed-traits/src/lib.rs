@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-pub trait BytesEncode<'a> {
-    type EItem: ?Sized + 'a;
+pub trait BytesEncode {
+    type EItem: ?Sized;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<'a, [u8]>>;
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>>;
 }
 
 pub trait BytesDecode<'a> {

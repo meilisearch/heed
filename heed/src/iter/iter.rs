@@ -112,10 +112,10 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     ///
     /// This is intended to be used when the new data is the same size as the old.
     /// Otherwise it will simply perform a delete of the old record followed by an insert.
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
     where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -126,10 +126,10 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
     /// is returned and the key is not inserted into the database.
-    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn append(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<()>
     where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -320,10 +320,10 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     ///
     /// This is intended to be used when the new data is the same size as the old.
     /// Otherwise it will simply perform a delete of the old record followed by an insert.
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    pub fn put_current(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<bool>
     where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
@@ -334,10 +334,10 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
     /// is returned and the key is not inserted into the database.
-    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn append(&mut self, key: &KC::EItem, data: &DC::EItem) -> Result<()>
     where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
+        KC: BytesEncode,
+        DC: BytesEncode,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;

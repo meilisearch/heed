@@ -26,10 +26,10 @@ use crate::CowType;
 /// [`CowSlice`]: crate::CowSlice
 pub struct OwnedType<T>(std::marker::PhantomData<T>);
 
-impl<'a, T: Pod> BytesEncode<'a> for OwnedType<T> {
+impl<T: Pod> BytesEncode for OwnedType<T> {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
         CowType::bytes_encode(item)
     }
 }
