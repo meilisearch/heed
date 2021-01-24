@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::error::Error;
 
 use bytemuck::{Pod, PodCastError, try_cast_slice, pod_collect_to_vec};
 use heed_traits::{BytesDecode, BytesEncode};
@@ -23,19 +24,19 @@ pub struct CowSlice<'a, T>(std::marker::PhantomData<&'a T>);
 impl<'a, T: Pod> BytesEncode for CowSlice<'a, T> {
     type EItem = &'a [T];
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
-        try_cast_slice(item).map(Cow::Borrowed).ok()
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+        try_cast_slice(item).map(Cow::Borrowed).map_err(Into::into)
     }
 }
 
 impl<'a, T: Pod> BytesDecode<'a> for CowSlice<'_, T> {
     type DItem = Cow<'a, [T]>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
         match try_cast_slice(bytes) {
-            Ok(items) => Some(Cow::Borrowed(items)),
-            Err(PodCastError::AlignmentMismatch) => Some(Cow::Owned(pod_collect_to_vec(bytes))),
-            Err(_) => None,
+            Ok(items) => Ok(Cow::Borrowed(items)),
+            Err(PodCastError::AlignmentMismatch) => Ok(Cow::Owned(pod_collect_to_vec(bytes))),
+            Err(e) => Err(e.into()),
         }
     }
 }
