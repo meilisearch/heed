@@ -37,6 +37,11 @@ pub use ffi::mdb_cursor_get as mdb_cursor_get;
 pub use ffi::mdb_cursor_open as mdb_cursor_open;
 pub use ffi::mdb_cursor_put as mdb_cursor_put;
 
+pub use ffi::mdb_env_stat as mdb_env_stat;
+pub use ffi::mdb_stat as mdb_stat;
+pub use ffi::MDB_stat as MDB_Stat;
+
+
 pub mod cursor_op {
     use super::ffi::{self, MDB_cursor_op};
 
