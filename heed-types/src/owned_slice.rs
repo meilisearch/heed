@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::error::Error;
 
 use bytemuck::Pod;
 use heed_traits::{BytesDecode, BytesEncode};
@@ -23,7 +24,7 @@ pub struct OwnedSlice<'a, T>(std::marker::PhantomData<&'a T>);
 impl<'a, T: Pod> BytesEncode for OwnedSlice<'a, T> {
     type EItem = &'a [T];
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
         CowSlice::bytes_encode(item)
     }
 }
@@ -31,7 +32,7 @@ impl<'a, T: Pod> BytesEncode for OwnedSlice<'a, T> {
 impl<'a, T: Pod + 'a> BytesDecode<'a> for OwnedSlice<'_, T> {
     type DItem = Vec<T>;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
+    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, Box<dyn Error>> {
         CowSlice::bytes_decode(bytes).map(Cow::into_owned)
     }
 }

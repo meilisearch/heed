@@ -74,6 +74,7 @@ use self::cursor::{RoCursor, RwCursor};
 use self::mdb::ffi::{into_val, from_val};
 
 use std::{error, fmt, io, result};
+use std::error::Error as StdError;
 
 /// An helper type alias for [`Database`]s that are not typed and returns raw bytes.
 pub type UntypedDatabase = Database<types::ByteSlice<'static>, types::ByteSlice<'static>>;
@@ -83,8 +84,8 @@ pub type UntypedDatabase = Database<types::ByteSlice<'static>, types::ByteSlice<
 pub enum Error {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding,
-    Decoding,
+    Encoding(Box<dyn StdError>),
+    Decoding(Box<dyn StdError>),
     InvalidDatabaseTyping,
     DatabaseClosing,
 }
@@ -94,8 +95,8 @@ impl fmt::Display for Error {
         match self {
             Error::Io(error) => write!(f, "{}", error),
             Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding => f.write_str("error while encoding"),
-            Error::Decoding => f.write_str("error while decoding"),
+            Error::Encoding(e) => write!(f, "error while encoding: {}", e),
+            Error::Decoding(e) => write!(f, "error while decoding: {}", e),
             Error::InvalidDatabaseTyping => {
                 f.write_str("database was previously opened with different types")
             },
