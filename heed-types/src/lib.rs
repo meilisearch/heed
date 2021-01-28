@@ -47,6 +47,8 @@ pub use self::unaligned_slice::UnalignedSlice;
 pub use self::unaligned_type::UnalignedType;
 pub use self::unit::Unit;
 
+use std::error::Error;
+
 /// Describes a slice of bytes `[u8]` that is totally
 /// borrowed and doesn't depends on any [memory alignment].
 ///
@@ -62,8 +64,8 @@ pub struct DecodeIgnore;
 impl heed_traits::BytesDecode<'_> for DecodeIgnore {
     type DItem = ();
 
-    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
-        Some(())
+    fn bytes_decode(_bytes: &[u8]) -> Result<Self::DItem, Box<dyn Error>> {
+        Ok(())
     }
 }
 

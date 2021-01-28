@@ -1,7 +1,8 @@
 use std::borrow::Cow;
+use std::error::Error;
 
-use heed_traits::{BytesDecode, BytesEncode};
 use bytemuck::{Pod, try_cast_slice};
+use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes a type that is totally borrowed and doesn't
 /// depends on any [memory alignment].
@@ -16,16 +17,16 @@ pub struct UnalignedSlice<T>(std::marker::PhantomData<T>);
 impl<'a, T: Pod> BytesEncode<'a> for UnalignedSlice<T> {
     type EItem = [T];
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        try_cast_slice(item).map(Cow::Borrowed).ok()
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, Box<dyn Error>> {
+        try_cast_slice(item).map(Cow::Borrowed).map_err(Into::into)
     }
 }
 
 impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<T> {
     type DItem = &'a [T];
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        try_cast_slice(bytes).ok()
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+        try_cast_slice(bytes).map_err(Into::into)
     }
 }
 
