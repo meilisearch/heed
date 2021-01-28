@@ -656,7 +656,7 @@ impl<KC, DC> Database<KC, DC> {
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
+    /// db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), &"i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), &"i-am-twenty-seven")?;
     /// db.put(&mut wtxn, &BEI32::new(13), &"i-am-thirteen")?;
@@ -671,24 +671,41 @@ impl<KC, DC> Database<KC, DC> {
     /// assert_eq!(ret, 3);
     ///
     /// wtxn.commit()?;
+    ///
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<u64> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let mut count = 0;
+        let mut db_stat = mem::MaybeUninit::uninit();
 
-        match cursor.move_on_first()? {
-            Some(_) => count += 1,
-            None => return Ok(0),
+        #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
+        let result = unsafe {
+            mdb_result(ffi::mdb_stat(
+                txn.txn,
+                self.dbi,
+                db_stat.as_mut_ptr(),
+                std::mem::size_of::<ffi::MDB_Stat>(),
+            ))
+
+        };
+
+        #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
+        let result = unsafe {
+            mdb_result(ffi::mdb_stat(
+                txn.txn,
+                self.dbi,
+                db_stat.as_mut_ptr(),
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let stats = unsafe { db_stat.assume_init() };
+                Ok(stats.ms_entries as u64)
+            }
+            Err(e) => Err(e.into()),
         }
-
-        while let Some(_) = cursor.move_on_next()? {
-            count += 1;
-        }
-
-        Ok(count)
     }
 
     /// Returns `true` if and only if this database is empty.
