@@ -1,6 +1,9 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
-// found in the Fushia_LICENSE file.
+// found in the Fuchsia_LICENSE file.
+
+// Code has been retrieved from the zerocopy crate.
+// https://fuchsia.googlesource.com/fuchsia/+/master/src/lib/zerocopy/src/byteorder.rs
 
 //! Byte order-aware numeric primitives.
 //!
