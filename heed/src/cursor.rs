@@ -1,9 +1,9 @@
 use std::ops::{Deref, DerefMut};
 use std::{marker, mem, ptr};
 
-use crate::*;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
+use crate::*;
 
 pub struct RoCursor<'txn> {
     cursor: *mut ffi::MDB_cursor,
@@ -193,9 +193,22 @@ impl<'txn> RwCursor<'txn> {
         })
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         // Delete the current entry
-        let result = unsafe { mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0)) };
+        let result = mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0));
 
         match result {
             Ok(()) => Ok(true),
@@ -204,19 +217,40 @@ impl<'txn> RwCursor<'txn> {
         }
     }
 
-    pub fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
-        let mut key_val = unsafe { crate::into_val(&key) };
-        let mut data_val = unsafe { crate::into_val(&data) };
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
+        let mut key_val = crate::into_val(&key);
+        let mut data_val = crate::into_val(&data);
 
         // Modify the pointed data
-        let result = unsafe {
-            mdb_result(ffi::mdb_cursor_put(
-                self.cursor.cursor,
-                &mut key_val,
-                &mut data_val,
-                ffi::MDB_CURRENT,
-            ))
-        };
+        let result = mdb_result(ffi::mdb_cursor_put(
+            self.cursor.cursor,
+            &mut key_val,
+            &mut data_val,
+            ffi::MDB_CURRENT,
+        ));
 
         match result {
             Ok(()) => Ok(true),
@@ -225,19 +259,35 @@ impl<'txn> RwCursor<'txn> {
         }
     }
 
-    pub fn append(&mut self, key: &[u8], data: &[u8]) -> Result<()> {
-        let mut key_val = unsafe { crate::into_val(&key) };
-        let mut data_val = unsafe { crate::into_val(&data) };
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append(&mut self, key: &[u8], data: &[u8]) -> Result<()> {
+        let mut key_val = crate::into_val(&key);
+        let mut data_val = crate::into_val(&data);
 
         // Modify the pointed data
-        let result = unsafe {
-            mdb_result(ffi::mdb_cursor_put(
-                self.cursor.cursor,
-                &mut key_val,
-                &mut data_val,
-                ffi::MDB_APPEND,
-            ))
-        };
+        let result = mdb_result(ffi::mdb_cursor_put(
+            self.cursor.cursor,
+            &mut key_val,
+            &mut data_val,
+            ffi::MDB_APPEND,
+        ));
 
         result.map_err(Into::into)
     }

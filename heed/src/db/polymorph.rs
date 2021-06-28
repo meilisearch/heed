@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{mem, ptr};
 
-use crate::*;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::types::DecodeIgnore;
+use crate::*;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -615,7 +615,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -668,7 +671,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -860,12 +866,12 @@ impl PolyDatabase {
     ///
     /// let mut iter = db.iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// let ret = iter.del_current()?;
+    /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = iter.put_current(&BEI32::new(42), "i-am-the-new-forty-two")?;
+    /// let ret = unsafe { iter.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -881,7 +887,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+    ) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -923,7 +932,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
+    pub fn rev_iter<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
@@ -958,12 +970,12 @@ impl PolyDatabase {
     ///
     /// let mut iter = db.rev_iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = iter.del_current()?;
+    /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// let ret = iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")?;
+    /// let ret = unsafe { iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -979,7 +991,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+    ) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
@@ -1095,10 +1110,10 @@ impl PolyDatabase {
     /// let range = BEI32::new(27)..=BEI32::new(42);
     /// let mut range = db.range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// let ret = range.del_current()?;
+    /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = range.put_current(&BEI32::new(42), "i-am-the-new-forty-two")?;
+    /// let ret = unsafe { range.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -1264,10 +1279,10 @@ impl PolyDatabase {
     /// let range = BEI32::new(27)..=BEI32::new(42);
     /// let mut range = db.rev_range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = range.del_current()?;
+    /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// let ret = range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")?;
+    /// let ret = unsafe { range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -1411,12 +1426,12 @@ impl PolyDatabase {
     ///
     /// let mut iter = db.prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// let ret = iter.del_current()?;
+    /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// let ret = iter.put_current("i-am-twenty-seven", &BEI32::new(27000))?;
+    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &BEI32::new(27000))? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1536,12 +1551,12 @@ impl PolyDatabase {
     ///
     /// let mut iter = db.rev_prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// let ret = iter.del_current()?;
+    /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// let ret = iter.put_current("i-am-twenty-eight", &BEI32::new(28000))?;
+    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &BEI32::new(28000))? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1809,7 +1824,6 @@ impl PolyDatabase {
     /// let ret = db.delete_range::<_, OwnedType<BEI32>, _>(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
-    ///
     /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
@@ -1819,7 +1833,11 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, KC, R>(&self, txn: &'txn mut RwTxn<T>, range: &'a R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, T, KC, R>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+        range: &'a R,
+    ) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -1829,8 +1847,11 @@ impl PolyDatabase {
         let mut count = 0;
         let mut iter = self.range_mut::<T, KC, DecodeIgnore, _>(txn, range)?;
 
-        while let Some(_) = iter.next() {
-            iter.del_current()?;
+        while iter.next().is_some() {
+            // safety: We do not keep any reference from the database while using `del_current`.
+            //         The user can't keep any reference inside of the database as we ask for a
+            //         mutable reference to the `txn`.
+            unsafe { iter.del_current()? };
             count += 1;
         }
 

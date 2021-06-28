@@ -2,27 +2,22 @@ use std::borrow::Cow;
 use std::marker;
 use std::ops::Bound;
 
-use crate::*;
 use super::{advance_key, retreat_key};
+use crate::*;
 
 fn move_on_range_end<'txn>(
     cursor: &mut RoCursor<'txn>,
     end_bound: &Bound<Vec<u8>>,
-) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-{
+) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     match end_bound {
-        Bound::Included(end) => {
-            match cursor.move_on_key_greater_than_or_equal_to(end) {
-                Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
-                Ok(_) => cursor.move_on_prev(),
-                Err(e) => Err(e),
-            }
+        Bound::Included(end) => match cursor.move_on_key_greater_than_or_equal_to(end) {
+            Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
+            Ok(_) => cursor.move_on_prev(),
+            Err(e) => Err(e),
         },
-        Bound::Excluded(end) => {
-            cursor
-                .move_on_key_greater_than_or_equal_to(end)
-                .and_then(|_| cursor.move_on_prev())
-        },
+        Bound::Excluded(end) => cursor
+            .move_on_key_greater_than_or_equal_to(end)
+            .and_then(|_| cursor.move_on_prev()),
         Bound::Unbounded => cursor.move_on_last(),
     }
 }
@@ -30,18 +25,15 @@ fn move_on_range_end<'txn>(
 fn move_on_range_start<'txn>(
     cursor: &mut RoCursor<'txn>,
     start_bound: &mut Bound<Vec<u8>>,
-) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-{
+) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     match start_bound {
-        Bound::Included(start) => {
-            cursor.move_on_key_greater_than_or_equal_to(start)
-        },
+        Bound::Included(start) => cursor.move_on_key_greater_than_or_equal_to(start),
         Bound::Excluded(start) => {
             advance_key(start);
             let result = cursor.move_on_key_greater_than_or_equal_to(start);
             retreat_key(start);
             result
-        },
+        }
         Bound::Unbounded => cursor.move_on_first(),
     }
 }
@@ -59,8 +51,7 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RoRange<'txn, KC, DC>
-    {
+    ) -> RoRange<'txn, KC, DC> {
         RoRange {
             cursor,
             move_on_start: true,
@@ -138,10 +129,13 @@ where
         let result = if self.move_on_start {
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
+            match (
+                self.cursor.current(),
+                move_on_range_end(&mut self.cursor, &self.end_bound),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -163,7 +157,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -183,8 +177,7 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RwRange<'txn, KC, DC>
-    {
+    ) -> RwRange<'txn, KC, DC> {
         RwRange {
             cursor,
             move_on_start: true,
@@ -194,11 +187,51 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         }
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -206,6 +239,34 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -276,10 +337,13 @@ where
         let result = if self.move_on_start {
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
+            match (
+                self.cursor.current(),
+                move_on_range_end(&mut self.cursor, &self.end_bound),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -301,7 +365,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -321,8 +385,7 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RoRevRange<'txn, KC, DC>
-    {
+    ) -> RoRevRange<'txn, KC, DC> {
         RoRevRange {
             cursor,
             move_on_end: true,
@@ -405,7 +468,7 @@ where
             match (current, start) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -427,7 +490,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -447,8 +510,7 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RwRevRange<'txn, KC, DC>
-    {
+    ) -> RwRevRange<'txn, KC, DC> {
         RwRevRange {
             cursor,
             move_on_end: true,
@@ -458,11 +520,51 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         }
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -470,6 +572,34 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -545,7 +675,7 @@ where
             match (current, start) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -567,7 +697,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
