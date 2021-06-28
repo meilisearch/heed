@@ -1,6 +1,6 @@
 [package]
 name = "heed"
-version = "0.10.6"
+version = "0.12.0"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB/MDBX wrapper with minimum overhead"
 license = "MIT"
