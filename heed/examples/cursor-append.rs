@@ -30,9 +30,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We try to append ordered entries in the second database.
     let mut iter = second.iter_mut(&mut wtxn)?;
 
-    iter.append("aaaa", "lol")?;
-    iter.append("abcd", "lol")?;
-    iter.append("bcde", "lol")?;
+    unsafe { iter.append("aaaa", "lol")? };
+    unsafe { iter.append("abcd", "lol")? };
+    unsafe { iter.append("bcde", "lol")? };
 
     drop(iter);
 
