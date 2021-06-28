@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{mem, ptr};
 
-use crate::*;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::types::DecodeIgnore;
+use crate::*;
 
 /// A polymorphic database that accepts types on call methods and not at creation.
 ///
@@ -615,7 +615,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -668,7 +671,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -881,7 +887,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+    ) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -923,7 +932,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
+    pub fn rev_iter<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn RoTxn<T>,
+    ) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
@@ -979,7 +991,10 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T, KC, DC>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn, T, KC, DC>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+    ) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
@@ -1819,7 +1834,11 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, KC, R>(&self, txn: &'txn mut RwTxn<T>, range: &'a R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, T, KC, R>(
+        &self,
+        txn: &'txn mut RwTxn<T>,
+        range: &'a R,
+    ) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -1829,8 +1848,11 @@ impl PolyDatabase {
         let mut count = 0;
         let mut iter = self.range_mut::<T, KC, DecodeIgnore, _>(txn, range)?;
 
-        while let Some(_) = iter.next() {
-            iter.del_current()?;
+        while iter.next().is_some() {
+            // safety: We do not keep any reference from the database while using `del_current`.
+            //         The user can't keep any reference inside of the database as we ask for a
+            //         mutable reference to the `txn`.
+            unsafe { iter.del_current()? };
             count += 1;
         }
 

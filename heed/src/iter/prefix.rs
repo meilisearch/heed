@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 use std::marker;
 
-use crate::*;
 use super::{advance_key, retreat_key};
+use crate::*;
 
 fn move_on_prefix_end<'txn>(
     cursor: &mut RoCursor<'txn>,
     prefix: &mut Vec<u8>,
-) -> Result<Option<(&'txn [u8], &'txn [u8])>>
-{
+) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     advance_key(prefix);
     let result = cursor
         .move_on_key_greater_than_or_equal_to(prefix)
@@ -26,7 +25,12 @@ pub struct RoPrefix<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoPrefix<'txn, KC, DC> {
-        RoPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
+        RoPrefix {
+            cursor,
+            prefix,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -65,7 +69,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
             self.move_on_first = false;
-            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+            self.cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
             self.cursor.move_on_next()
         };
@@ -80,7 +85,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -90,10 +95,13 @@ where
         let result = if self.move_on_first {
             move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
+            match (
+                self.cursor.current(),
+                move_on_prefix_end(&mut self.cursor, &mut self.prefix),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -109,7 +117,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -125,14 +133,59 @@ pub struct RwPrefix<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwPrefix<'txn, KC, DC> {
-        RwPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
+        RwPrefix {
+            cursor,
+            prefix,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -140,6 +193,34 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -178,7 +259,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
             self.move_on_first = false;
-            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+            self.cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
             self.cursor.move_on_next()
         };
@@ -193,7 +275,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -203,10 +285,13 @@ where
         let result = if self.move_on_first {
             move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
+            match (
+                self.cursor.current(),
+                move_on_prefix_end(&mut self.cursor, &mut self.prefix),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -222,7 +307,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -238,7 +323,12 @@ pub struct RoRevPrefix<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoRevPrefix<'txn, KC, DC> {
-        RoRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
+        RoRevPrefix {
+            cursor,
+            prefix,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -292,7 +382,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -300,14 +390,17 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
-            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+            self.cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
             let current = self.cursor.current();
-            let start = self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix);
+            let start = self
+                .cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix);
             match (current, start) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -323,7 +416,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -339,14 +432,59 @@ pub struct RwRevPrefix<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwRevPrefix<'txn, KC, DC> {
-        RwRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
+        RwRevPrefix {
+            cursor,
+            prefix,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
-    pub fn del_current(&mut self) -> Result<bool> {
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -354,6 +492,34 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        self.cursor.append(&key_bytes, &data_bytes)
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -407,7 +573,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
@@ -415,14 +581,17 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
-            self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
+            self.cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
             let current = self.cursor.current();
-            let start = self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix);
+            let start = self
+                .cursor
+                .move_on_key_greater_than_or_equal_to(&self.prefix);
             match (current, start) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -438,7 +607,7 @@ where
                 } else {
                     None
                 }
-            },
+            }
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }

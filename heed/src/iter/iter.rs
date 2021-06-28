@@ -10,7 +10,11 @@ pub struct RoIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>) -> RoIter<'txn, KC, DC> {
-        RoIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
+        RoIter {
+            cursor,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -70,7 +74,7 @@ where
             match (self.cursor.current(), self.cursor.move_on_last()) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -95,24 +99,58 @@ pub struct RwIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>) -> RwIter<'txn, KC, DC> {
-        RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
+        RwIter {
+            cursor,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Delete the entry the cursor is currently pointing to.
     ///
     /// Returns `true` if the entry was successfully deleted.
-    pub fn del_current(&mut self) -> Result<bool> {
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
     /// Write a new value to the current entry.
-    /// The given key must be equal to the one this cursor is pointing at.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
     ///
     /// Returns `true` if the entry was successfully written.
     ///
-    /// This is intended to be used when the new data is the same size as the old.
-    /// Otherwise it will simply perform a delete of the old record followed by an insert.
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -126,7 +164,21 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
     /// is returned and the key is not inserted into the database.
-    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -193,7 +245,7 @@ where
             match (self.cursor.current(), self.cursor.move_on_last()) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -218,7 +270,11 @@ pub struct RoRevIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoRevIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>) -> RoRevIter<'txn, KC, DC> {
-        RoRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
+        RoRevIter {
+            cursor,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -278,7 +334,7 @@ where
             match (self.cursor.current(), self.cursor.move_on_first()) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
@@ -303,24 +359,58 @@ pub struct RwRevIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>) -> RwRevIter<'txn, KC, DC> {
-        RwRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
+        RwRevIter {
+            cursor,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Delete the entry the cursor is currently pointing to.
     ///
     /// Returns `true` if the entry was successfully deleted.
-    pub fn del_current(&mut self) -> Result<bool> {
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
         self.cursor.del_current()
     }
 
     /// Write a new value to the current entry.
-    /// The given key must be equal to the one this cursor is pointing at.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
     ///
     /// Returns `true` if the entry was successfully written.
     ///
-    /// This is intended to be used when the new data is the same size as the old.
-    /// Otherwise it will simply perform a delete of the old record followed by an insert.
-    pub fn put_current<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current<'a>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -334,7 +424,7 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
     /// is returned and the key is not inserted into the database.
-    pub fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -401,7 +491,7 @@ where
             match (self.cursor.current(), self.cursor.move_on_first()) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
-                },
+                }
                 (Ok(_), Ok(_)) => Ok(None),
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }
