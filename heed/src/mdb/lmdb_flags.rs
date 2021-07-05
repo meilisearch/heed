@@ -12,4 +12,6 @@ pub enum Flags {
     MdbNoLock = lmdb_sys::MDB_NOLOCK,
     MdbNoRdAhead = lmdb_sys::MDB_NORDAHEAD,
     MdbNoMemInit = lmdb_sys::MDB_NOMEMINIT,
+    /// Always free single pages instead of keeping them in a list, for future reuse.
+    MdbAlwaysFreePages = lmdb_sys::MDB_ALWAYSFREEPAGES,
 }
