@@ -30,7 +30,7 @@ pub struct CowType<T>(std::marker::PhantomData<T>);
 impl<T: Pod> BytesEncode for CowType<T> {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error + Sync + Send>> {
         Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
@@ -38,7 +38,7 @@ impl<T: Pod> BytesEncode for CowType<T> {
 impl<'a, T: Pod> BytesDecode<'a> for CowType<T> {
     type DItem = Cow<'a, T>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error + Sync + Send>> {
         match try_from_bytes(bytes) {
             Ok(item) => Ok(Cow::Borrowed(item)),
             Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned) => {

@@ -84,8 +84,8 @@ pub type UntypedDatabase = Database<types::ByteSlice<'static>, types::ByteSlice<
 pub enum Error {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding(Box<dyn StdError>),
-    Decoding(Box<dyn StdError>),
+    Encoding(Box<dyn StdError + Sync + Send>),
+    Decoding(Box<dyn StdError + Sync + Send>),
     InvalidDatabaseTyping,
     DatabaseClosing,
 }

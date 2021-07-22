@@ -23,7 +23,7 @@ pub struct UnalignedType<T>(std::marker::PhantomData<T>);
 impl<T: Pod> BytesEncode for UnalignedType<T> {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error + Sync + Send>> {
         Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
@@ -31,7 +31,7 @@ impl<T: Pod> BytesEncode for UnalignedType<T> {
 impl<'a, T: Pod> BytesDecode<'a> for UnalignedType<T> {
     type DItem = &'a T;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error + Sync + Send>> {
         try_from_bytes(bytes).map_err(Into::into)
     }
 }

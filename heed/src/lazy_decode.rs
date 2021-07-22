@@ -12,7 +12,7 @@ pub struct LazyDecode<C>(marker::PhantomData<C>);
 impl<'a, C: 'static> heed_traits::BytesDecode<'a> for LazyDecode<C> {
     type DItem = Lazy<'a, C>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> StdResult<Self::DItem, Box<dyn StdError>> {
+    fn bytes_decode(bytes: &'a [u8]) -> StdResult<Self::DItem, Box<dyn StdError + Sync + Send>> {
         Ok(Lazy { data: bytes, _phantom: marker::PhantomData })
     }
 }

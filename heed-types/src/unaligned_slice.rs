@@ -17,7 +17,7 @@ pub struct UnalignedSlice<'a, T>(std::marker::PhantomData<&'a T>);
 impl<'a, T: Pod> BytesEncode for UnalignedSlice<'a, T> {
     type EItem = &'a [T];
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error + Sync + Send>> {
         try_cast_slice(item).map(Cow::Borrowed).map_err(Into::into)
     }
 }
@@ -25,7 +25,7 @@ impl<'a, T: Pod> BytesEncode for UnalignedSlice<'a, T> {
 impl<'a, T: Pod> BytesDecode<'a> for UnalignedSlice<'_, T> {
     type DItem = &'a [T];
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error + Sync + Send>> {
         try_cast_slice(bytes).map_err(Into::into)
     }
 }

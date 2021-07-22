@@ -13,7 +13,7 @@ pub struct Str<'a> {
 impl<'a> BytesEncode for Str<'a> {
     type EItem = &'a str;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error + Sync + Send>> {
         try_cast_slice(item.as_bytes()).map(Cow::Borrowed).map_err(Into::into)
     }
 }
@@ -21,7 +21,7 @@ impl<'a> BytesEncode for Str<'a> {
 impl<'a> BytesDecode<'a> for Str<'_> {
     type DItem = &'a str;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error + Sync + Send>> {
         str::from_utf8(bytes).map_err(Into::into)
     }
 }

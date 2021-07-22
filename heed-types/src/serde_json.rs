@@ -15,7 +15,7 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error>> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, Box<dyn Error + Sync + Send>> {
         serde_json::to_vec(item).map(Cow::Owned).map_err(Into::into)
     }
 }
@@ -26,7 +26,7 @@ where
 {
     type DItem = T;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error>> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Box<dyn Error + Sync + Send>> {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 }
