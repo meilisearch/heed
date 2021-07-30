@@ -322,23 +322,23 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
+        let mut wtxn = self.write_txn()?;
+        let db = self.create_database_with_txn(name, &mut wtxn)?;
+        wtxn.commit()?;
         Ok(db)
     }
 
     pub fn create_database_with_txn<KC, DC>(
         &self,
         name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
+        wtxn: &mut RwTxn,
     ) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
+        self.raw_create_database(name, Some(types), wtxn)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
@@ -352,9 +352,9 @@ impl Env {
     pub fn create_poly_database_with_txn(
         &self,
         name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
+        wtxn: &mut RwTxn,
     ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
+        self.raw_create_database(name, None, wtxn)
             .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
     }
 
@@ -362,10 +362,8 @@ impl Env {
         &self,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
-        parent_wtxn: &mut RwTxn,
+        wtxn: &mut RwTxn,
     ) -> Result<u32> {
-        let wtxn = self.nested_write_txn(parent_wtxn)?;
-
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
         let name_ptr = match name {
@@ -388,8 +386,6 @@ impl Env {
 
         match result {
             Ok(()) => {
-                wtxn.commit()?;
-
                 let old_types = lock.entry(dbi).or_insert(types);
 
                 if *old_types == types {
