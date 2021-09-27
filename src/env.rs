@@ -425,6 +425,17 @@ impl Env {
             }
         }
     }
+
+    /// Check for stale entries in the reader lock table and clear them.
+    ///
+    /// Returns the number of stale readers cleared.
+    pub fn clear_stale_readers(&self) -> Result<usize> {
+        let mut dead = 0;
+        unsafe { mdb_result(ffi::mdb_reader_check(self.0.env, &mut dead))? }
+        // safety: The reader_check function asks for an i32, initialize it to zero
+        //         and never decrements it. It is safe to use either an u32 or u64 (usize).
+        Ok(dead as usize)
+    }
 }
 
 #[derive(Clone)]
