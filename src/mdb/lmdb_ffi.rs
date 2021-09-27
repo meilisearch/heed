@@ -4,6 +4,7 @@ pub use ffi::mdb_filehandle_t;
 pub use ffi::MDB_cursor;
 pub use ffi::MDB_dbi;
 pub use ffi::MDB_env;
+pub use ffi::MDB_stat;
 pub use ffi::MDB_txn;
 
 pub use ffi::MDB_APPEND;
@@ -27,6 +28,7 @@ pub use ffi::mdb_del;
 pub use ffi::mdb_drop;
 pub use ffi::mdb_get;
 pub use ffi::mdb_put;
+pub use ffi::mdb_stat;
 
 pub use ffi::mdb_txn_abort;
 pub use ffi::mdb_txn_begin;

@@ -516,22 +516,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
-
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let mut count = 0;
-
-        match cursor.move_on_first()? {
-            Some(_) => count += 1,
-            None => return Ok(0),
-        }
-
-        while let Some(_) = cursor.move_on_next()? {
-            count += 1;
-        }
-
-        Ok(count)
+        let mut stat = mem::MaybeUninit::uninit();
+        let stat = unsafe {
+            mdb_result(ffi::mdb_stat(txn.txn, self.dbi, stat.as_mut_ptr()))?;
+            stat.assume_init()
+        };
+        Ok(stat.ms_entries as u64)
     }
 
     /// Returns `true` if and only if this database is empty.
