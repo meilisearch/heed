@@ -438,6 +438,8 @@ impl Env {
     }
 }
 
+/// A struct that can be used to synchronously wait (block the thread)
+/// for a environement closing event to occur.
 #[derive(Clone)]
 pub struct EnvClosingEvent(Arc<SignalEvent>);
 
