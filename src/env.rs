@@ -300,24 +300,22 @@ impl Env {
     }
 
     pub fn create_database(&self, name: Option<&str>) -> Result<Database> {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
+        let mut wtxn = self.write_txn()?;
+        let db = self.create_database_with_txn(name, &mut wtxn)?;
+        wtxn.commit()?;
         Ok(db)
     }
 
     pub fn create_database_with_txn(
         &self,
         name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
+        wtxn: &mut RwTxn,
     ) -> Result<Database> {
-        self.raw_create_database(name, parent_wtxn)
+        self.raw_create_database(name, wtxn)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
-    fn raw_create_database(&self, name: Option<&str>, parent_wtxn: &mut RwTxn) -> Result<u32> {
-        let wtxn = self.nested_write_txn(parent_wtxn)?;
-
+    fn raw_create_database(&self, name: Option<&str>, wtxn: &mut RwTxn) -> Result<u32> {
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
         let name_ptr = match name {
@@ -337,10 +335,7 @@ impl Env {
         drop(name);
 
         match result {
-            Ok(()) => {
-                wtxn.commit()?;
-                Ok(dbi)
-            }
+            Ok(()) => Ok(dbi),
             Err(e) => Err(e.into()),
         }
     }
