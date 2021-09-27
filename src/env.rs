@@ -352,8 +352,11 @@ impl Env {
         RoTxn::new(self)
     }
 
-    // TODO rename into `copy_to_file` for more clarity
-    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+    /// Copy the environnement to the file at the given path, creating
+    /// and truncating the file if already exist.
+    ///
+    /// Returns the created `File` with the content of the environnement.
+    pub fn copy_to_file<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
         let file = File::create(&path)?;
         let fd = get_file_fd(&file);
 
