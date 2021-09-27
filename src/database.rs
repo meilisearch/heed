@@ -144,10 +144,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T>(&self, txn: &'txn RoTxn, key: &'a [u8]) -> Result<Option<&'txn [u8]>> {
+    pub fn get<'txn, A: AsRef<[u8]>>(
+        &self,
+        txn: &'txn RoTxn,
+        key: A,
+    ) -> Result<Option<&'txn [u8]>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let mut key_val = unsafe { crate::into_val(key) };
+        let mut key_val = unsafe { crate::into_val(key.as_ref()) };
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
@@ -212,14 +216,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn, T>(
+    pub fn get_lower_than<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        key: &'a [u8],
+        key: A,
     ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        cursor.move_on_key_greater_than_or_equal_to(key)?;
+        cursor.move_on_key_greater_than_or_equal_to(key.as_ref())?;
         cursor.move_on_prev()
     }
 
@@ -266,15 +270,16 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_lower_than_or_equal_to<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        key: &'a [u8],
+        key: A,
     ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let key = key.as_ref();
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_key_greater_than_or_equal_to(key) {
-            Ok(Some((k, data))) if k == &key[..] => Ok(Some((k, data))),
+            Ok(Some((k, data))) if k == key => Ok(Some((k, data))),
             Ok(_) => cursor.move_on_prev(),
             Err(e) => Err(e),
         }
@@ -323,15 +328,16 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn, T>(
+    pub fn get_greater_than<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        key: &'a [u8],
+        key: A,
     ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let key = key.as_ref();
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_key_greater_than_or_equal_to(key)? {
-            Some((k, data)) if k > &key[..] => Ok(Some((k, data))),
+            Some((k, data)) if k > key => Ok(Some((k, data))),
             Some((_key, _data)) => cursor.move_on_next(),
             None => Ok(None),
         }
@@ -380,14 +386,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_greater_than_or_equal_to<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        key: &'a [u8],
+        key: A,
     ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        cursor.move_on_key_greater_than_or_equal_to(key)
+        cursor.move_on_key_greater_than_or_equal_to(key.as_ref())
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -425,7 +431,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn RoTxn) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         cursor.move_on_first()
@@ -466,7 +472,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn RoTxn) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         cursor.move_on_last()
@@ -510,7 +516,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
@@ -566,7 +572,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn) -> Result<bool> {
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
@@ -612,7 +618,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn>> {
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
@@ -666,7 +672,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn>> {
+    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
@@ -707,7 +713,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn>> {
+    pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
@@ -762,7 +768,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn>> {
+    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
@@ -806,7 +812,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'txn, T, R, A>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn>>
+    pub fn range<'txn, R, A>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRange<'txn>>
     where
         R: RangeBounds<A>,
         A: AsRef<[u8]>,
@@ -881,7 +887,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'txn, T, R, A>(&self, txn: &'txn mut RwTxn, range: R) -> Result<RwRange<'txn>>
+    pub fn range_mut<'txn, R, A>(&self, txn: &'txn mut RwTxn, range: R) -> Result<RwRange<'txn>>
     where
         R: RangeBounds<A>,
         A: AsRef<[u8]>,
@@ -943,7 +949,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'txn, T, R, A>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRevRange<'txn>>
+    pub fn rev_range<'txn, R, A>(&self, txn: &'txn RoTxn, range: R) -> Result<RoRevRange<'txn>>
     where
         R: RangeBounds<A>,
         A: AsRef<[u8]>,
@@ -1018,7 +1024,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'txn, T, R, A>(
+    pub fn rev_range_mut<'txn, R, A>(
         &self,
         txn: &'txn mut RwTxn,
         range: R,
@@ -1085,13 +1091,13 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn, T>(
+    pub fn prefix_iter<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        prefix: &'a [u8],
+        prefix: A,
     ) -> Result<RoPrefix<'txn>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
-        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix.to_vec()))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix.as_ref().to_vec()))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1148,13 +1154,13 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn, T>(
+    pub fn prefix_iter_mut<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn mut RwTxn,
-        prefix: &'a [u8],
+        prefix: A,
     ) -> Result<RwPrefix<'txn>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
-        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix.to_vec()))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix.as_ref().to_vec()))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1198,13 +1204,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn, T>(
+    pub fn rev_prefix_iter<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn RoTxn,
-        prefix: &'a [u8],
+        prefix: A,
     ) -> Result<RoRevPrefix<'txn>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix.to_vec()))
+        RoCursor::new(txn, self.dbi)
+            .map(|cursor| RoRevPrefix::new(cursor, prefix.as_ref().to_vec()))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1261,13 +1268,14 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn, T>(
+    pub fn rev_prefix_iter_mut<'txn, A: AsRef<[u8]>>(
         &self,
         txn: &'txn mut RwTxn,
-        prefix: &'a [u8],
+        prefix: A,
     ) -> Result<RwRevPrefix<'txn>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix.to_vec()))
+        RwCursor::new(txn, self.dbi)
+            .map(|cursor| RwRevPrefix::new(cursor, prefix.as_ref().to_vec()))
     }
 
     /// Insert a key-value pairs in this database.
@@ -1303,11 +1311,15 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T>(&self, txn: &mut RwTxn, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+    pub fn put<A, B>(&self, txn: &mut RwTxn, key: A, data: B) -> Result<()>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let mut key_val = unsafe { crate::into_val(key) };
-        let mut data_val = unsafe { crate::into_val(data) };
+        let mut key_val = unsafe { crate::into_val(key.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data.as_ref()) };
         let flags = 0;
 
         unsafe {
@@ -1359,11 +1371,15 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T>(&self, txn: &mut RwTxn, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+    pub fn append<A, B>(&self, txn: &mut RwTxn, key: A, data: B) -> Result<()>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let mut key_val = unsafe { crate::into_val(key) };
-        let mut data_val = unsafe { crate::into_val(data) };
+        let mut key_val = unsafe { crate::into_val(key.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data.as_ref()) };
         let flags = ffi::MDB_APPEND;
 
         unsafe {
@@ -1420,9 +1436,9 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T>(&self, txn: &mut RwTxn, key: &'a [u8]) -> Result<bool> {
+    pub fn delete<A: AsRef<[u8]>>(&self, txn: &mut RwTxn, key: A) -> Result<bool> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
-        let mut key_val = unsafe { crate::into_val(key) };
+        let mut key_val = unsafe { crate::into_val(key.as_ref()) };
         let result = unsafe {
             mdb_result(ffi::mdb_del(
                 txn.txn.txn,
@@ -1486,7 +1502,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'txn, T, R, A>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
+    pub fn delete_range<'txn, R, A>(&self, txn: &'txn mut RwTxn, range: R) -> Result<usize>
     where
         R: RangeBounds<A>,
         A: AsRef<[u8]>,
@@ -1494,7 +1510,7 @@ impl Database {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         let mut count = 0;
-        let mut iter = self.range_mut::<T, _, _>(txn, range)?;
+        let mut iter = self.range_mut::<_, A>(txn, range)?;
 
         while iter.next().is_some() {
             // safety: We do not keep any reference from the database while using `del_current`.
@@ -1547,7 +1563,7 @@ impl Database {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn) -> Result<()> {
+    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
         unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
