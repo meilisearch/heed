@@ -1,12 +1,13 @@
-use std::marker;
-use std::ops::RangeBounds;
+use std::ops::{Bound, RangeBounds};
+use std::{mem, ptr};
 
+use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
-/// A typed database that accepts only the types it was created with.
+/// A database that stores entries composed of slice of bytes.
 ///
-/// # Example: Iterate over databases entries
+/// # Example: Iterate over ranges of databases entries
 ///
 /// In this example we store numbers in big endian this way those are ordered.
 /// Thanks to their bytes representation, heed is able to iterate over them
@@ -28,34 +29,30 @@ use crate::*;
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
+/// let db: Database = env.create_poly_database(Some("big-endian-iter"))?;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
 ///
 /// // you can iterate over database entries in order
-/// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let mut range = db.range::<_, OwnedType<BEI64>, Str, _>(&wtxn, &range)?;
+/// assert_eq!(range.next().transpose()?, Some((BEI64::new(35), "thirty five")));
+/// assert_eq!(range.next().transpose()?, Some((BEI64::new(42), "forty two")));
+/// assert_eq!(range.next().transpose()?, None);
 ///
-/// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
-///     (BEI64::new(68), ()),
-/// ];
-///
-/// assert_eq!(rets, expected);
+/// drop(range);
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
 ///
-/// # Example: Iterate over and delete ranges of entries
+/// # Example: Select ranges of entries
 ///
-/// Discern also support ranges and ranges deletions.
+/// Heed also support ranges deletions.
 /// Same configuration as above, numbers are ordered, therefore it is safe to specify
 /// a range and be able to iterate over and/or delete it.
 ///
@@ -75,32 +72,21 @@ use crate::*;
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
+/// let db: Database = env.create_poly_database(Some("big-endian-iter"))?;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
-///
-/// // you can iterate over ranges too!!!
-/// let range = BEI64::new(35)..=BEI64::new(42);
-/// let rets: Result<_, _> = db.range(&wtxn, &range)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
-///
-/// let expected = vec![
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
-/// ];
-///
-/// assert_eq!(rets, expected);
+/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
 ///
 /// // even delete a range of keys
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted: usize = db.delete_range(&mut wtxn, &range)?;
+/// let deleted = db.delete_range::<_, OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+/// assert_eq!(deleted, 2);
 ///
-/// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
+/// let rets: Result<_, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
 /// let rets: Vec<(BEI64, _)> = rets?;
 ///
 /// let expected = vec![
@@ -114,17 +100,15 @@ use crate::*;
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct Database<KC, DC> {
-    pub(crate) dyndb: PolyDatabase,
-    marker: marker::PhantomData<(KC, DC)>,
+#[derive(Copy, Clone)]
+pub struct Database {
+    pub(crate) env_ident: usize,
+    pub(crate) dbi: ffi::MDB_dbi,
 }
 
-impl<KC, DC> Database<KC, DC> {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database {
-            dyndb: PolyDatabase::new(env_ident, dbi),
-            marker: std::marker::PhantomData,
-        }
+impl Database {
+    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database {
+        Database { env_ident, dbi }
     }
 
     /// Retrieves the value associated with a key.
@@ -144,17 +128,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(Some("get-i32"))?;
+    /// let db = env.create_poly_database(Some("get-poly-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-forty-two", &42)?;
+    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-twenty-seven", &27)?;
     ///
-    /// let ret = db.get(&wtxn, "i-am-forty-two")?;
+    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-forty-two")?;
     /// assert_eq!(ret, Some(42));
     ///
-    /// let ret = db.get(&wtxn, "i-am-twenty-one")?;
+    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-twenty-one")?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -163,13 +147,30 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<DC::DItem>>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.get::<T, KC, DC>(txn, key)
+        key: &'a [u8],
+    ) -> Result<Option<&'txn [u8]>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut key_val = unsafe { crate::into_val(key) };
+        let mut data_val = mem::MaybeUninit::uninit();
+
+        let result = unsafe {
+            mdb_result(ffi::mdb_get(
+                txn.txn,
+                self.dbi,
+                &mut key_val,
+                data_val.as_mut_ptr(),
+            ))
+        };
+
+        match result {
+            Ok(()) => {
+                let data = unsafe { crate::from_val(data_val.assume_init()) };
+                Ok(Some(data))
+            }
+            Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Retrieves the key/value pair lower than the given one in this database.
@@ -195,21 +196,21 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
+    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -218,16 +219,15 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get_lower_than<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesEncode<'a> + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.get_lower_than::<T, KC, DC>(txn, key)
+        key: &'a [u8],
+    ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        cursor.move_on_key_greater_than_or_equal_to(key)?;
+        cursor.move_on_prev()
     }
 
-    /// Retrieves the key/value pair lower than or equal to the given one in this database.
+    /// Retrieves the key/value pair lower than or equal the given one in this database.
     ///
     /// If the database if empty or there is no key lower than or equal to the given one,
     /// then `None` is returned.
@@ -250,21 +250,21 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
+    /// let db = env.create_poly_database(Some("get-lte-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(26))?;
+    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(26))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -273,13 +273,15 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesEncode<'a> + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.get_lower_than_or_equal_to::<T, KC, DC>(txn, key)
+        key: &'a [u8],
+    ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_key_greater_than_or_equal_to(key) {
+            Ok(Some((k, data))) if k == &key[..] => Ok(Some((k, data))),
+            Ok(_) => cursor.move_on_prev(),
+            Err(e) => Err(e),
+        }
     }
 
     /// Retrieves the key/value pair greater than the given one in this database.
@@ -305,21 +307,21 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
+    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -328,16 +330,18 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get_greater_than<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesEncode<'a> + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.get_greater_than::<T, KC, DC>(txn, key)
+        key: &'a [u8],
+    ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_key_greater_than_or_equal_to(key)? {
+            Some((k, data)) if k > &key[..] => Ok(Some((k, data))),
+            Some((_key, _data)) => cursor.move_on_next(),
+            None => Ok(None),
+        }
     }
 
-    /// Retrieves the key/value pair greater than or equal to the given one in this database.
+    /// Retrieves the key/value pair greater than or equal the given one in this database.
     ///
     /// If the database if empty or there is no key greater than or equal to the given one,
     /// then `None` is returned.
@@ -360,21 +364,21 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
+    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(44))?;
+    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(44))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -383,14 +387,11 @@ impl<KC, DC> Database<KC, DC> {
     pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesEncode<'a> + BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb
-            .get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
+        key: &'a [u8],
+    ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        cursor.move_on_key_greater_than_or_equal_to(key)
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -415,25 +416,23 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("first-i32"))?;
+    /// let db = env.create_poly_database(Some("first-poly-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.first(&wtxn)?;
+    /// let ret = db.first::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((BEI32::new(27), "i-am-twenty-seven")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.first::<T, KC, DC>(txn)
+    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        cursor.move_on_first()
     }
 
     /// Retrieves the last key/value pair of this database.
@@ -458,25 +457,23 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("last-i32"))?;
+    /// let db = env.create_poly_database(Some("last-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.last(&wtxn)?;
+    /// let ret = db.last::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((BEI32::new(42), "i-am-forty-two")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
-    where
-        KC: BytesDecode<'txn>,
-        DC: BytesDecode<'txn>,
-    {
-        self.dyndb.last::<T, KC, DC>(txn)
+    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        cursor.move_on_last()
     }
 
     /// Returns the number of elements in this database.
@@ -497,19 +494,19 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -518,7 +515,21 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
-        self.dyndb.len(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut count = 0;
+
+        match cursor.move_on_first()? {
+            Some(_) => count += 1,
+            None => return Ok(0),
+        }
+
+        while let Some(_) = cursor.move_on_next()? {
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     /// Returns `true` if and only if this database is empty.
@@ -539,14 +550,14 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
@@ -560,7 +571,13 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
-        self.dyndb.is_empty(txn)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        match cursor.move_on_first()? {
+            Some(_) => Ok(false),
+            None => Ok(true),
+        }
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
@@ -581,15 +598,15 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter(&wtxn)?;
+    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
@@ -599,8 +616,9 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
-        self.dyndb.iter::<T, KC, DC>(txn)
+    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -621,15 +639,15 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter_mut(&mut wtxn)?;
+    /// let mut iter = db.iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -643,20 +661,21 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
     /// assert_eq!(ret, Some("i-am-the-new-forty-two"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
-        self.dyndb.iter_mut::<T, KC, DC>(txn)
+    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn>> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
-    /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
+    /// Returns a reversed lexicographically ordered iterator of all key-value pairs in this database.
     ///
     /// ```
     /// # use std::fs;
@@ -674,15 +693,15 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter(&wtxn)?;
+    /// let mut iter = db.rev_iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
@@ -692,12 +711,13 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter::<T, KC, DC>(txn)
+    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
-    /// Return a mutable reversed lexicographically ordered iterator of all key-value\
-    /// pairs in this database.
+    /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
+    /// in this database.
     ///
     /// ```
     /// # use std::fs;
@@ -715,15 +735,15 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter_mut(&mut wtxn)?;
+    /// let mut iter = db.rev_iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -737,20 +757,18 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
     /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-    ) -> Result<RwRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter_mut::<T, KC, DC>(txn)
+    pub fn rev_iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwRevIter<'txn>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -773,17 +791,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut iter = db.range(&wtxn, &range)?;
+    /// let mut iter = db.range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -792,16 +810,26 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, T, R>(
-        &self,
-        txn: &'txn RoTxn<T>,
-        range: &'a R,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    pub fn range<'txn, T, R, A>(&self, txn: &'txn RoTxn<T>, range: R) -> Result<RoRange<'txn>>
     where
-        KC: BytesEncode<'a>,
-        R: RangeBounds<KC::EItem>,
+        R: RangeBounds<A>,
+        A: AsRef<[u8]>,
     {
-        self.dyndb.range::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -825,17 +853,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.range_mut(&mut wtxn, &range)?;
+    /// let mut range = db.range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -847,7 +875,7 @@ impl<KC, DC> Database<KC, DC> {
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter(&wtxn)?;
+    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-the-new-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
@@ -857,16 +885,30 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, T, R>(
+    pub fn range_mut<'txn, T, R, A>(
         &self,
         txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<RwRange<'txn, KC, DC>>
+        range: R,
+    ) -> Result<RwRange<'txn>>
     where
-        KC: BytesEncode<'a>,
-        R: RangeBounds<KC::EItem>,
+        R: RangeBounds<A>,
+        A: AsRef<[u8]>,
     {
-        self.dyndb.range_mut::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a reversed lexicographically ordered iterator of a range of key-value
@@ -890,17 +932,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(43);
-    /// let mut iter = db.rev_range(&wtxn, &range)?;
+    /// let mut iter = db.rev_range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -909,16 +951,30 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, T, R>(
+    pub fn rev_range<'txn, T, R, A>(
         &self,
         txn: &'txn RoTxn<T>,
-        range: &'a R,
-    ) -> Result<RoRevRange<'txn, KC, DC>>
+        range: R,
+    ) -> Result<RoRevRange<'txn>>
     where
-        KC: BytesEncode<'a>,
-        R: RangeBounds<KC::EItem>,
+        R: RangeBounds<A>,
+        A: AsRef<[u8]>,
     {
-        self.dyndb.rev_range::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of a range of
@@ -942,17 +998,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.rev_range_mut(&mut wtxn, &range)?;
+    /// let mut range = db.rev_range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -964,7 +1020,7 @@ impl<KC, DC> Database<KC, DC> {
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter(&wtxn)?;
+    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
@@ -974,16 +1030,30 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, T, R>(
+    pub fn rev_range_mut<'txn, T, R, A>(
         &self,
         txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<RwRevRange<'txn, KC, DC>>
+        range: R,
+    ) -> Result<RwRevRange<'txn>>
     where
-        KC: BytesEncode<'a>,
-        R: RangeBounds<KC::EItem>,
+        R: RangeBounds<A>,
+        A: AsRef<[u8]>,
     {
-        self.dyndb.rev_range_mut::<T, KC, DC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let start_bound = match range.start_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let end_bound = match range.end_bound() {
+            Bound::Included(bytes) => Bound::Included(bytes.as_ref().to_vec()),
+            Bound::Excluded(bytes) => Bound::Excluded(bytes.as_ref().to_vec()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1007,17 +1077,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.prefix_iter(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
@@ -1030,12 +1100,10 @@ impl<KC, DC> Database<KC, DC> {
     pub fn prefix_iter<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        prefix: &'a KC::EItem,
-    ) -> Result<RoPrefix<'txn, KC, DC>>
-    where
-        KC: BytesEncode<'a>,
-    {
-        self.dyndb.prefix_iter::<T, KC, DC>(txn, prefix)
+        prefix: &'a [u8],
+    ) -> Result<RoPrefix<'txn>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix.to_vec()))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1059,17 +1127,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1083,10 +1151,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
     /// assert_eq!(ret, Some(BEI32::new(27000)));
     ///
     /// wtxn.commit()?;
@@ -1095,12 +1163,10 @@ impl<KC, DC> Database<KC, DC> {
     pub fn prefix_iter_mut<'a, 'txn, T>(
         &self,
         txn: &'txn mut RwTxn<T>,
-        prefix: &'a KC::EItem,
-    ) -> Result<RwPrefix<'txn, KC, DC>>
-    where
-        KC: BytesEncode<'a>,
-    {
-        self.dyndb.prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        prefix: &'a [u8],
+    ) -> Result<RwPrefix<'txn>> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix.to_vec()))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1124,17 +1190,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.rev_prefix_iter(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
@@ -1147,15 +1213,13 @@ impl<KC, DC> Database<KC, DC> {
     pub fn rev_prefix_iter<'a, 'txn, T>(
         &self,
         txn: &'txn RoTxn<T>,
-        prefix: &'a KC::EItem,
-    ) -> Result<RoRevPrefix<'txn, KC, DC>>
-    where
-        KC: BytesEncode<'a>,
-    {
-        self.dyndb.rev_prefix_iter::<T, KC, DC>(txn, prefix)
+        prefix: &'a [u8],
+    ) -> Result<RoRevPrefix<'txn>> {
+        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix.to_vec()))
     }
 
-    /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
+    /// Return a mutable lexicographically ordered iterator of all key-value pairs
     /// in this database that starts with the given prefix.
     ///
     /// Comparisons are made by using the bytes representation of the key.
@@ -1176,17 +1240,17 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.rev_prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1200,10 +1264,10 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
+    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
     /// assert_eq!(ret, Some(BEI32::new(28000)));
     ///
     /// wtxn.commit()?;
@@ -1212,12 +1276,10 @@ impl<KC, DC> Database<KC, DC> {
     pub fn rev_prefix_iter_mut<'a, 'txn, T>(
         &self,
         txn: &'txn mut RwTxn<T>,
-        prefix: &'a KC::EItem,
-    ) -> Result<RwRevPrefix<'txn, KC, DC>>
-    where
-        KC: BytesEncode<'a>,
-    {
-        self.dyndb.rev_prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        prefix: &'a [u8],
+    ) -> Result<RwRevPrefix<'txn>> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix.to_vec()))
     }
 
     /// Insert a key-value pairs in this database.
@@ -1238,32 +1300,39 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        self.dyndb.put::<T, KC, DC>(txn, key, data)
+    pub fn put<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let mut key_val = unsafe { crate::into_val(key) };
+        let mut data_val = unsafe { crate::into_val(data) };
+        let flags = 0;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
+        }
+
+        Ok(())
     }
 
     /// Append the given key/data pair to the end of the database.
@@ -1287,32 +1356,39 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("append-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        self.dyndb.append::<T, KC, DC>(txn, key, data)
+    pub fn append<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let mut key_val = unsafe { crate::into_val(key) };
+        let mut data_val = unsafe { crate::into_val(data) };
+        let flags = ffi::MDB_APPEND;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
+        }
+
+        Ok(())
     }
 
     /// Deletes a key-value pairs in this database.
@@ -1335,32 +1411,44 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(467))?;
+    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(467))?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
-    where
-        KC: BytesEncode<'a>,
-    {
-        self.dyndb.delete::<T, KC>(txn, key)
+    pub fn delete<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a [u8]) -> Result<bool> {
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        let mut key_val = unsafe { crate::into_val(key) };
+        let result = unsafe {
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn,
+                self.dbi,
+                &mut key_val,
+                ptr::null_mut(),
+            ))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Deletes a range of key-value pairs in this database.
@@ -1388,21 +1476,20 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let ret = db.delete_range(&mut wtxn, &range)?;
+    /// let ret = db.delete_range::<_, OwnedType<BEI32>, _>(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
-    ///
-    /// let mut iter = db.iter(&wtxn)?;
+    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1411,16 +1498,25 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, R>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<usize>
+    pub fn delete_range<'txn, T, R, A>(&self, txn: &'txn mut RwTxn<T>, range: R) -> Result<usize>
     where
-        KC: BytesEncode<'a> + BytesDecode<'txn>,
-        R: RangeBounds<KC::EItem>,
+        R: RangeBounds<A>,
+        A: AsRef<[u8]>,
     {
-        self.dyndb.delete_range::<T, KC, R>(txn, range)
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+
+        let mut count = 0;
+        let mut iter = self.range_mut::<T, _, _>(txn, range)?;
+
+        while iter.next().is_some() {
+            // safety: We do not keep any reference from the database while using `del_current`.
+            //         The user can't keep any reference inside of the database as we ask for a
+            //         mutable reference to the `txn`.
+            unsafe { iter.del_current()? };
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     /// Deletes all key/value pairs in this database.
@@ -1446,14 +1542,14 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
+    /// let db = env.create_poly_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// db.clear(&mut wtxn)?;
     ///
@@ -1464,127 +1560,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
-        self.dyndb.clear(txn)
-    }
-
-    /// Change the codec types of this uniform database, specifying the codecs.
-    ///
-    /// # Safety
-    ///
-    /// It is up to you to ensure that the data read and written using the polymorphic
-    /// handle correspond to the the typed, uniform one. If an invalid write is made,
-    /// it can corrupt the database from the eyes of heed.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use std::fs;
-    /// # use std::path::Path;
-    /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PolyDatabase};
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
-    /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024) // 10MB
-    /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
-    ///
-    /// let db: Database<Unit, Unit> = env.create_database(Some("iter-i32"))?;
-    ///
-    /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// // We remap the types for ease of use.
-    /// let db = db.remap_types::<OwnedType<BEI32>, Str>();
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
-    ///
-    /// wtxn.commit()?;
-    /// # Ok(()) }
-    /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> Database<KC2, DC2> {
-        Database::new(self.dyndb.env_ident, self.dyndb.dbi)
-    }
-
-    /// Change the key codec type of this uniform database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> Database<KC2, DC> {
-        self.remap_types::<KC2, DC>()
-    }
-
-    /// Change the data codec type of this uniform database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> Database<KC, DC2> {
-        self.remap_types::<KC, DC2>()
-    }
-
-    /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> Database<KC, LazyDecode<DC>> {
-        self.remap_types::<KC, LazyDecode<DC>>()
-    }
-
-    /// Get an handle on the internal polymorphic database.
-    ///
-    /// Using this method is useful when you want to skip deserializing of the value,
-    /// by specifying that the value is of type `DecodeIgnore` for example.
-    ///
-    /// [`DecodeIgnore`]: crate::types::DecodeIgnore
-    ///
-    /// # Safety
-    ///
-    /// It is up to you to ensure that the data read and written using the polymorphic
-    /// handle correspond to the the typed, uniform one. If an invalid write is made,
-    /// it can corrupt the database from the eyes of heed.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use std::fs;
-    /// # use std::path::Path;
-    /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
-    /// # let env = EnvOpenOptions::new()
-    /// #     .map_size(10 * 1024 * 1024) // 10MB
-    /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
-    ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
-    /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
-    ///
-    /// // Check if a key exists and skip potentially expensive deserializing
-    /// let ret = db.as_polymorph().get::<_, OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
-    /// assert!(ret.is_some());
-    ///
-    /// wtxn.commit()?;
-    /// # Ok(()) }
-    /// ```
-    pub fn as_polymorph(&self) -> &PolyDatabase {
-        &self.dyndb
+        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 }
-
-impl<KC, DC> Clone for Database<KC, DC> {
-    fn clone(&self) -> Database<KC, DC> {
-        Database {
-            dyndb: self.dyndb,
-            marker: marker::PhantomData,
-        }
-    }
-}
-
-impl<KC, DC> Copy for Database<KC, DC> {}

@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
 #[cfg(windows)]
@@ -17,7 +16,7 @@ use synchronoise::event::SignalEvent;
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use crate::{Database, Error, Result, RoTxn, RwTxn};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -234,7 +233,7 @@ pub struct Env(Arc<EnvInner>);
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    dbi_open_mutex: sync::Mutex<()>,
     path: PathBuf,
 }
 
@@ -270,28 +269,13 @@ impl Env {
         self.0.env
     }
 
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+    pub fn open_database(&self, name: Option<&str>) -> Result<Option<Database>> {
         Ok(self
-            .raw_open_database(name, Some(types))?
+            .raw_open_database(name)?
             .map(|db| Database::new(self.env_mut_ptr() as _, db)))
     }
 
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self
-            .raw_open_database(name, None)?
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
-    }
-
-    fn raw_open_database(
-        &self,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-    ) -> Result<Option<u32>> {
+    fn raw_open_database(&self, name: Option<&str>) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
         let mut dbi = 0;
@@ -301,76 +285,37 @@ impl Env {
             None => ptr::null(),
         };
 
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
+        let _lock = self.0.dbi_open_mutex.lock().unwrap();
         let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
-
         drop(name);
 
         match result {
             Ok(()) => {
                 rtxn.commit()?;
-
-                let old_types = lock.entry(dbi).or_insert(types);
-
-                if *old_types == types {
-                    Ok(Some(dbi))
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
+                Ok(Some(dbi))
             }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
+    pub fn create_database(&self, name: Option<&str>) -> Result<Database> {
         let mut parent_wtxn = self.write_txn()?;
         let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
         parent_wtxn.commit()?;
         Ok(db)
     }
 
-    pub fn create_database_with_txn<KC, DC>(
+    pub fn create_database_with_txn(
         &self,
         name: Option<&str>,
         parent_wtxn: &mut RwTxn,
-    ) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
+    ) -> Result<Database> {
+        self.raw_create_database(name, parent_wtxn)
             .map(|db| Database::new(self.env_mut_ptr() as _, db))
     }
 
-    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
-    }
-
-    pub fn create_poly_database_with_txn(
-        &self,
-        name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
-    ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
-    }
-
-    fn raw_create_database(
-        &self,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-        parent_wtxn: &mut RwTxn,
-    ) -> Result<u32> {
+    fn raw_create_database(&self, name: Option<&str>, parent_wtxn: &mut RwTxn) -> Result<u32> {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
 
         let mut dbi = 0;
@@ -380,8 +325,7 @@ impl Env {
             None => ptr::null(),
         };
 
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
+        let _lock = self.0.dbi_open_mutex.lock().unwrap();
         let result = unsafe {
             mdb_result(ffi::mdb_dbi_open(
                 wtxn.txn.txn,
@@ -390,20 +334,12 @@ impl Env {
                 &mut dbi,
             ))
         };
-
         drop(name);
 
         match result {
             Ok(()) => {
                 wtxn.commit()?;
-
-                let old_types = lock.entry(dbi).or_insert(types);
-
-                if *old_types == types {
-                    Ok(dbi)
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
+                Ok(dbi)
             }
             Err(e) => Err(e.into()),
         }
@@ -529,7 +465,6 @@ mod tests {
     #[test]
     fn close_env() {
         use crate::env_closing_event;
-        use crate::types::*;
         use crate::EnvOpenOptions;
         use std::path::Path;
         use std::time::Duration;
@@ -549,17 +484,17 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let db = env.create_database::<Str, Str>(None).unwrap();
+        let db = env.create_database(None).unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, "hello", "hello").unwrap();
-        db.put(&mut wtxn, "world", "world").unwrap();
+        db.put(&mut wtxn, b"hello", b"hello").unwrap();
+        db.put(&mut wtxn, b"world", b"world").unwrap();
 
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some(("hello", "hello")));
-        assert_eq!(iter.next().transpose().unwrap(), Some(("world", "world")));
+        assert_eq!(iter.next().transpose().unwrap(), Some((b"hello", b"hello")));
+        assert_eq!(iter.next().transpose().unwrap(), Some((b"world", b"world")));
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
 

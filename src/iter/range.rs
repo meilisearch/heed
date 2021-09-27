@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-use std::marker;
 use std::ops::Bound;
 
 use super::{advance_key, retreat_key};
@@ -38,62 +36,30 @@ fn move_on_range_start<'txn>(
     }
 }
 
-pub struct RoRange<'txn, KC, DC> {
+pub struct RoRange<'txn> {
     cursor: RoCursor<'txn>,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
+impl<'txn> RoRange<'txn> {
     pub(crate) fn new(
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RoRange<'txn, KC, DC> {
+    ) -> RoRange<'txn> {
         RoRange {
             cursor,
             move_on_start: true,
             start_bound,
             end_bound,
-            _phantom: marker::PhantomData,
         }
-    }
-
-    /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
-        RoRange {
-            cursor: self.cursor,
-            move_on_start: self.move_on_start,
-            start_bound: self.start_bound,
-            end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
-        }
-    }
-
-    /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRange<'txn, KC2, DC> {
-        self.remap_types::<KC2, DC>()
-    }
-
-    /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRange<'txn, KC, DC2> {
-        self.remap_types::<KC, DC2>()
-    }
-
-    /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRange<'txn, KC, LazyDecode<DC>> {
-        self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
-where
-    KC: BytesDecode<'txn>,
-    DC: BytesDecode<'txn>,
-{
-    type Item = Result<(KC::DItem, DC::DItem)>;
+impl<'txn> Iterator for RoRange<'txn> {
+    type Item = Result<(&'txn [u8], &'txn [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
@@ -112,10 +78,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -150,10 +113,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -164,26 +124,24 @@ where
     }
 }
 
-pub struct RwRange<'txn, KC, DC> {
+pub struct RwRange<'txn> {
     cursor: RwCursor<'txn>,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
+impl<'txn> RwRange<'txn> {
     pub(crate) fn new(
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RwRange<'txn, KC, DC> {
+    ) -> RwRange<'txn> {
         RwRange {
             cursor,
             move_on_start: true,
             start_bound,
             end_bound,
-            _phantom: marker::PhantomData,
         }
     }
 
@@ -227,18 +185,8 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current<'a>(
-        &mut self,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<bool>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.put_current(&key_bytes, &data_bytes)
+    pub unsafe fn put_current<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<bool> {
+        self.cursor.put_current(key, data)
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -259,49 +207,13 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.append(&key_bytes, &data_bytes)
-    }
-
-    /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2> {
-        RwRange {
-            cursor: self.cursor,
-            move_on_start: self.move_on_start,
-            start_bound: self.start_bound,
-            end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
-        }
-    }
-
-    /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRange<'txn, KC2, DC> {
-        self.remap_types::<KC2, DC>()
-    }
-
-    /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRange<'txn, KC, DC2> {
-        self.remap_types::<KC, DC2>()
-    }
-
-    /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRange<'txn, KC, LazyDecode<DC>> {
-        self.remap_types::<KC, LazyDecode<DC>>()
+    pub unsafe fn append<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+        self.cursor.append(key, data)
     }
 }
 
-impl<'txn, KC, DC> Iterator for RwRange<'txn, KC, DC>
-where
-    KC: BytesDecode<'txn>,
-    DC: BytesDecode<'txn>,
-{
-    type Item = Result<(KC::DItem, DC::DItem)>;
+impl<'txn> Iterator for RwRange<'txn> {
+    type Item = Result<(&'txn [u8], &'txn [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_start {
@@ -320,10 +232,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -358,10 +267,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -372,62 +278,30 @@ where
     }
 }
 
-pub struct RoRevRange<'txn, KC, DC> {
+pub struct RoRevRange<'txn> {
     cursor: RoCursor<'txn>,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
+impl<'txn> RoRevRange<'txn> {
     pub(crate) fn new(
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RoRevRange<'txn, KC, DC> {
+    ) -> RoRevRange<'txn> {
         RoRevRange {
             cursor,
             move_on_end: true,
             start_bound,
             end_bound,
-            _phantom: marker::PhantomData,
         }
-    }
-
-    /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRevRange<'txn, KC2, DC2> {
-        RoRevRange {
-            cursor: self.cursor,
-            move_on_end: self.move_on_end,
-            start_bound: self.start_bound,
-            end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
-        }
-    }
-
-    /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRevRange<'txn, KC2, DC> {
-        self.remap_types::<KC2, DC>()
-    }
-
-    /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRevRange<'txn, KC, DC2> {
-        self.remap_types::<KC, DC2>()
-    }
-
-    /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRevRange<'txn, KC, LazyDecode<DC>> {
-        self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RoRevRange<'txn, KC, DC>
-where
-    KC: BytesDecode<'txn>,
-    DC: BytesDecode<'txn>,
-{
-    type Item = Result<(KC::DItem, DC::DItem)>;
+impl<'txn> Iterator for RoRevRange<'txn> {
+    type Item = Result<(&'txn [u8], &'txn [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_end {
@@ -446,10 +320,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -483,10 +354,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -497,26 +365,24 @@ where
     }
 }
 
-pub struct RwRevRange<'txn, KC, DC> {
+pub struct RwRevRange<'txn> {
     cursor: RwCursor<'txn>,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
 }
 
-impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
+impl<'txn> RwRevRange<'txn> {
     pub(crate) fn new(
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-    ) -> RwRevRange<'txn, KC, DC> {
+    ) -> RwRevRange<'txn> {
         RwRevRange {
             cursor,
             move_on_end: true,
             start_bound,
             end_bound,
-            _phantom: marker::PhantomData,
         }
     }
 
@@ -560,18 +426,8 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current<'a>(
-        &mut self,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<bool>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.put_current(&key_bytes, &data_bytes)
+    pub unsafe fn put_current<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<bool> {
+        self.cursor.put_current(key, data)
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -592,49 +448,13 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
-    where
-        KC: BytesEncode<'a>,
-        DC: BytesEncode<'a>,
-    {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
-        self.cursor.append(&key_bytes, &data_bytes)
-    }
-
-    /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRevRange<'txn, KC2, DC2> {
-        RwRevRange {
-            cursor: self.cursor,
-            move_on_end: self.move_on_end,
-            start_bound: self.start_bound,
-            end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
-        }
-    }
-
-    /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRevRange<'txn, KC2, DC> {
-        self.remap_types::<KC2, DC>()
-    }
-
-    /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRevRange<'txn, KC, DC2> {
-        self.remap_types::<KC, DC2>()
-    }
-
-    /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRevRange<'txn, KC, LazyDecode<DC>> {
-        self.remap_types::<KC, LazyDecode<DC>>()
+    pub unsafe fn append<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<()> {
+        self.cursor.append(key, data)
     }
 }
 
-impl<'txn, KC, DC> Iterator for RwRevRange<'txn, KC, DC>
-where
-    KC: BytesDecode<'txn>,
-    DC: BytesDecode<'txn>,
-{
-    type Item = Result<(KC::DItem, DC::DItem)>;
+impl<'txn> Iterator for RwRevRange<'txn> {
+    type Item = Result<(&'txn [u8], &'txn [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_end {
@@ -653,10 +473,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
@@ -690,10 +507,7 @@ where
                 };
 
                 if must_be_returned {
-                    match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
-                    }
+                    Some(Ok((key, data)))
                 } else {
                     None
                 }
