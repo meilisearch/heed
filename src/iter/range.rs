@@ -1,6 +1,5 @@
 use std::ops::Bound;
 
-use super::{advance_key, retreat_key};
 use crate::*;
 
 fn move_on_range_end<'txn>(
@@ -22,16 +21,15 @@ fn move_on_range_end<'txn>(
 
 fn move_on_range_start<'txn>(
     cursor: &mut RoCursor<'txn>,
-    start_bound: &mut Bound<Vec<u8>>,
+    start_bound: &Bound<Vec<u8>>,
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     match start_bound {
         Bound::Included(start) => cursor.move_on_key_greater_than_or_equal_to(start),
-        Bound::Excluded(start) => {
-            advance_key(start);
-            let result = cursor.move_on_key_greater_than_or_equal_to(start);
-            retreat_key(start);
-            result
-        }
+        Bound::Excluded(start) => match cursor.move_on_key_greater_than_or_equal_to(start)? {
+            Some((key, _)) if key == start => cursor.move_on_next(),
+            Some((key, val)) => Ok(Some((key, val))),
+            None => Ok(None),
+        },
         Bound::Unbounded => cursor.move_on_first(),
     }
 }

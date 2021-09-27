@@ -1,16 +1,16 @@
-use super::{advance_key, retreat_key};
+use super::advance_key;
 use crate::*;
 
-fn move_on_prefix_end<'txn>(
+fn move_on_last_prefix<'txn>(
     cursor: &mut RoCursor<'txn>,
-    prefix: &mut Vec<u8>,
+    prefix: Vec<u8>,
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-    advance_key(prefix);
-    let result = cursor
-        .move_on_key_greater_than_or_equal_to(prefix)
-        .and_then(|_| cursor.move_on_prev());
-    retreat_key(prefix);
-    result
+    match advance_key(prefix) {
+        Some(next_prefix) => cursor
+            .move_on_key_greater_than_or_equal_to(&next_prefix)
+            .and_then(|_| cursor.move_on_prev()),
+        None => cursor.move_on_last(),
+    }
 }
 
 pub struct RoPrefix<'txn> {
@@ -48,11 +48,11 @@ impl<'txn> Iterator for RoPrefix<'txn> {
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_last_prefix(&mut self.cursor, self.prefix.clone())
         } else {
             match (
                 self.cursor.current(),
-                move_on_prefix_end(&mut self.cursor, &mut self.prefix),
+                move_on_last_prefix(&mut self.cursor, self.prefix.clone()),
             ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
@@ -169,11 +169,11 @@ impl<'txn> Iterator for RwPrefix<'txn> {
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_last_prefix(&mut self.cursor, self.prefix.clone())
         } else {
             match (
                 self.cursor.current(),
-                move_on_prefix_end(&mut self.cursor, &mut self.prefix),
+                move_on_last_prefix(&mut self.cursor, self.prefix.clone()),
             ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
@@ -211,7 +211,7 @@ impl<'txn> Iterator for RoRevPrefix<'txn> {
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_last_prefix(&mut self.cursor, self.prefix.clone())
         } else {
             self.cursor.move_on_prev()
         };
@@ -333,7 +333,7 @@ impl<'txn> Iterator for RwRevPrefix<'txn> {
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_last_prefix(&mut self.cursor, self.prefix.clone())
         } else {
             self.cursor.move_on_prev()
         };

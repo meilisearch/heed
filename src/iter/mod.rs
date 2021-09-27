@@ -6,21 +6,17 @@ pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::prefix::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
 pub use self::range::{RoRange, RoRevRange, RwRange, RwRevRange};
 
-fn advance_key(bytes: &mut Vec<u8>) {
-    match bytes.last_mut() {
-        Some(&mut 255) | None => bytes.push(0),
-        Some(last) => *last += 1,
-    }
-}
-
-fn retreat_key(bytes: &mut Vec<u8>) {
-    match bytes.last_mut() {
-        Some(&mut 0) => {
+/// Returns a vector representing the key that is just **after** the one provided.
+fn advance_key(mut bytes: Vec<u8>) -> Option<Vec<u8>> {
+    while let Some(x) = bytes.last_mut() {
+        if let Some(y) = x.checked_add(1) {
+            *x = y;
+            return Some(bytes);
+        } else {
             bytes.pop();
         }
-        Some(last) => *last -= 1,
-        None => panic!("Vec is empty and must not be"),
     }
+    None
 }
 
 #[cfg(test)]
