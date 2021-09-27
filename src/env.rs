@@ -371,6 +371,7 @@ impl Env {
         Ok(file)
     }
 
+    /// Copy the environnement to the provided file descriptor.
     pub unsafe fn copy_to_fd(
         &self,
         fd: ffi::mdb_filehandle_t,
