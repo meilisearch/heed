@@ -51,8 +51,6 @@ mod iter;
 mod mdb;
 mod txn;
 
-pub use byteorder;
-
 use self::cursor::{RoCursor, RwCursor};
 pub use self::database::Database;
 pub use self::env::{env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvOpenOptions};
