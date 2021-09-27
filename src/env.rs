@@ -101,12 +101,11 @@ impl EnvOpenOptions {
         self
     }
 
-    /// Set one or more LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html).
+    /// Set one or more LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html>).
     /// ```
     /// use std::fs;
     /// use std::path::Path;
     /// use heed::{EnvOpenOptions, Database};
-    /// use heed::types::*;
     /// use heed::flags::Flags;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -119,14 +118,14 @@ impl EnvOpenOptions {
     /// let env = env_builder.open(Path::new("target").join("zerocopy.mdb"))?;
     ///
     /// // we will open the default unamed database
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+    /// let db = env.create_database(None)?;
     ///
     /// // opening a write transaction
     /// let mut wtxn = env.write_txn()?;
-    /// db.put(&mut wtxn, "seven", &7)?;
-    /// db.put(&mut wtxn, "zero", &0)?;
-    /// db.put(&mut wtxn, "five", &5)?;
-    /// db.put(&mut wtxn, "three", &3)?;
+    /// db.put(&mut wtxn, "seven", 7_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "zero", 0_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "five", 5_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "three", 3_i32.to_be_bytes())?;
     /// wtxn.commit()?;
     ///
     /// // Force the OS to flush the buffers (see Flags::MdbNoSync and Flags::MdbNoMetaSync).
@@ -137,10 +136,10 @@ impl EnvOpenOptions {
     /// let mut rtxn = env.read_txn()?;
     ///
     /// let ret = db.get(&rtxn, "zero")?;
-    /// assert_eq!(ret, Some(0));
+    /// assert_eq!(ret, Some(&0_i32.to_be_bytes()[..]));
     ///
     /// let ret = db.get(&rtxn, "five")?;
-    /// assert_eq!(ret, Some(5));
+    /// assert_eq!(ret, Some(&5_i32.to_be_bytes()[..]));
     /// # Ok(()) }
     /// ```
     pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
@@ -494,8 +493,14 @@ mod tests {
 
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.iter(&wtxn).unwrap();
-        assert_eq!(iter.next().transpose().unwrap(), Some((b"hello", b"hello")));
-        assert_eq!(iter.next().transpose().unwrap(), Some((b"world", b"world")));
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&b"hello"[..], &b"hello"[..]))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&b"world"[..], &b"world"[..]))
+        );
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
 

@@ -1,8 +1,6 @@
 //! Crate `heed` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
 //!
-//! It provides you a way to store types in LMDB without any limit and with a minimal overhead as possible,
-//! relying on the [zerocopy] library to avoid copying bytes when that's unnecessary and the serde library
-//! when this is unavoidable.
+//! It provides you a way to store types in LMDB without any limit and with a minimal overhead as possible.
 //!
 //! The Lightning Memory-Mapped Database (LMDB) directly maps files parts into main memory, combined
 //! with the zerocopy library allows us to safely zero-copy parse and serialize Rust types into LMDB.
@@ -18,21 +16,20 @@
 //! use std::fs;
 //! use std::path::Path;
 //! use heed::{EnvOpenOptions, Database};
-//! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
 //! let env = EnvOpenOptions::new().open(Path::new("target").join("zerocopy.mdb"))?;
 //!
 //! // we will open the default unamed database
-//! let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+//! let db = env.create_database(None)?;
 //!
 //! // opening a write transaction
 //! let mut wtxn = env.write_txn()?;
-//! db.put(&mut wtxn, "seven", &7)?;
-//! db.put(&mut wtxn, "zero", &0)?;
-//! db.put(&mut wtxn, "five", &5)?;
-//! db.put(&mut wtxn, "three", &3)?;
+//! db.put(&mut wtxn, "seven", 7_i32.to_be_bytes())?;
+//! db.put(&mut wtxn, "zero", 0_i32.to_be_bytes())?;
+//! db.put(&mut wtxn, "five", 5_i32.to_be_bytes())?;
+//! db.put(&mut wtxn, "three", 3_i32.to_be_bytes())?;
 //! wtxn.commit()?;
 //!
 //! // opening a read transaction
@@ -40,10 +37,10 @@
 //! let mut rtxn = env.read_txn()?;
 //!
 //! let ret = db.get(&rtxn, "zero")?;
-//! assert_eq!(ret, Some(0));
+//! assert_eq!(ret, Some(&0_i32.to_be_bytes()[..]));
 //!
 //! let ret = db.get(&rtxn, "five")?;
-//! assert_eq!(ret, Some(5));
+//! assert_eq!(ret, Some(&5_i32.to_be_bytes()[..]));
 //! # Ok(()) }
 //! ```
 

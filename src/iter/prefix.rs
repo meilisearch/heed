@@ -123,8 +123,12 @@ impl<'txn> RwPrefix<'txn> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<bool> {
-        self.cursor.put_current(key, data)
+    pub unsafe fn put_current<A, B>(&mut self, key: A, data: B) -> Result<bool>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
+        self.cursor.put_current(key.as_ref(), data.as_ref())
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -145,8 +149,12 @@ impl<'txn> RwPrefix<'txn> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<()> {
-        self.cursor.append(key, data)
+    pub unsafe fn append<A, B>(&mut self, key: A, data: B) -> Result<()>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
+        self.cursor.append(key.as_ref(), data.as_ref())
     }
 }
 
@@ -300,8 +308,12 @@ impl<'txn> RwRevPrefix<'txn> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<bool> {
-        self.cursor.put_current(key, data)
+    pub unsafe fn put_current<A, B>(&mut self, key: A, data: B) -> Result<bool>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
+        self.cursor.put_current(key.as_ref(), data.as_ref())
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -322,8 +334,12 @@ impl<'txn> RwRevPrefix<'txn> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a [u8], data: &'a [u8]) -> Result<()> {
-        self.cursor.append(key, data)
+    pub unsafe fn append<A, B>(&mut self, key: A, data: B) -> Result<()>
+    where
+        A: AsRef<[u8]>,
+        B: AsRef<[u8]>,
+    {
+        self.cursor.append(key.as_ref(), data.as_ref())
     }
 }
 

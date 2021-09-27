@@ -18,8 +18,6 @@ use crate::*;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
-/// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -27,22 +25,20 @@ use crate::*;
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-/// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database = env.create_poly_database(Some("big-endian-iter"))?;
+/// let db: Database = env.create_database(Some("big-endian-iter"))?;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put(&mut wtxn, 0_i32.to_be_bytes(), [])?;
+/// db.put(&mut wtxn, 35_i32.to_be_bytes(), "thirty five")?;
+/// db.put(&mut wtxn, 42_i32.to_be_bytes(), "forty two")?;
+/// db.put(&mut wtxn, 68_i32.to_be_bytes(), [])?;
 ///
 /// // you can iterate over database entries in order
-/// let range = BEI64::new(35)..=BEI64::new(42);
-/// let mut range = db.range::<_, OwnedType<BEI64>, Str, _>(&wtxn, &range)?;
-/// assert_eq!(range.next().transpose()?, Some((BEI64::new(35), "thirty five")));
-/// assert_eq!(range.next().transpose()?, Some((BEI64::new(42), "forty two")));
+/// let mut range = db.range(&wtxn, 35_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
+/// assert_eq!(range.next().transpose()?, Some((&35_i32.to_be_bytes()[..], &b"thirty five"[..])));
+/// assert_eq!(range.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"forty two"[..])));
 /// assert_eq!(range.next().transpose()?, None);
 ///
 /// drop(range);
@@ -61,8 +57,6 @@ use crate::*;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
-/// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -70,28 +64,28 @@ use crate::*;
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-/// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database = env.create_poly_database(Some("big-endian-iter"))?;
+/// let db: Database = env.create_database(Some("big-endian-iter"))?;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put(&mut wtxn, 0_i32.to_be_bytes(), [])?;
+/// db.put(&mut wtxn, 35_i32.to_be_bytes(), "thirty five")?;
+/// db.put(&mut wtxn, 42_i32.to_be_bytes(), "forty two")?;
+/// db.put(&mut wtxn, 68_i32.to_be_bytes(), [])?;
 ///
 /// // even delete a range of keys
-/// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted = db.delete_range::<_, OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+/// let deleted = db.delete_range(&mut wtxn, 35_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
 /// assert_eq!(deleted, 2);
 ///
-/// let rets: Result<_, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
+/// let rets: Vec<(_, _)> = rets?;
 ///
+/// let first = 0_i32.to_be_bytes();
+/// let second = 68_i32.to_be_bytes();
 /// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(68), ()),
+///     (&first[..], &[][..]),
+///     (&second[..], &[][..]),
 /// ];
 ///
 /// assert_eq!(deleted, 2);
@@ -120,7 +114,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -128,17 +121,17 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db = env.create_poly_database(Some("get-poly-i32"))?;
+    /// let db = env.create_database(Some("get-poly-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-forty-two", &42)?;
-    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-forty-two", 42_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", 27_i32.to_be_bytes())?;
     ///
-    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-forty-two")?;
-    /// assert_eq!(ret, Some(42));
+    /// let ret = db.get(&wtxn, "i-am-forty-two")?;
+    /// assert_eq!(ret, Some(&42_i32.to_be_bytes()[..]));
     ///
-    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-twenty-one")?;
+    /// let ret = db.get(&wtxn, "i-am-twenty-one")?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -185,8 +178,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -194,23 +185,22 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let db = env.create_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 43_i32.to_be_bytes(), [])?;
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than(&wtxn, 4404_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&43_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_lower_than(&wtxn, 43_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&42_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than(&wtxn, 27_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -239,8 +229,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -248,23 +236,22 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lte-u32"))?;
+    /// let db = env.create_database(Some("get-lte-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 43_i32.to_be_bytes(), [])?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, 4404_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&43_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, 43_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&43_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(26))?;
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, 26_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -297,8 +284,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -306,23 +291,22 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let db = env.create_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 43_i32.to_be_bytes(), [])?;
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than(&wtxn, 0_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&27_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_greater_than(&wtxn, 42_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&43_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than(&wtxn, 43_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -355,8 +339,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -364,23 +346,22 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let db = env.create_database(Some("get-lt-u32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), [])?;
+    /// db.put(&mut wtxn, 43_i32.to_be_bytes(), [])?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, 0_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&27_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, 42_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some((&42_i32.to_be_bytes()[..], &[][..])));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(44))?;
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, 44_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -407,8 +388,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -416,17 +395,16 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("first-poly-i32"))?;
+    /// let db = env.create_database(Some("first-poly-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.first::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// let ret = db.first(&wtxn)?;
+    /// assert_eq!(ret, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -448,8 +426,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -457,17 +433,16 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("last-i32"))?;
+    /// let db = env.create_database(Some("last-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.last::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let ret = db.last(&wtxn)?;
+    /// assert_eq!(ret, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -485,8 +460,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -494,21 +467,20 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
+    /// db.delete(&mut wtxn, 27_i32.to_be_bytes())?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -533,8 +505,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -542,16 +512,15 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
@@ -581,8 +550,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -590,20 +557,19 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let mut iter = db.iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -622,8 +588,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -631,35 +595,34 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// let mut iter = db.iter_mut(&mut wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
+    /// let ret = unsafe { iter.put_current(&42_i32.to_be_bytes()[..], &b"i-am-the-new-forty-two"[..])? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get(&wtxn, 13_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
-    /// assert_eq!(ret, Some("i-am-the-new-forty-two"));
+    /// let ret = db.get(&wtxn, 42_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some(&b"i-am-the-new-forty-two"[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -676,8 +639,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -685,20 +646,19 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// let mut iter = db.rev_iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -718,8 +678,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -727,35 +685,34 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let mut iter = db.rev_iter_mut(&mut wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")? };
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
+    /// let ret = unsafe { iter.put_current(&13_i32.to_be_bytes()[..], &b"i-am-the-new-thirteen"[..])? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&wtxn, &42_i32.to_be_bytes()[..])?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
-    /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
+    /// let ret = db.get(&wtxn, &13_i32.to_be_bytes()[..])?;
+    /// assert_eq!(ret, Some(&b"i-am-the-new-thirteen"[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -774,8 +731,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -783,21 +738,19 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut iter = db.range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let mut iter = db.range(&wtxn, 27_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -836,8 +789,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -845,34 +796,32 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// let mut range = db.range_mut(&mut wtxn, 27_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
+    /// assert_eq!(range.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(range.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
+    /// let ret = unsafe { range.put_current(&42_i32.to_be_bytes()[..], &b"i-am-the-new-forty-two"[..])? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-the-new-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// let mut iter = db.iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-the-new-forty-two"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&521_i32.to_be_bytes()[..], &b"i-am-five-hundred-and-twenty-one"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -911,8 +860,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -920,21 +867,19 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(43);
-    /// let mut iter = db.rev_range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// let mut iter = db.rev_range(&wtxn, 27_i32.to_be_bytes()..=43_i32.to_be_bytes())?;
+    /// assert_eq!(iter.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -973,8 +918,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -982,34 +925,32 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.rev_range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// let mut range = db.rev_range_mut(&mut wtxn, 27_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
+    /// assert_eq!(range.next().transpose()?, Some((&42_i32.to_be_bytes()[..], &b"i-am-forty-two"[..])));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")? };
+    /// assert_eq!(range.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-twenty-seven"[..])));
+    /// let ret = unsafe { range.put_current(27_i32.to_be_bytes(), "i-am-the-new-twenty-seven")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// let mut iter = db.iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&27_i32.to_be_bytes()[..], &b"i-am-the-new-twenty-seven"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&521_i32.to_be_bytes()[..], &b"i-am-five-hundred-and-twenty-one"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1052,8 +993,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1061,22 +1000,21 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", 28_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", 27_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine", 29_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-one", 41_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-two", 42_i32.to_be_bytes())?;
     ///
-    /// let mut iter = db.prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// let mut iter = db.prefix_iter(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-eight"[..], &28_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-nine"[..], &29_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-seven"[..], &27_i32.to_be_bytes()[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1102,8 +1040,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1111,37 +1047,36 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", 28_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", 27_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine", 29_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-one", 41_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-two", 42_i32.to_be_bytes())?;
     ///
-    /// let mut iter = db.prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// let mut iter = db.prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-eight"[..], &28_i32.to_be_bytes()[..])));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &BEI32::new(27000))? };
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-nine"[..], &29_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-seven"[..], &27_i32.to_be_bytes()[..])));
+    /// let ret = unsafe { iter.put_current(&b"i-am-twenty-seven"[..], &27000_i32.to_be_bytes()[..])? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
+    /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
-    /// assert_eq!(ret, Some(BEI32::new(27000)));
+    /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
+    /// assert_eq!(ret, Some(&27000_i32.to_be_bytes()[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1165,8 +1100,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1174,22 +1107,21 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", 28_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", 27_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine", 29_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-one", 41_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-two", 42_i32.to_be_bytes())?;
     ///
-    /// let mut iter = db.rev_prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// let mut iter = db.rev_prefix_iter(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-seven"[..], &27_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-nine"[..], &29_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-eight"[..], &28_i32.to_be_bytes()[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1216,8 +1148,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1225,37 +1155,36 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", 28_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", 27_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine", 29_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-one", 41_i32.to_be_bytes())?;
+    /// db.put(&mut wtxn, "i-am-forty-two", 42_i32.to_be_bytes())?;
     ///
-    /// let mut iter = db.rev_prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// let mut iter = db.rev_prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-seven"[..], &27_i32.to_be_bytes()[..])));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &BEI32::new(28000))? };
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-nine"[..], &29_i32.to_be_bytes()[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&b"i-am-twenty-eight"[..], &28_i32.to_be_bytes()[..])));
+    /// let ret = unsafe { iter.put_current(&b"i-am-twenty-eight"[..], &28000_i32.to_be_bytes()[..])? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
+    /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
-    /// assert_eq!(ret, Some(BEI32::new(28000)));
+    /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
+    /// assert_eq!(ret, Some(&28000_i32.to_be_bytes()[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1277,8 +1206,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1286,19 +1213,18 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
-    /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    /// let ret = db.get(&mut wtxn, 27_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some(&b"i-am-twenty-seven"[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1337,8 +1263,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1346,19 +1270,18 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("append-i32"))?;
+    /// let db = env.create_database(Some("append-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
-    /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    /// let ret = db.get(&mut wtxn, 27_i32.to_be_bytes())?;
+    /// assert_eq!(ret, Some(&b"i-am-twenty-seven"[..]));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1396,8 +1319,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1405,24 +1326,23 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.delete(&mut wtxn, 27_i32.to_be_bytes())?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get(&mut wtxn, 27_i32.to_be_bytes())?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(467))?;
+    /// let ret = db.delete(&mut wtxn, 467_i32.to_be_bytes())?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
@@ -1461,8 +1381,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1470,24 +1388,22 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let ret = db.delete_range::<_, OwnedType<BEI32>, _>(&mut wtxn, &range)?;
+    /// let ret = db.delete_range(&mut wtxn, 27_i32.to_be_bytes()..=42_i32.to_be_bytes())?;
     /// assert_eq!(ret, 2);
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// let mut iter = db.iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((&13_i32.to_be_bytes()[..], &b"i-am-thirteen"[..])));
+    /// assert_eq!(iter.next().transpose()?, Some((&521_i32.to_be_bytes()[..], &b"i-am-five-hundred-and-twenty-one"[..])));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1527,8 +1443,6 @@ impl Database {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
-    /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
@@ -1536,16 +1450,15 @@ impl Database {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let db = env.create_database(Some("iter-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, 42_i32.to_be_bytes(), "i-am-forty-two")?;
+    /// db.put(&mut wtxn, 27_i32.to_be_bytes(), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, 13_i32.to_be_bytes(), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, 521_i32.to_be_bytes(), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// db.clear(&mut wtxn)?;
     ///
