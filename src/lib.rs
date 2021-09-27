@@ -74,9 +74,6 @@ use std::{error, fmt, io, result};
 pub enum Error {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding,
-    Decoding,
-    InvalidDatabaseTyping,
     DatabaseClosing,
 }
 
@@ -85,11 +82,6 @@ impl fmt::Display for Error {
         match self {
             Error::Io(error) => write!(f, "{}", error),
             Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding => f.write_str("error while encoding"),
-            Error::Decoding => f.write_str("error while decoding"),
-            Error::InvalidDatabaseTyping => {
-                f.write_str("database was previously opened with different types")
-            }
             Error::DatabaseClosing => {
                 f.write_str("database is in a closing phase, you can't open it at the same time")
             }
