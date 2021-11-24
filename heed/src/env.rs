@@ -463,17 +463,20 @@ impl Env {
         &self.0.path
     }
 
-    /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
-    /// multiple threads can wait on this event.
+    /// Deregister the environment from the global environment table so that it can be closed later on,
+    /// when dropped.
+    ///
+    /// Returns `None` if the environment was already closed, or a `Some(EnvClosingEvent)` handle that can
+    /// be used to wait for the environment to be be closed from another thread.
     ///
     /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
     /// when all references are dropped, the last one will eventually close the environment.
-    pub fn prepare_for_closing(self) -> EnvClosingEvent {
+    pub fn prepare_for_closing(self) -> Option<EnvClosingEvent> {
         let mut lock = OPENED_ENV.write().unwrap();
         let env = lock.get_mut(&self.0.path);
 
         match env {
-            None => panic!("cannot find the env that we are trying to close"),
+            None => None,
             Some((env, signal_event)) => {
                 // We remove the env from the global list and replace it with a None.
                 let _env = env.take();
@@ -484,7 +487,7 @@ impl Env {
                 // global and we don't want to trigger a dead-lock.
                 drop(lock);
 
-                EnvClosingEvent(signal_event)
+                Some(EnvClosingEvent(signal_event))
             }
         }
     }
@@ -552,8 +555,7 @@ mod tests {
 
         wtxn.commit().unwrap();
 
-        let signal_event = env.prepare_for_closing();
-
+        let signal_event = env.prepare_for_closing().unwrap();
         eprintln!("waiting for the env to be closed");
         signal_event.wait();
         eprintln!("env closed successfully");
