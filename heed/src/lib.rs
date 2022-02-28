@@ -84,6 +84,7 @@ pub enum Error {
     Decoding,
     InvalidDatabaseTyping,
     DatabaseClosing,
+    BadOpenOptions,
 }
 
 impl fmt::Display for Error {
@@ -99,6 +100,7 @@ impl fmt::Display for Error {
             Error::DatabaseClosing => {
                 f.write_str("database is in a closing phase, you can't open it at the same time")
             },
+            Error::BadOpenOptions => f.write_str("An environment is already opened with different options."),
         }
     }
 }
