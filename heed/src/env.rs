@@ -424,7 +424,7 @@ impl Env {
 
     // TODO rename into `copy_to_file` for more clarity
     pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        let file = File::create(&path)?;
+        let file = File::options().create_new(true).write(true).open(&path)?;
         let fd = get_file_fd(&file);
 
         unsafe { self.copy_to_fd(fd, option)?; }
