@@ -24,7 +24,13 @@ use crate::mdb::ffi;
 /// noone tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, (Option<Env>, Arc<SignalEvent>)>>> = Lazy::new(RwLock::default);
+static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
+
+struct EnvEntry {
+    env: Option<Env>,
+    signal_event: Arc<SignalEvent>,
+    options: EnvOpenOptions,
+}
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -65,7 +71,7 @@ fn get_file_fd(file: &File) -> std::os::unix::io::RawFd {
     file.as_raw_fd()
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnvOpenOptions {
     map_size: Option<usize>,
@@ -152,7 +158,12 @@ impl EnvOpenOptions {
         let mut lock = OPENED_ENV.write().unwrap();
 
         match lock.entry(path) {
-            Entry::Occupied(entry) => entry.get().0.clone().ok_or(Error::DatabaseClosing),
+            Entry::Occupied(entry) => {
+                if &entry.get().options != self {
+                    return Err(Error::BadOpenOptions)
+                }
+                entry.get().env.clone().ok_or(Error::DatabaseClosing)
+            },
             Entry::Vacant(entry) => {
                 let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -205,7 +216,12 @@ impl EnvOpenOptions {
                                 path: path.clone(),
                             };
                             let env = Env(Arc::new(inner));
-                            entry.insert((Some(env.clone()), signal_event));
+                            let cache_entry = EnvEntry {
+                                env: Some(env.clone()),
+                                options: self.clone(),
+                                signal_event,
+                            };
+                            entry.insert(cache_entry);
                             Ok(env)
                         }
                         Err(e) => {
@@ -222,7 +238,7 @@ impl EnvOpenOptions {
 /// Returns a struct that allows to wait for the effective closing of an environment.
 pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
     let lock = OPENED_ENV.read().unwrap();
-    lock.get(path.as_ref()).map(|(_env, se)| EnvClosingEvent(se.clone()))
+    lock.get(path.as_ref()).map(|e| EnvClosingEvent(e.signal_event.clone()))
 }
 
 #[derive(Clone)]
@@ -244,7 +260,7 @@ impl Drop for EnvInner {
 
         match lock.remove(&self.path) {
             None => panic!("It seems another env closed this env before"),
-            Some((_, signal_event)) => {
+            Some(EnvEntry { signal_event, .. }) => {
                 unsafe { let _ = ffi::mdb_env_close(self.env); }
                 // We signal to all the waiters that we have closed the env.
                 signal_event.signal();
@@ -474,7 +490,7 @@ impl Env {
 
         match env {
             None => panic!("cannot find the env that we are trying to close"),
-            Some((env, signal_event)) => {
+            Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
                 let _env = env.take();
                 let signal_event = signal_event.clone();
@@ -514,20 +530,22 @@ impl EnvClosingEvent {
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::time::Duration;
+
+    use tempfile::tempdir;
+
+    use crate::{types::*, EnvOpenOptions};
+    use crate::env_closing_event;
+
     #[test]
     fn close_env() {
-        use std::{fs, thread};
-        use std::time::Duration;
-        use std::path::Path;
-        use crate::EnvOpenOptions;
-        use crate::types::*;
-        use crate::env_closing_event;
-
-        fs::create_dir_all(Path::new("target").join("close-env.mdb")).unwrap();
+        let dir = tempdir().unwrap();
+        let path = dir.path();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(Path::new("target").join("close-env.mdb")).unwrap();
+            .open(&path).unwrap();
 
         // Force a thread to keep the env for 1 second.
         let env_cloned = env.clone();
@@ -559,6 +577,21 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(Path::new("target").join("close-env.mdb")).is_none());
+        assert!(env_closing_event(&path).is_none());
+    }
+
+    #[test]
+    fn reopen_env_with_different_options_is_err() {
+        let dir = tempdir().unwrap();
+        let path = dir.path();
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&path).unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(12 * 1024 * 1024) // 10MB
+            .open(&path);
+
+        assert!(env.is_err());
     }
 }
