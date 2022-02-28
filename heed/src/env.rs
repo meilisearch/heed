@@ -24,9 +24,9 @@ use crate::mdb::ffi;
 /// noone tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvCacheEntry>>> = Lazy::new(RwLock::default);
+static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
 
-struct EnvCacheEntry {
+struct EnvEntry {
     env: Option<Env>,
     signal_event: Arc<SignalEvent>,
     options: EnvOpenOptions,
@@ -216,7 +216,7 @@ impl EnvOpenOptions {
                                 path: path.clone(),
                             };
                             let env = Env(Arc::new(inner));
-                            let cache_entry = EnvCacheEntry {
+                            let cache_entry = EnvEntry {
                                 env: Some(env.clone()),
                                 options: self.clone(),
                                 signal_event,
@@ -260,7 +260,7 @@ impl Drop for EnvInner {
 
         match lock.remove(&self.path) {
             None => panic!("It seems another env closed this env before"),
-            Some(EnvCacheEntry { signal_event, .. }) => {
+            Some(EnvEntry { signal_event, .. }) => {
                 unsafe { let _ = ffi::mdb_env_close(self.env); }
                 // We signal to all the waiters that we have closed the env.
                 signal_event.signal();
@@ -490,7 +490,7 @@ impl Env {
 
         match env {
             None => panic!("cannot find the env that we are trying to close"),
-            Some(EnvCacheEntry { env, signal_event, .. }) => {
+            Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
                 let _env = env.take();
                 let signal_event = signal_event.clone();
