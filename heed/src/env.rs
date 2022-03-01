@@ -464,16 +464,8 @@ impl Env {
         Ok(())
     }
 
-    #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
     pub fn force_sync(&self) -> Result<()> {
         unsafe { mdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
-
-        Ok(())
-    }
-
-    #[cfg(all(feature = "mdbx", not(feature = "lmdb")))]
-    pub fn force_sync(&self) -> Result<()> {
-        unsafe { mdb_result(ffi::mdb_env_sync(self.0.env))? }
 
         Ok(())
     }
