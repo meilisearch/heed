@@ -147,9 +147,6 @@ mod test {
     #[test]
     fn test_description() {
         assert_eq!("Permission denied", Error::from_err_code(13).to_string());
-        assert_eq!(
-            "MDB_NOTFOUND: No matching key/data pair found",
-            Error::NotFound.to_string()
-        );
+        assert_eq!("MDB_NOTFOUND: No matching key/data pair found", Error::NotFound.to_string());
     }
 }

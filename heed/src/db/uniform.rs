@@ -121,10 +121,7 @@ pub struct Database<KC, DC> {
 
 impl<KC, DC> Database<KC, DC> {
     pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC> {
-        Database {
-            dyndb: PolyDatabase::new(env_ident, dbi),
-            marker: std::marker::PhantomData,
-        }
+        Database { dyndb: PolyDatabase::new(env_ident, dbi), marker: std::marker::PhantomData }
     }
 
     /// Retrieve the sequence of a database.
@@ -412,8 +409,7 @@ impl<KC, DC> Database<KC, DC> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb
-            .get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -1603,10 +1599,7 @@ impl<KC, DC> Database<KC, DC> {
 
 impl<KC, DC> Clone for Database<KC, DC> {
     fn clone(&self) -> Database<KC, DC> {
-        Database {
-            dyndb: self.dyndb,
-            marker: marker::PhantomData,
-        }
+        Database { dyndb: self.dyndb, marker: marker::PhantomData }
     }
 }
 
