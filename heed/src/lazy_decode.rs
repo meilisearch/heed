@@ -1,5 +1,6 @@
 use std::marker;
-use crate::{Result, Error};
+
+use crate::{Error, Result};
 
 /// Lazily decode the data bytes, it can be used to avoid CPU intensive decoding
 /// before making sure we really need to decode it (e.g. based on the key).

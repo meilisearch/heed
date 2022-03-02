@@ -1,6 +1,7 @@
+use std::borrow::Cow;
+
 use heed_traits::{BytesDecode, BytesEncode};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 
 /// Describes a type that is [`Serialize`]/[`Deserialize`] and uses `bincode` to do so.
 ///

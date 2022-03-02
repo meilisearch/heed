@@ -1,6 +1,7 @@
-use crate::*;
 use std::borrow::Cow;
 use std::marker;
+
+use crate::*;
 
 pub struct RoIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
@@ -10,11 +11,7 @@ pub struct RoIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>) -> RoIter<'txn, KC, DC> {
-        RoIter {
-            cursor,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        }
+        RoIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -99,11 +96,7 @@ pub struct RwIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>) -> RwIter<'txn, KC, DC> {
-        RwIter {
-            cursor,
-            move_on_first: true,
-            _phantom: marker::PhantomData,
-        }
+        RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -270,11 +263,7 @@ pub struct RoRevIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RoRevIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RoCursor<'txn>) -> RoRevIter<'txn, KC, DC> {
-        RoRevIter {
-            cursor,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        }
+        RoRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -359,11 +348,7 @@ pub struct RwRevIter<'txn, KC, DC> {
 
 impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     pub(crate) fn new(cursor: RwCursor<'txn>) -> RwRevIter<'txn, KC, DC> {
-        RwRevIter {
-            cursor,
-            move_on_last: true,
-            _phantom: marker::PhantomData,
-        }
+        RwRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
     }
 
     /// Delete the entry the cursor is currently pointing to.

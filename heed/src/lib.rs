@@ -55,25 +55,24 @@ mod lazy_decode;
 mod mdb;
 mod txn;
 
-pub use byteorder;
-pub use heed_types as types;
-pub use zerocopy;
-use heed_traits as traits;
+use std::{error, fmt, io, result};
 
+use heed_traits as traits;
+pub use {byteorder, heed_types as types, zerocopy};
+
+use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase};
-pub use self::env::{CompactionOption, Env, EnvOpenOptions, env_closing_event, EnvClosingEvent};
-pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
-pub use self::iter::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
-pub use self::iter::{RoRange, RoRevRange, RwRange, RwRevRange};
-pub use self::lazy_decode::{LazyDecode, Lazy};
+pub use self::env::{env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvOpenOptions};
+pub use self::iter::{
+    RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
+    RwRevIter, RwRevPrefix, RwRevRange,
+};
+pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
+use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags;
 pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
-use self::cursor::{RoCursor, RwCursor};
-use self::mdb::ffi::{into_val, from_val};
-
-use std::{error, fmt, io, result};
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
@@ -96,11 +95,13 @@ impl fmt::Display for Error {
             Error::Decoding => f.write_str("error while decoding"),
             Error::InvalidDatabaseTyping => {
                 f.write_str("database was previously opened with different types")
-            },
+            }
             Error::DatabaseClosing => {
                 f.write_str("database is in a closing phase, you can't open it at the same time")
-            },
-            Error::BadOpenOptions => f.write_str("an environment is already opened with different options"),
+            }
+            Error::BadOpenOptions => {
+                f.write_str("an environment is already opened with different options")
+            }
         }
     }
 }

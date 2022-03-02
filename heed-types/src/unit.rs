@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+
 use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes the `()` type.
