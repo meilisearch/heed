@@ -37,6 +37,36 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     pub fn lazily_decode_data(self) -> RoIter<'txn, KC, LazyDecode<DC>> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
+
+    /// Move the iterator to the provided key, and return the value if it exists.
+    ///
+    /// If the key doesn't exist, the cursor is moved close to where the requested key would have been.
+    pub fn move_on_key(&mut self, key: &'txn KC::EItem) -> Result<Option<DC::DItem>>
+    where
+        KC: BytesEncode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        let key = KC::bytes_encode(key).ok_or(Error::Encoding)?;
+        match self.cursor.move_on_key(&key)? {
+            Some((_, value)) => DC::bytes_decode(value).ok_or(Error::Decoding).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// Return the key/value pair for the current cursor position.
+    pub fn current(&mut self) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        match self.cursor.current()? {
+            Some((k, v)) => Ok(Some((
+                KC::bytes_decode(k).ok_or(Error::Decoding)?,
+                DC::bytes_decode(v).ok_or(Error::Decoding)?,
+            ))),
+            None => Ok(None),
+        }
+    }
 }
 
 impl<'txn, KC, DC> Iterator for RoIter<'txn, KC, DC>
@@ -203,6 +233,36 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     /// Wrap the data bytes into a lazy decoder.
     pub fn lazily_decode_data(self) -> RwIter<'txn, KC, LazyDecode<DC>> {
         self.remap_types::<KC, LazyDecode<DC>>()
+    }
+
+    /// Move the iterator to the provided key, and return the value if it exists.
+    ///
+    /// If the key doesn't exist, the cursor is moved close to where the requested key would have been.
+    pub fn move_on_key(&mut self, key: &'txn KC::EItem) -> Result<Option<DC::DItem>>
+    where
+        KC: BytesEncode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        let key = KC::bytes_encode(key).ok_or(Error::Encoding)?;
+        match self.cursor.move_on_key(&key)? {
+            Some((_, value)) => DC::bytes_decode(value).ok_or(Error::Decoding).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// Return the key/value pair for the current cursor position.
+    pub fn current(&mut self) -> Result<Option<(KC::DItem, DC::DItem)>>
+    where
+        KC: BytesDecode<'txn>,
+        DC: BytesDecode<'txn>,
+    {
+        match self.cursor.current()? {
+            Some((k, v)) => Ok(Some((
+                KC::bytes_decode(k).ok_or(Error::Decoding)?,
+                DC::bytes_decode(v).ok_or(Error::Decoding)?,
+            ))),
+            None => Ok(None),
+        }
     }
 }
 
