@@ -235,12 +235,27 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 
+    /// Insert a new value in the database using the cursor, and returns whether the value was
+    /// sucessfully written.
+    ///
+    /// On success, the cursor is moved to the newly inserted value.
+    pub unsafe fn put<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        let key = KC::bytes_encode(key).ok_or(Error::Encoding)?;
+        let data = DC::bytes_encode(data).ok_or(Error::Encoding)?;
+
+        self.cursor.put(&key, &data)
+    }
+
     /// Move the iterator to the provided key, and return the value if it exists.
     ///
     /// If the key doesn't exist, the cursor is moved close to where the requested key would have been.
-    pub fn move_on_key(&mut self, key: &'txn KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn move_on_key<'a>(&mut self, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
-        KC: BytesEncode<'txn>,
+        KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
         let key = KC::bytes_encode(key).ok_or(Error::Encoding)?;

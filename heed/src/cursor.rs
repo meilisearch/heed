@@ -94,7 +94,7 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_key(&mut self, key: &[u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_key<'a>(&mut self, key: &'a [u8]) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = unsafe { crate::into_val(&key) };
         let mut data_val = mem::MaybeUninit::uninit();
 
@@ -271,6 +271,39 @@ impl<'txn> RwCursor<'txn> {
             &mut data_val,
             ffi::MDB_CURRENT,
         ));
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Insert the given key/value pair into the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
+        let mut key_val = crate::into_val(&key);
+        let mut data_val = crate::into_val(&data);
+
+        // Modify the pointed data
+        let result =
+            mdb_result(ffi::mdb_cursor_put(self.cursor.cursor, &mut key_val, &mut data_val, 0));
 
         match result {
             Ok(()) => Ok(true),
