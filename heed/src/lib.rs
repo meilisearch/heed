@@ -71,7 +71,7 @@ pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags;
-pub use self::traits::{BytesDecode, BytesEncode};
+pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 
 /// An error that encapsulates all possible errors in this crate.
@@ -79,8 +79,8 @@ pub use self::txn::{RoTxn, RwTxn};
 pub enum Error {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding,
-    Decoding,
+    Encoding(BoxedError),
+    Decoding(BoxedError),
     InvalidDatabaseTyping,
     DatabaseClosing,
     BadOpenOptions,
@@ -91,8 +91,8 @@ impl fmt::Display for Error {
         match self {
             Error::Io(error) => write!(f, "{}", error),
             Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding => f.write_str("error while encoding"),
-            Error::Decoding => f.write_str("error while decoding"),
+            Error::Encoding(error) => write!(f, "error while encoding: {}", error),
+            Error::Decoding(error) => write!(f, "error while decoding: {}", error),
             Error::InvalidDatabaseTyping => {
                 f.write_str("database was previously opened with different types")
             }

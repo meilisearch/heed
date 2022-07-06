@@ -1,6 +1,6 @@
 use std::marker;
 
-use crate::{Error, Result};
+use heed_traits::BoxedError;
 
 /// Lazily decode the data bytes, it can be used to avoid CPU intensive decoding
 /// before making sure we really need to decode it (e.g. based on the key).
@@ -10,8 +10,8 @@ pub struct LazyDecode<C>(marker::PhantomData<C>);
 impl<'a, C: 'static> heed_traits::BytesDecode<'a> for LazyDecode<C> {
     type DItem = Lazy<'a, C>;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        Some(Lazy { data: bytes, _phantom: marker::PhantomData })
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
+        Ok(Lazy { data: bytes, _phantom: marker::PhantomData })
     }
 }
 
@@ -23,7 +23,7 @@ pub struct Lazy<'a, C> {
 }
 
 impl<'a, C: heed_traits::BytesDecode<'a>> Lazy<'a, C> {
-    pub fn decode(&self) -> Result<C::DItem> {
-        C::bytes_decode(self.data).ok_or(Error::Decoding)
+    pub fn decode(&self) -> Result<C::DItem, BoxedError> {
+        C::bytes_decode(self.data)
     }
 }

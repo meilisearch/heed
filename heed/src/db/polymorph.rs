@@ -157,7 +157,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = mem::MaybeUninit::uninit();
@@ -169,7 +169,7 @@ impl PolyDatabase {
         match result {
             Ok(()) => {
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).ok_or(Error::Decoding)?;
+                let data = DC::bytes_decode(data).map_err(Error::Decoding)?;
                 Ok(Some(data))
             }
             Err(e) if e.not_found() => Ok(None),
@@ -232,13 +232,13 @@ impl PolyDatabase {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         cursor.move_on_key_greater_than_or_equal_to(&key_bytes)?;
 
         match cursor.move_on_prev() {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -300,7 +300,7 @@ impl PolyDatabase {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let result = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
             Ok(Some((key, data))) if key == &key_bytes[..] => Ok(Some((key, data))),
             Ok(_) => cursor.move_on_prev(),
@@ -309,8 +309,8 @@ impl PolyDatabase {
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -372,7 +372,7 @@ impl PolyDatabase {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let entry = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes)? {
             Some((key, data)) if key > &key_bytes[..] => Some((key, data)),
             Some((_key, _data)) => cursor.move_on_next()?,
@@ -381,8 +381,8 @@ impl PolyDatabase {
 
         match entry {
             Some((key, data)) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             None => Ok(None),
         }
@@ -443,11 +443,11 @@ impl PolyDatabase {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -499,8 +499,8 @@ impl PolyDatabase {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_first() {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -552,8 +552,8 @@ impl PolyDatabase {
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_last() {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Ok(Some((key, data))),
-                (_, _) => Err(Error::Decoding),
+                (Ok(key), Ok(data)) => Ok(Some((key, data))),
+                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -912,11 +912,11 @@ impl PolyDatabase {
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -924,11 +924,11 @@ impl PolyDatabase {
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1003,11 +1003,11 @@ impl PolyDatabase {
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1015,11 +1015,11 @@ impl PolyDatabase {
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1081,11 +1081,11 @@ impl PolyDatabase {
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1093,11 +1093,11 @@ impl PolyDatabase {
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1172,11 +1172,11 @@ impl PolyDatabase {
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1184,11 +1184,11 @@ impl PolyDatabase {
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Included(bytes.into_owned())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).ok_or(Error::Encoding)?;
+                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
                 Bound::Excluded(bytes.into_owned())
             }
             Bound::Unbounded => Bound::Unbounded,
@@ -1248,7 +1248,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
         RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
@@ -1317,7 +1317,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
         RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
@@ -1373,7 +1373,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
@@ -1442,7 +1442,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let prefix_bytes = KC::bytes_encode(prefix).ok_or(Error::Encoding)?;
+        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
@@ -1492,8 +1492,8 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
@@ -1554,8 +1554,8 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
@@ -1615,7 +1615,7 @@ impl PolyDatabase {
     {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {

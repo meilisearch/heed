@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use bytemuck::{bytes_of, AnyBitPattern, NoUninit};
-use heed_traits::{BytesDecode, BytesEncode};
+use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
 use crate::CowType;
 
@@ -29,15 +29,15 @@ pub struct OwnedType<T>(std::marker::PhantomData<T>);
 impl<'a, T: NoUninit> BytesEncode<'a> for OwnedType<T> {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        Some(Cow::Borrowed(bytes_of(item)))
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+        Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
 
 impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for OwnedType<T> {
     type DItem = T;
 
-    fn bytes_decode(bytes: &[u8]) -> Option<Self::DItem> {
+    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, BoxedError> {
         CowType::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }

@@ -56,8 +56,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -79,8 +79,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -148,8 +148,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -176,8 +176,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -223,8 +223,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -246,8 +246,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -308,8 +308,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -331,8 +331,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -400,8 +400,8 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -414,8 +414,8 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -461,8 +461,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -484,8 +484,8 @@ where
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                (Some(key), Some(data)) => Some(Ok((key, data))),
-                (_, _) => Some(Err(Error::Decoding)),
+                (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
             },
             Ok(None) => None,
             Err(e) => Some(Err(e)),
