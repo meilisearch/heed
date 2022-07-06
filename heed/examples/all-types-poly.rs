@@ -25,8 +25,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db = env.create_poly_database(Some("kikou"))?;
 
     let mut wtxn = env.write_txn()?;
-    db.put::<_, OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
-    let ret = db.get::<_, OwnedType<[i32; 2]>, Str>(&wtxn, &[2, 3])?;
+    db.put::<OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
+    let ret = db.get::<OwnedType<[i32; 2]>, Str>(&wtxn, &[2, 3])?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
@@ -35,8 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db = env.create_poly_database(Some("kiki"))?;
 
     let mut wtxn = env.write_txn()?;
-    db.put::<_, Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
-    let ret = db.get::<_, Str, ByteSlice>(&wtxn, "hello")?;
+    db.put::<Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
+    let ret = db.get::<Str, ByteSlice>(&wtxn, "hello")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
@@ -52,15 +52,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
 
     let hello = Hello { string: "hi" };
-    db.put::<_, Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
+    db.put::<Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
 
-    let ret = db.get::<_, Str, SerdeBincode<Hello>>(&wtxn, "hello")?;
+    let ret = db.get::<Str, SerdeBincode<Hello>>(&wtxn, "hello")?;
     println!("serde-bincode:\t{:?}", ret);
 
     let hello = Hello { string: "hi" };
-    db.put::<_, Str, SerdeJson<Hello>>(&mut wtxn, "hello", &hello)?;
+    db.put::<Str, SerdeJson<Hello>>(&mut wtxn, "hello", &hello)?;
 
-    let ret = db.get::<_, Str, SerdeJson<Hello>>(&wtxn, "hello")?;
+    let ret = db.get::<Str, SerdeJson<Hello>>(&wtxn, "hello")?;
     println!("serde-json:\t{:?}", ret);
 
     wtxn.commit()?;
@@ -76,9 +76,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
 
     let zerobytes = ZeroBytes { bytes: [24; 12] };
-    db.put::<_, Str, UnalignedType<ZeroBytes>>(&mut wtxn, "zero", &zerobytes)?;
+    db.put::<Str, UnalignedType<ZeroBytes>>(&mut wtxn, "zero", &zerobytes)?;
 
-    let ret = db.get::<_, Str, UnalignedType<ZeroBytes>>(&wtxn, "zero")?;
+    let ret = db.get::<Str, UnalignedType<ZeroBytes>>(&wtxn, "zero")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
@@ -87,12 +87,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db = env.create_poly_database(Some("ignored-data"))?;
 
     let mut wtxn = env.write_txn()?;
-    db.put::<_, Str, Unit>(&mut wtxn, "hello", &())?;
-    let ret = db.get::<_, Str, Unit>(&wtxn, "hello")?;
+    db.put::<Str, Unit>(&mut wtxn, "hello", &())?;
+    let ret = db.get::<Str, Unit>(&wtxn, "hello")?;
 
     println!("{:?}", ret);
 
-    let ret = db.get::<_, Str, Unit>(&wtxn, "non-existant")?;
+    let ret = db.get::<Str, Unit>(&wtxn, "non-existant")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
@@ -117,27 +117,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db = env.create_poly_database(Some("big-endian-iter"))?;
 
     let mut wtxn = env.write_txn()?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(35), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(42), &())?;
+    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(35), &())?;
+    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(42), &())?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
 
     println!("{:?}", rets);
 
     // or iterate over ranges too!!!
     let range = BEI64::new(35)..=BEI64::new(42);
     let rets: Result<Vec<(BEI64, _)>, _> =
-        db.range::<_, OwnedType<BEI64>, Unit, _>(&wtxn, &range)?.collect();
+        db.range::<OwnedType<BEI64>, Unit, _>(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
     // delete a range of key
     let range = BEI64::new(35)..=BEI64::new(42);
-    let deleted: usize = db.delete_range::<_, OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+    let deleted: usize = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, &range)?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;

@@ -157,16 +157,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T>(
-        &self,
-        txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get::<T, KC, DC>(txn, key)
+        self.dyndb.get::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair lower than the given one in this database.
@@ -212,16 +208,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn, T>(
+    pub fn get_lower_than<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than::<T, KC, DC>(txn, key)
+        self.dyndb.get_lower_than::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair lower than or equal to the given one in this database.
@@ -267,16 +263,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_lower_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than_or_equal_to::<T, KC, DC>(txn, key)
+        self.dyndb.get_lower_than_or_equal_to::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair greater than the given one in this database.
@@ -322,16 +318,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn, T>(
+    pub fn get_greater_than<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair greater than or equal to the given one in this database.
@@ -377,16 +373,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_greater_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than_or_equal_to::<KC, DC>(txn, key)
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -424,12 +420,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.first::<T, KC, DC>(txn)
+        self.dyndb.first::<KC, DC>(txn)
     }
 
     /// Retrieves the last key/value pair of this database.
@@ -467,12 +463,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.last::<T, KC, DC>(txn)
+        self.dyndb.last::<KC, DC>(txn)
     }
 
     /// Returns the number of elements in this database.
@@ -513,7 +509,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
         self.dyndb.len(txn)
     }
 
@@ -555,7 +551,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
         self.dyndb.is_empty(txn)
     }
 
@@ -595,8 +591,8 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
-        self.dyndb.iter::<T, KC, DC>(txn)
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
+        self.dyndb.iter::<KC, DC>(txn)
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -648,8 +644,8 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
-        self.dyndb.iter_mut::<T, KC, DC>(txn)
+    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+        self.dyndb.iter_mut::<KC, DC>(txn)
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
@@ -688,8 +684,8 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter::<T, KC, DC>(txn)
+    pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
+        self.dyndb.rev_iter::<KC, DC>(txn)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value\
@@ -742,11 +738,8 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-    ) -> Result<RwRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter_mut::<T, KC, DC>(txn)
+    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
+        self.dyndb.rev_iter_mut::<KC, DC>(txn)
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -788,16 +781,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, T, R>(
+    pub fn range<'a, 'txn, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range::<T, KC, DC, R>(txn, range)
+        self.dyndb.range::<KC, DC, R>(txn, range)
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -853,16 +846,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, T, R>(
+    pub fn range_mut<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range_mut::<T, KC, DC, R>(txn, range)
+        self.dyndb.range_mut::<KC, DC, R>(txn, range)
     }
 
     /// Return a reversed lexicographically ordered iterator of a range of key-value
@@ -905,16 +898,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, T, R>(
+    pub fn rev_range<'a, 'txn, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRevRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range::<T, KC, DC, R>(txn, range)
+        self.dyndb.rev_range::<KC, DC, R>(txn, range)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of a range of
@@ -970,16 +963,16 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, T, R>(
+    pub fn rev_range_mut<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRevRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range_mut::<T, KC, DC, R>(txn, range)
+        self.dyndb.rev_range_mut::<KC, DC, R>(txn, range)
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1023,15 +1016,15 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn, T>(
+    pub fn prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter::<T, KC, DC>(txn, prefix)
+        self.dyndb.prefix_iter::<KC, DC>(txn, prefix)
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1088,15 +1081,15 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn, T>(
+    pub fn prefix_iter_mut<'a, 'txn>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        self.dyndb.prefix_iter_mut::<KC, DC>(txn, prefix)
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1140,15 +1133,15 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn, T>(
+    pub fn rev_prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoRevPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter::<T, KC, DC>(txn, prefix)
+        self.dyndb.rev_prefix_iter::<KC, DC>(txn, prefix)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
@@ -1205,15 +1198,15 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn, T>(
+    pub fn rev_prefix_iter_mut<'a, 'txn>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwRevPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        self.dyndb.rev_prefix_iter_mut::<KC, DC>(txn, prefix)
     }
 
     /// Insert a key-value pairs in this database.
@@ -1249,17 +1242,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
+    pub fn put<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.put::<T, KC, DC>(txn, key, data)
+        self.dyndb.put::<KC, DC>(txn, key, data)
     }
 
     /// Append the given key/data pair to the end of the database.
@@ -1298,17 +1286,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
+    pub fn append<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.append::<T, KC, DC>(txn, key, data)
+        self.dyndb.append::<KC, DC>(txn, key, data)
     }
 
     /// Deletes a key-value pairs in this database.
@@ -1352,11 +1335,11 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.delete::<T, KC>(txn, key)
+        self.dyndb.delete::<KC>(txn, key)
     }
 
     /// Deletes a range of key-value pairs in this database.
@@ -1407,16 +1390,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, R>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<usize>
+    pub fn delete_range<'a, 'txn, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.delete_range::<T, KC, R>(txn, range)
+        self.dyndb.delete_range::<KC, R>(txn, range)
     }
 
     /// Deletes all key/value pairs in this database.
@@ -1459,7 +1438,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
+    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         self.dyndb.clear(txn)
     }
 
@@ -1563,7 +1542,7 @@ impl<KC, DC> Database<KC, DC> {
     /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// // Check if a key exists and skip potentially expensive deserializing
-    /// let ret = db.as_polymorph().get::<_, OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.as_polymorph().get::<OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
     /// assert!(ret.is_some());
     ///
     /// wtxn.commit()?;

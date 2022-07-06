@@ -35,14 +35,14 @@ use crate::*;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
 ///
 /// // you can iterate over database entries in order
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let mut range = db.range::<_, OwnedType<BEI64>, Str, _>(&wtxn, &range)?;
+/// let mut range = db.range::<OwnedType<BEI64>, Str, _>(&wtxn, &range)?;
 /// assert_eq!(range.next().transpose()?, Some((BEI64::new(35), "thirty five")));
 /// assert_eq!(range.next().transpose()?, Some((BEI64::new(42), "forty two")));
 /// assert_eq!(range.next().transpose()?, None);
@@ -78,17 +78,17 @@ use crate::*;
 ///
 /// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
-/// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
-/// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
+/// db.put::<OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(42), "forty two")?;
+/// db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
 ///
 /// // even delete a range of keys
 /// let range = BEI64::new(35)..=BEI64::new(42);
-/// let deleted = db.delete_range::<_, OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+/// let deleted = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, &range)?;
 /// assert_eq!(deleted, 2);
 ///
-/// let rets: Result<_, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+/// let rets: Result<_, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
 /// let rets: Vec<(BEI64, _)> = rets?;
 ///
 /// let expected = vec![
@@ -134,21 +134,21 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-forty-two", &42)?;
-    /// db.put::<_, Str, OwnedType<i32>>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, OwnedType<i32>>(&mut wtxn, "i-am-forty-two", &42)?;
+    /// db.put::<Str, OwnedType<i32>>(&mut wtxn, "i-am-twenty-seven", &27)?;
     ///
-    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-forty-two")?;
+    /// let ret = db.get::<Str, OwnedType<i32>>(&wtxn, "i-am-forty-two")?;
     /// assert_eq!(ret, Some(42));
     ///
-    /// let ret = db.get::<_, Str, OwnedType<i32>>(&wtxn, "i-am-twenty-one")?;
+    /// let ret = db.get::<Str, OwnedType<i32>>(&wtxn, "i-am-twenty-one")?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T, KC, DC>(
+    pub fn get<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<DC::DItem>>
     where
@@ -204,25 +204,25 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_lower_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(27))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn, T, KC, DC>(
+    pub fn get_lower_than<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -272,25 +272,25 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
+    /// let ret = db.get_lower_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(4404))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_lower_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(26))?;
+    /// let ret = db.get_lower_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(26))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn, T, KC, DC>(
+    pub fn get_lower_than_or_equal_to<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -344,25 +344,25 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(43), ())));
     ///
-    /// let ret = db.get_greater_than::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(43))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn, T, KC, DC>(
+    pub fn get_greater_than<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -415,25 +415,25 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put::<_, OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(27), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(42), &())?;
+    /// db.put::<OwnedType<BEU32>, Unit>(&mut wtxn, &BEU32::new(43), &())?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
+    /// let ret = db.get_greater_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(0))?;
     /// assert_eq!(ret, Some((BEU32::new(27), ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
+    /// let ret = db.get_greater_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(42))?;
     /// assert_eq!(ret, Some((BEU32::new(42), ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<_, OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(44))?;
+    /// let ret = db.get_greater_than_or_equal_to::<OwnedType<BEU32>, Unit>(&wtxn, &BEU32::new(44))?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn, T, KC, DC>(
+    pub fn get_greater_than_or_equal_to<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -480,19 +480,16 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.first::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let ret = db.first::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((BEI32::new(27), "i-am-twenty-seven")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T, KC, DC>(
-        &self,
-        txn: &'txn RoTxn<T>,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -536,19 +533,16 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
     ///
-    /// let ret = db.last::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let ret = db.last::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((BEI32::new(42), "i-am-forty-two")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T, KC, DC>(
-        &self,
-        txn: &'txn RoTxn<T>,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -588,15 +582,15 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
+    /// db.delete::<OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -604,7 +598,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
@@ -644,10 +638,10 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
@@ -660,7 +654,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
@@ -692,11 +686,11 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let mut iter = db.iter::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
@@ -706,7 +700,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T, KC, DC>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
+    pub fn iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
@@ -734,11 +728,11 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
+    /// let mut iter = db.iter_mut::<OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -752,19 +746,16 @@ impl PolyDatabase {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
     /// assert_eq!(ret, Some("i-am-the-new-forty-two"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T, KC, DC>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-    ) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, KC, DC>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -792,11 +783,11 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let mut iter = db.rev_iter::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
@@ -806,10 +797,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T, KC, DC>(
-        &self,
-        txn: &'txn RoTxn<T>,
-    ) -> Result<RoRevIter<'txn, KC, DC>> {
+    pub fn rev_iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
@@ -838,11 +826,11 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter_mut::<_, OwnedType<BEI32>, Str>(&mut wtxn)?;
+    /// let mut iter = db.rev_iter_mut::<OwnedType<BEI32>, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -856,18 +844,18 @@ impl PolyDatabase {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(42))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&wtxn, &BEI32::new(13))?;
     /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T, KC, DC>(
+    pub fn rev_iter_mut<'txn, KC, DC>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
     ) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
@@ -898,13 +886,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut iter = db.range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
+    /// let mut iter = db.range::<OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -913,9 +901,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, T, KC, DC, R>(
+    pub fn range<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
@@ -976,13 +964,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
+    /// let mut range = db.range_mut::<OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -994,7 +982,7 @@ impl PolyDatabase {
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let mut iter = db.iter::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-the-new-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
@@ -1004,9 +992,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, T, KC, DC, R>(
+    pub fn range_mut<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
@@ -1067,13 +1055,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(43);
-    /// let mut iter = db.rev_range::<_, OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
+    /// let mut iter = db.rev_range::<OwnedType<BEI32>, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1082,9 +1070,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, T, KC, DC, R>(
+    pub fn rev_range<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRevRange<'txn, KC, DC>>
     where
@@ -1145,13 +1133,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let mut range = db.rev_range_mut::<_, OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
+    /// let mut range = db.rev_range_mut::<OwnedType<BEI32>, Str, _>(&mut wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -1163,7 +1151,7 @@ impl PolyDatabase {
     /// drop(range);
     ///
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let mut iter = db.iter::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
@@ -1173,9 +1161,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, T, KC, DC, R>(
+    pub fn rev_range_mut<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRevRange<'txn, KC, DC>>
     where
@@ -1236,13 +1224,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
@@ -1252,9 +1240,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn, T, KC, DC>(
+    pub fn prefix_iter<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoPrefix<'txn, KC, DC>>
     where
@@ -1292,13 +1280,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter_mut::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1312,18 +1300,18 @@ impl PolyDatabase {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
+    /// let ret = db.get::<Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
+    /// let ret = db.get::<Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
     /// assert_eq!(ret, Some(BEI32::new(27000)));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn, T, KC, DC>(
+    pub fn prefix_iter_mut<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where
@@ -1361,13 +1349,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.rev_prefix_iter::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
@@ -1377,9 +1365,9 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn, T, KC, DC>(
+    pub fn rev_prefix_iter<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoRevPrefix<'txn, KC, DC>>
     where
@@ -1417,13 +1405,13 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
+    /// db.put::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
     ///
-    /// let mut iter = db.rev_prefix_iter_mut::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter_mut::<Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1437,18 +1425,18 @@ impl PolyDatabase {
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
+    /// let ret = db.get::<Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-seven")?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get::<_, Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
+    /// let ret = db.get::<Str, OwnedType<BEI32>>(&wtxn, "i-am-twenty-eight")?;
     /// assert_eq!(ret, Some(BEI32::new(28000)));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn, T, KC, DC>(
+    pub fn rev_prefix_iter_mut<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwRevPrefix<'txn, KC, DC>>
     where
@@ -1483,20 +1471,20 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T, KC, DC>(
+    pub fn put<'a, KC, DC>(
         &self,
-        txn: &mut RwTxn<T>,
+        txn: &mut RwTxn,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
     ) -> Result<()>
@@ -1545,20 +1533,20 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T, KC, DC>(
+    pub fn append<'a, KC, DC>(
         &self,
-        txn: &mut RwTxn<T>,
+        txn: &mut RwTxn,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
     ) -> Result<()>
@@ -1606,24 +1594,24 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.delete::<OwnedType<BEI32>>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27))?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete::<_, OwnedType<BEI32>>(&mut wtxn, &BEI32::new(467))?;
+    /// let ret = db.delete::<OwnedType<BEI32>>(&mut wtxn, &BEI32::new(467))?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T, KC>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a, KC>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
@@ -1672,16 +1660,16 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = BEI32::new(27)..=BEI32::new(42);
-    /// let ret = db.delete_range::<_, OwnedType<BEI32>, _>(&mut wtxn, &range)?;
+    /// let ret = db.delete_range::<OwnedType<BEI32>, _>(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
-    /// let mut iter = db.iter::<_, OwnedType<BEI32>, Str>(&wtxn)?;
+    /// let mut iter = db.iter::<OwnedType<BEI32>, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1690,11 +1678,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, KC, R>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<usize>
+    pub fn delete_range<'a, 'txn, KC, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -1702,7 +1686,7 @@ impl PolyDatabase {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         let mut count = 0;
-        let mut iter = self.range_mut::<T, KC, DecodeIgnore, _>(txn, range)?;
+        let mut iter = self.range_mut::<KC, DecodeIgnore, _>(txn, range)?;
 
         while iter.next().is_some() {
             // safety: We do not keep any reference from the database while using `del_current`.
@@ -1742,10 +1726,10 @@ impl PolyDatabase {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
     ///
     /// db.clear(&mut wtxn)?;
     ///
@@ -1755,7 +1739,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
+    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
 
         unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
