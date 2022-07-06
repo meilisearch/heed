@@ -14,18 +14,18 @@ This library is able to serialize all kind of types, not just bytes slices, even
 ## Example Usage
 
 ```rust
-fs::create_dir_all("target/heed.mdb")?;
-let env = EnvOpenOptions::new().open("target/heed.mdb")?;
+fs::create_dir_all("my-env.mdb")?;
+let env = EnvOpenOptions::new().max_dbs(10).open("my-env.mdb")?;
 
 // We open the default unamed database.
 // Specifying the type of the newly created database.
 // Here we specify that the key is an str and the value a simple integer.
-let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+let mut wtxn = env.write_txn()?;
+let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
 
 // We then open a write transaction and start writing into the database.
 // All of those puts are type checked at compile time,
 // therefore you cannot write an integer instead of a string.
-let mut wtxn = env.write_txn()?;
 db.put(&mut wtxn, "seven", &7)?;
 db.put(&mut wtxn, "zero", &0)?;
 db.put(&mut wtxn, "five", &5)?;
@@ -44,3 +44,19 @@ assert_eq!(ret, Some(5));
 ```
 
 You want to see more about all the possibilities? Go check out [the examples](heed/examples/).
+
+## Building from Source
+
+If you don't already have clone the repository you can use this command:
+
+```bash
+git clone --recursive https://github.com/meilisearch/heed.git
+cd heed
+cargo build
+```
+
+However, if you already cloned it and forgot about the initialising the submodules:
+
+```bash
+git submodule update --init
+```
