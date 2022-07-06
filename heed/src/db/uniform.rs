@@ -21,11 +21,11 @@ use crate::*;
 /// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+/// # let dir = tempfile::tempdir()?;
 /// # let env = EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+/// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
@@ -68,11 +68,11 @@ use crate::*;
 /// use heed::{zerocopy::I64, byteorder::BigEndian};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+/// # let dir = tempfile::tempdir()?;
 /// # let env = EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+/// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
@@ -136,11 +136,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(Some("get-i32"))?;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -185,11 +185,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
@@ -240,11 +240,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
@@ -295,11 +295,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
@@ -350,11 +350,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::U32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
@@ -404,11 +404,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("first-i32"))?;
@@ -447,11 +447,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("last-i32"))?;
@@ -486,11 +486,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -528,11 +528,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -570,11 +570,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -610,11 +610,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -663,11 +663,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -704,11 +704,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -762,11 +762,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -814,11 +814,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -879,11 +879,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -931,11 +931,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -996,11 +996,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
@@ -1048,11 +1048,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
@@ -1113,11 +1113,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
@@ -1165,11 +1165,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
@@ -1227,11 +1227,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -1276,11 +1276,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -1324,11 +1324,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -1377,11 +1377,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -1435,11 +1435,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
@@ -1482,11 +1482,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<Unit, Unit> = env.create_database(Some("iter-i32"))?;
@@ -1546,11 +1546,11 @@ impl<KC, DC> Database<KC, DC> {
     /// use heed::{zerocopy::I32, byteorder::BigEndian};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;

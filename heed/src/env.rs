@@ -102,7 +102,7 @@ impl EnvOpenOptions {
         self
     }
 
-    /// Set one or more LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html).
+    /// Set one or more LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html>).
     /// ```
     /// use std::fs;
     /// use std::path::Path;
@@ -117,7 +117,8 @@ impl EnvOpenOptions {
     ///     env_builder.flag(Flags::MdbNoTls);
     ///     env_builder.flag(Flags::MdbNoMetaSync);
     /// }
-    /// let env = env_builder.open(Path::new("target").join("zerocopy.mdb"))?;
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = env_builder.open(dir.path())?;
     ///
     /// // we will open the default unamed database
     /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
@@ -526,22 +527,19 @@ impl EnvClosingEvent {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
     use std::time::Duration;
-
-    use tempfile::tempdir;
+    use std::{fs, thread};
 
     use crate::types::*;
-    use crate::{env_closing_event, EnvOpenOptions};
+    use crate::{env_closing_event, EnvOpenOptions, Error};
 
     #[test]
     fn close_env() {
-        let dir = tempdir().unwrap();
-        let path = dir.path();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(&path)
+            .open(&dir.path())
             .unwrap();
 
         // Force a thread to keep the env for 1 second.
@@ -558,7 +556,6 @@ mod tests {
         db.put(&mut wtxn, "hello", "hello").unwrap();
         db.put(&mut wtxn, "world", "world").unwrap();
 
-        // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.iter(&wtxn).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some(("hello", "hello")));
         assert_eq!(iter.next().transpose().unwrap(), Some(("world", "world")));
@@ -574,22 +571,36 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&path).is_none());
+        assert!(env_closing_event(&dir.path()).is_none());
     }
 
     #[test]
     fn reopen_env_with_different_options_is_err() {
-        let dir = tempdir().unwrap();
-        let path = dir.path();
+        let dir = tempfile::tempdir().unwrap();
         let _env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&path)
+            .open(&dir.path())
             .unwrap();
 
-        let env = EnvOpenOptions::new()
-            .map_size(12 * 1024 * 1024) // 10MB
-            .open(&path);
+        let result = EnvOpenOptions::new()
+            .map_size(12 * 1024 * 1024) // 12MB
+            .open(&dir.path());
 
-        assert!(env.is_err());
+        assert!(matches!(result, Err(Error::BadOpenOptions)));
+    }
+
+    #[test]
+    fn open_env_with_named_path() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("babar.mdb")).unwrap();
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(dir.path().join("babar.mdb"))
+            .unwrap();
+
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(dir.path().join("babar.mdb"))
+            .unwrap();
     }
 }

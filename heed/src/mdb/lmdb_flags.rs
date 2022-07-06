@@ -1,17 +1,17 @@
-// LMDB flags (see http://www.lmdb.tech/doc/group__mdb__env.html for more details).
+use lmdb_master3_sys as ffi;
+
+// LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html> for more details).
 #[repr(u32)]
 pub enum Flags {
-    MdbFixedmap = lmdb_sys::MDB_FIXEDMAP,
-    MdbNoSubDir = lmdb_sys::MDB_NOSUBDIR,
-    MdbNoSync = lmdb_sys::MDB_NOSYNC,
-    MdbRdOnly = lmdb_sys::MDB_RDONLY,
-    MdbNoMetaSync = lmdb_sys::MDB_NOMETASYNC,
-    MdbWriteMap = lmdb_sys::MDB_WRITEMAP,
-    MdbMapAsync = lmdb_sys::MDB_MAPASYNC,
-    MdbNoTls = lmdb_sys::MDB_NOTLS,
-    MdbNoLock = lmdb_sys::MDB_NOLOCK,
-    MdbNoRdAhead = lmdb_sys::MDB_NORDAHEAD,
-    MdbNoMemInit = lmdb_sys::MDB_NOMEMINIT,
-    /// Always free single pages instead of keeping them in a list, for future reuse.
-    MdbAlwaysFreePages = lmdb_sys::MDB_ALWAYSFREEPAGES,
+    MdbFixedmap = ffi::MDB_FIXEDMAP,
+    MdbNoSubDir = ffi::MDB_NOSUBDIR,
+    MdbNoSync = ffi::MDB_NOSYNC,
+    MdbRdOnly = ffi::MDB_RDONLY,
+    MdbNoMetaSync = ffi::MDB_NOMETASYNC,
+    MdbWriteMap = ffi::MDB_WRITEMAP,
+    MdbMapAsync = ffi::MDB_MAPASYNC,
+    MdbNoTls = ffi::MDB_NOTLS,
+    MdbNoLock = ffi::MDB_NOLOCK,
+    MdbNoRdAhead = ffi::MDB_NORDAHEAD,
+    MdbNoMemInit = ffi::MDB_NOMEMINIT,
 }

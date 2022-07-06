@@ -21,8 +21,8 @@
 //! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
-//! let env = EnvOpenOptions::new().open(Path::new("target").join("zerocopy.mdb"))?;
+//! let dir = tempfile::tempdir()?;
+//! let env = EnvOpenOptions::new().open(dir.path())?;
 //!
 //! // we will open the default unamed database
 //! let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;

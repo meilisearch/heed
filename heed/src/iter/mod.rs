@@ -27,17 +27,14 @@ fn retreat_key(bytes: &mut Vec<u8>) {
 mod tests {
     #[test]
     fn prefix_iter_with_byte_255() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::types::*;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("prefix_iter_with_byte_255.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("prefix_iter_with_byte_255.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<ByteSlice, Str>(None).unwrap();
 
@@ -66,19 +63,16 @@ mod tests {
 
     #[test]
     fn iter_last() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::byteorder::BigEndian;
         use crate::types::*;
         use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("iter_last.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
         type BEI32 = I32<BigEndian>;
@@ -134,19 +128,16 @@ mod tests {
 
     #[test]
     fn range_iter_last() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::byteorder::BigEndian;
         use crate::types::*;
         use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("iter_last.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("iter_last.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
         type BEI32 = I32<BigEndian>;
@@ -226,17 +217,14 @@ mod tests {
 
     #[test]
     fn prefix_iter_last() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::types::*;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("prefix_iter_last.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
 
@@ -301,17 +289,14 @@ mod tests {
 
     #[test]
     fn rev_prefix_iter_last() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::types::*;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("prefix_iter_last.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("prefix_iter_last.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
 
@@ -376,19 +361,16 @@ mod tests {
 
     #[test]
     fn rev_range_iter_last() {
-        use std::fs;
-        use std::path::Path;
-
         use crate::byteorder::BigEndian;
         use crate::types::*;
         use crate::zerocopy::I32;
         use crate::EnvOpenOptions;
 
-        fs::create_dir_all(Path::new("target").join("range_iter_last.mdb")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3000)
-            .open(Path::new("target").join("range_iter_last.mdb"))
+            .open(dir.path())
             .unwrap();
         let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
         type BEI32 = I32<BigEndian>;
