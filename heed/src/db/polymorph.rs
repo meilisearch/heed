@@ -596,24 +596,22 @@ impl PolyDatabase {
     /// assert_eq!(ret, 3);
     ///
     /// wtxn.commit()?;
+    ///
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
         assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let mut count = 0;
+        let mut db_stat = mem::MaybeUninit::uninit();
+        let result = unsafe { mdb_result(ffi::mdb_stat(txn.txn, self.dbi, db_stat.as_mut_ptr())) };
 
-        match cursor.move_on_first()? {
-            Some(_) => count += 1,
-            None => return Ok(0),
+        match result {
+            Ok(()) => {
+                let stats = unsafe { db_stat.assume_init() };
+                Ok(stats.ms_entries as u64)
+            }
+            Err(e) => Err(e.into()),
         }
-
-        while let Some(_) = cursor.move_on_next()? {
-            count += 1;
-        }
-
-        Ok(count)
     }
 
     /// Returns `true` if and only if this database is empty.

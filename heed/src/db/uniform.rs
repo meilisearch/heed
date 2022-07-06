@@ -509,7 +509,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
         self.dyndb.len(txn)
     }
 
