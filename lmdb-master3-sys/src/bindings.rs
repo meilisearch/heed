@@ -2,7 +2,7 @@
 
 pub const MDB_FMT_Z: &'static [u8; 2usize] = b"z\0";
 pub const MDB_RPAGE_CACHE: ::libc::c_uint = 1;
-pub const MDB_SIZE_MAX: ::libc::c_ulong = 18446744073709551615;
+pub const MDB_SIZE_MAX: u64 = 18446744073709551615;
 pub const MDB_VERSION_MAJOR: ::libc::c_uint = 0;
 pub const MDB_VERSION_MINOR: ::libc::c_uint = 9;
 pub const MDB_VERSION_PATCH: ::libc::c_uint = 90;
