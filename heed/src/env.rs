@@ -14,6 +14,7 @@ use std::os::unix::ffi::OsStrExt;
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::cursor::RoCursor;
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
@@ -276,6 +277,57 @@ pub enum CompactionOption {
 }
 
 impl Env {
+    /// Return the size used by all the databases in the environment.
+    pub fn size(&self) -> Result<usize> {
+        let mut size = 0;
+
+        let mut stat = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr())) }?;
+        let stat = unsafe { stat.assume_init() };
+
+        size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
+            * stat.ms_psize as usize;
+
+        let rtxn = self.read_txn()?;
+
+        let dbi = self.raw_open_dbi(&rtxn, None, 0)?;
+
+        // we don’t want anyone to open an environment while we’re computing the stats
+        // thus we take a lock on all mutexes
+        let locks = (
+            OPENED_ENV.write().unwrap(),
+            self.0.dbi_open_mutex.lock().unwrap(),
+        );
+
+        // We’re going to iterate on the unnamed database
+        let mut cursor = RoCursor::new(&rtxn, dbi)?;
+
+        while let Some((key, _value)) = cursor.move_on_next()? {
+            if key.contains(&0) {
+                continue;
+            }
+
+            let key = String::from_utf8(key.to_vec()).unwrap();
+            let dbi = self.raw_open_dbi(&rtxn, Some(&key), 0);
+
+            if dbi.is_err() {
+                continue;
+            }
+
+            let mut stat = std::mem::MaybeUninit::uninit();
+            unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi.unwrap(), stat.as_mut_ptr()))? };
+            let stat = unsafe { stat.assume_init() };
+
+            size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
+                * stat.ms_psize as usize;
+        }
+
+        // once we reach this point we don’t need the lock anymore
+        drop(locks);
+
+        Ok(size)
+    }
+
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.0.env
     }
@@ -296,6 +348,23 @@ impl Env {
                 .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
     }
 
+    fn raw_open_dbi(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+        flags: u32,
+    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
+        let mut dbi = 0;
+        let name = name.map(|n| CString::new(n).unwrap());
+        let name_ptr = match name {
+            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
+            None => ptr::null(),
+        };
+        unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, flags, &mut dbi))? };
+
+        Ok(dbi)
+    }
+
     fn raw_open_database(
         &self,
         name: Option<&str>,
@@ -303,21 +372,12 @@ impl Env {
     ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
 
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
-
+        let result = self.raw_open_dbi(&rtxn, name, 0);
         drop(name);
 
         match result {
-            Ok(()) => {
+            Ok(dbi) => {
                 rtxn.commit()?;
 
                 let old_types = lock.entry(dbi).or_insert(types);
