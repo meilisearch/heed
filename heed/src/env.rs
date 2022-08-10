@@ -295,7 +295,7 @@ impl Env {
 
         // we don’t want anyone to open an environment while we’re computing the stats
         // thus we take a lock on the dbi
-        let _lock = self.0.dbi_open_mutex.lock().unwrap();
+        let dbi_open = self.0.dbi_open_mutex.lock().unwrap();
 
         // We’re going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -312,6 +312,11 @@ impl Env {
                 let stat = unsafe { stat.assume_init() };
 
                 size += compute_size(stat);
+
+                // if the db wasn’t already opened
+                if !dbi_open.contains_key(&dbi) {
+                    unsafe { ffi::mdb_dbi_close(self.0.env, dbi) }
+                }
             }
         }
 

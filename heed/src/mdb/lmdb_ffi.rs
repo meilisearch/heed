@@ -26,6 +26,7 @@ pub use ffi::{
     mdb_env_stat,
     mdb_env_sync,
 
+    mdb_dbi_close,
     mdb_dbi_open,
     mdb_del,
     mdb_drop,
