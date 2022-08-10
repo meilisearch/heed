@@ -367,12 +367,9 @@ impl Env {
         types: Option<(TypeId, TypeId)>,
     ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
-
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-        let result = self.raw_open_dbi(&rtxn, name, 0);
-        drop(name);
 
-        match result {
+        match self.raw_open_dbi(&rtxn, name, 0) {
             Ok(dbi) => {
                 rtxn.commit()?;
 
@@ -437,24 +434,10 @@ impl Env {
         parent_wtxn: &mut RwTxn,
     ) -> Result<u32> {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
-
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe {
-            mdb_result(ffi::mdb_dbi_open(wtxn.txn.txn, name_ptr, ffi::MDB_CREATE, &mut dbi))
-        };
-
-        drop(name);
-
-        match result {
-            Ok(()) => {
+        match self.raw_open_dbi(&wtxn, name, ffi::MDB_CREATE) {
+            Ok(dbi) => {
                 wtxn.commit()?;
 
                 let old_types = lock.entry(dbi).or_insert(types);
