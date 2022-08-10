@@ -278,17 +278,19 @@ pub enum CompactionOption {
 impl Env {
     /// Return the size used by all the databases in the environment.
     pub fn size(&self) -> Result<usize> {
+        let compute_size = |stat: lmdb_sys::MDB_stat| {
+            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
+                * stat.ms_psize as usize
+        };
+
         let mut size = 0;
 
         let mut stat = std::mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
-
-        size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
-            * stat.ms_psize as usize;
+        size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
-
         let dbi = self.raw_open_dbi(&rtxn, None, 0)?;
 
         // we don’t want anyone to open an environment while we’re computing the stats
@@ -304,18 +306,13 @@ impl Env {
             }
 
             let key = String::from_utf8(key.to_vec()).unwrap();
-            let dbi = self.raw_open_dbi(&rtxn, Some(&key), 0);
+            if let Ok(dbi) = self.raw_open_dbi(&rtxn, Some(&key), 0) {
+                let mut stat = std::mem::MaybeUninit::uninit();
+                unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
+                let stat = unsafe { stat.assume_init() };
 
-            if dbi.is_err() {
-                continue;
+                size += compute_size(stat);
             }
-
-            let mut stat = std::mem::MaybeUninit::uninit();
-            unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi.unwrap(), stat.as_mut_ptr()))? };
-            let stat = unsafe { stat.assume_init() };
-
-            size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
-                * stat.ms_psize as usize;
         }
 
         Ok(size)
