@@ -282,7 +282,7 @@ impl Env {
         let mut size = 0;
 
         let mut stat = std::mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr())) }?;
+        unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
 
         size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
