@@ -277,10 +277,10 @@ pub enum CompactionOption {
 
 impl Env {
     /// Return the size used by all the databases in the environment.
-    pub fn size(&self) -> Result<usize> {
+    pub fn size(&self) -> Result<u64> {
         let compute_size = |stat: lmdb_sys::MDB_stat| {
-            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
-                * stat.ms_psize as usize
+            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
+                * stat.ms_psize as u64
         };
 
         let mut size = 0;
