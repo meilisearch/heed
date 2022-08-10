@@ -292,8 +292,8 @@ impl Env {
         let dbi = self.raw_open_dbi(&rtxn, None, 0)?;
 
         // we don’t want anyone to open an environment while we’re computing the stats
-        // thus we take a lock on all mutexes
-        let locks = (OPENED_ENV.write().unwrap(), self.0.dbi_open_mutex.lock().unwrap());
+        // thus we take a lock on the dbi
+        let _lock = self.0.dbi_open_mutex.lock().unwrap();
 
         // We’re going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -317,9 +317,6 @@ impl Env {
             size += (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages)
                 * stat.ms_psize as usize;
         }
-
-        // once we reach this point we don’t need the lock anymore
-        drop(locks);
 
         Ok(size)
     }
