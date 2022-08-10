@@ -16,10 +16,7 @@ impl<'txn> RoCursor<'txn> {
 
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
 
-        Ok(RoCursor {
-            cursor,
-            _marker: marker::PhantomData,
-        })
+        Ok(RoCursor { cursor, _marker: marker::PhantomData })
     }
 
     pub fn current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -188,9 +185,7 @@ pub struct RwCursor<'txn> {
 
 impl<'txn> RwCursor<'txn> {
     pub(crate) fn new<T>(txn: &'txn RwTxn<T>, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
-        Ok(RwCursor {
-            cursor: RoCursor::new(txn, dbi)?,
-        })
+        Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
     }
 
     /// Delete the entry the cursor is currently pointing to.

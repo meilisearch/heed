@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::{mem, ptr};
 
-use crate::aligned_to;
 use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+
+use crate::aligned_to;
 
 /// Describes a type that must be [memory aligned] and
 /// will be reallocated if it is not.

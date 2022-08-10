@@ -219,12 +219,7 @@ impl PolyDatabase {
         let mut value = mem::MaybeUninit::uninit();
 
         let result = unsafe {
-            mdb_result(ffi::mdbx_dbi_sequence(
-                txn.txn.txn,
-                self.dbi,
-                value.as_mut_ptr(),
-                increment,
-            ))
+            mdb_result(ffi::mdbx_dbi_sequence(txn.txn.txn, self.dbi, value.as_mut_ptr(), increment))
         };
 
         match result {
@@ -284,12 +279,7 @@ impl PolyDatabase {
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_get(
-                txn.txn,
-                self.dbi,
-                &mut key_val,
-                data_val.as_mut_ptr(),
-            ))
+            mdb_result(ffi::mdb_get(txn.txn, self.dbi, &mut key_val, data_val.as_mut_ptr()))
         };
 
         match result {
@@ -1640,13 +1630,7 @@ impl PolyDatabase {
         let flags = 0;
 
         unsafe {
-            mdb_result(ffi::mdb_put(
-                txn.txn.txn,
-                self.dbi,
-                &mut key_val,
-                &mut data_val,
-                flags,
-            ))?
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
         }
 
         Ok(())
@@ -1708,13 +1692,7 @@ impl PolyDatabase {
         let flags = ffi::MDB_APPEND;
 
         unsafe {
-            mdb_result(ffi::mdb_put(
-                txn.txn.txn,
-                self.dbi,
-                &mut key_val,
-                &mut data_val,
-                flags,
-            ))?
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
         }
 
         Ok(())
@@ -1771,12 +1749,7 @@ impl PolyDatabase {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(
-                txn.txn.txn,
-                self.dbi,
-                &mut key_val,
-                ptr::null_mut(),
-            ))
+            mdb_result(ffi::mdb_del(txn.txn.txn, self.dbi, &mut key_val, ptr::null_mut()))
         };
 
         match result {
