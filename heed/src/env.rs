@@ -276,8 +276,8 @@ pub enum CompactionOption {
 }
 
 impl Env {
-    /// Return the size used by all the databases in the environment.
-    pub fn size(&self) -> Result<u64> {
+    /// Returns the size used by all the databases on the disk in the environment without taking the free pages into account.
+    pub fn real_disk_space_size(&self) -> Result<u64> {
         let compute_size = |stat: lmdb_sys::MDB_stat| {
             (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
                 * stat.ms_psize as u64
