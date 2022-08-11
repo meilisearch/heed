@@ -15,9 +15,9 @@ fn move_on_range_end<'txn>(
             Ok(_) => cursor.move_on_prev(),
             Err(e) => Err(e),
         },
-        Bound::Excluded(end) => cursor
-            .move_on_key_greater_than_or_equal_to(end)
-            .and_then(|_| cursor.move_on_prev()),
+        Bound::Excluded(end) => {
+            cursor.move_on_key_greater_than_or_equal_to(end).and_then(|_| cursor.move_on_prev())
+        }
         Bound::Unbounded => cursor.move_on_last(),
     }
 }
@@ -129,10 +129,7 @@ where
         let result = if self.move_on_start {
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (
-                self.cursor.current(),
-                move_on_range_end(&mut self.cursor, &self.end_bound),
-            ) {
+            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -337,10 +334,7 @@ where
         let result = if self.move_on_start {
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            match (
-                self.cursor.current(),
-                move_on_range_end(&mut self.cursor, &self.end_bound),
-            ) {
+            match (self.cursor.current(), move_on_range_end(&mut self.cursor, &self.end_bound)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }

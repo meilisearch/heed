@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
-use crate::CowType;
 use heed_traits::{BytesDecode, BytesEncode};
 use zerocopy::{AsBytes, FromBytes};
+
+use crate::CowType;
 
 /// Describes a type that is totally owned (doesn't
 /// hold any reference to the original slice).

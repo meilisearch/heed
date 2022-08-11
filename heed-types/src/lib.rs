@@ -78,7 +78,6 @@ impl heed_traits::BytesDecode<'_> for DecodeIgnore {
 
 #[cfg(feature = "serde-bincode")]
 pub use self::serde_bincode::SerdeBincode;
-
 #[cfg(feature = "serde-json")]
 pub use self::serde_json::SerdeJson;
 

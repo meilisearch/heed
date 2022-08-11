@@ -1,23 +1,24 @@
 use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::CString;
+#[cfg(windows)]
+use std::ffi::OsStr;
 use std::fs::File;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use std::{io, ptr, sync};
-#[cfg(windows)]
-use std::ffi::OsStr;
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
 
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::cursor::RoCursor;
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
-use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 use crate::mdb::ffi;
+use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -43,8 +44,10 @@ fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
 #[cfg(windows)]
 fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
     let canonical = path.canonicalize()?;
-    let url = url::Url::from_file_path(&canonical).map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
-    url.to_file_path().map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
+    let url = url::Url::from_file_path(&canonical)
+        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
+    url.to_file_path()
+        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
 }
 
 #[cfg(windows)]
@@ -82,12 +85,7 @@ pub struct EnvOpenOptions {
 
 impl EnvOpenOptions {
     pub fn new() -> EnvOpenOptions {
-        EnvOpenOptions {
-            map_size: None,
-            max_readers: None,
-            max_dbs: None,
-            flags: 0,
-        }
+        EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None, flags: 0 }
     }
 
     pub fn map_size(&mut self, size: usize) -> &mut Self {
@@ -160,10 +158,10 @@ impl EnvOpenOptions {
         match lock.entry(path) {
             Entry::Occupied(entry) => {
                 if &entry.get().options != self {
-                    return Err(Error::BadOpenOptions)
+                    return Err(Error::BadOpenOptions);
                 }
                 entry.get().env.clone().ok_or(Error::DatabaseClosing)
-            },
+            }
             Entry::Vacant(entry) => {
                 let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -176,9 +174,13 @@ impl EnvOpenOptions {
                         if size % page_size::get() != 0 {
                             let msg = format!(
                                 "map size ({}) must be a multiple of the system page size ({})",
-                                size, page_size::get()
+                                size,
+                                page_size::get()
                             );
-                            return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
+                            return Err(Error::Io(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                msg,
+                            )));
                         }
                         mdb_result(ffi::mdb_env_set_mapsize(env, size))?;
                     }
@@ -200,12 +202,8 @@ impl EnvOpenOptions {
                         self.flags
                     };
 
-                    let result = mdb_result(ffi::mdb_env_open(
-                        env,
-                        path_str.as_ptr(),
-                        flags,
-                        0o600,
-                    ));
+                    let result =
+                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), flags, 0o600));
 
                     match result {
                         Ok(()) => {
@@ -261,7 +259,9 @@ impl Drop for EnvInner {
         match lock.remove(&self.path) {
             None => panic!("It seems another env closed this env before"),
             Some(EnvEntry { signal_event, .. }) => {
-                unsafe { let _ = ffi::mdb_env_close(self.env); }
+                unsafe {
+                    let _ = ffi::mdb_env_close(self.env);
+                }
                 // We signal to all the waiters that we have closed the env.
                 signal_event.signal();
             }
@@ -276,6 +276,53 @@ pub enum CompactionOption {
 }
 
 impl Env {
+    /// Returns the size used by all the databases on the disk in the environment without taking the free pages into account.
+    pub fn real_disk_space_size(&self) -> Result<u64> {
+        let compute_size = |stat: lmdb_sys::MDB_stat| {
+            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
+                * stat.ms_psize as u64
+        };
+
+        let mut size = 0;
+
+        let mut stat = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr()))? };
+        let stat = unsafe { stat.assume_init() };
+        size += compute_size(stat);
+
+        let rtxn = self.read_txn()?;
+        let dbi = self.raw_open_dbi(&rtxn, None, 0)?;
+
+        // we don’t want anyone to open an environment while we’re computing the stats
+        // thus we take a lock on the dbi
+        let dbi_open = self.0.dbi_open_mutex.lock().unwrap();
+
+        // We’re going to iterate on the unnamed database
+        let mut cursor = RoCursor::new(&rtxn, dbi)?;
+
+        while let Some((key, _value)) = cursor.move_on_next()? {
+            if key.contains(&0) {
+                continue;
+            }
+
+            let key = String::from_utf8(key.to_vec()).unwrap();
+            if let Ok(dbi) = self.raw_open_dbi(&rtxn, Some(&key), 0) {
+                let mut stat = std::mem::MaybeUninit::uninit();
+                unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
+                let stat = unsafe { stat.assume_init() };
+
+                size += compute_size(stat);
+
+                // if the db wasn’t already opened
+                if !dbi_open.contains_key(&dbi) {
+                    unsafe { ffi::mdb_dbi_close(self.0.env, dbi) }
+                }
+            }
+        }
+
+        Ok(size)
+    }
+
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.0.env
     }
@@ -292,8 +339,26 @@ impl Env {
     }
 
     pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self.raw_open_database(name, None)?
-                .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
+        Ok(self
+            .raw_open_database(name, None)?
+            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
+    }
+
+    fn raw_open_dbi(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+        flags: u32,
+    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
+        let mut dbi = 0;
+        let name = name.map(|n| CString::new(n).unwrap());
+        let name_ptr = match name {
+            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
+            None => ptr::null(),
+        };
+        unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, flags, &mut dbi))? };
+
+        Ok(dbi)
     }
 
     fn raw_open_database(
@@ -302,22 +367,10 @@ impl Env {
         types: Option<(TypeId, TypeId)>,
     ) -> Result<Option<u32>> {
         let rtxn = self.read_txn()?;
-
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
-
-        drop(name);
-
-        match result {
-            Ok(()) => {
+        match self.raw_open_dbi(&rtxn, name, 0) {
+            Ok(dbi) => {
                 rtxn.commit()?;
 
                 let old_types = lock.entry(dbi).or_insert(types);
@@ -381,29 +434,10 @@ impl Env {
         parent_wtxn: &mut RwTxn,
     ) -> Result<u32> {
         let wtxn = self.nested_write_txn(parent_wtxn)?;
-
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let result = unsafe {
-            mdb_result(ffi::mdb_dbi_open(
-                wtxn.txn.txn,
-                name_ptr,
-                ffi::MDB_CREATE,
-                &mut dbi,
-            ))
-        };
-
-        drop(name);
-
-        match result {
-            Ok(()) => {
+        match self.raw_open_dbi(&wtxn, name, ffi::MDB_CREATE) {
+            Ok(dbi) => {
                 wtxn.commit()?;
 
                 let old_types = lock.entry(dbi).or_insert(types);
@@ -426,7 +460,10 @@ impl Env {
         RwTxn::<T>::new(self)
     }
 
-    pub fn nested_write_txn<'e, 'p: 'e, T>(&'e self, parent: &'p mut RwTxn<T>) -> Result<RwTxn<'e, 'p, T>> {
+    pub fn nested_write_txn<'e, 'p: 'e, T>(
+        &'e self,
+        parent: &'p mut RwTxn<T>,
+    ) -> Result<RwTxn<'e, 'p, T>> {
         RwTxn::nested(self, parent)
     }
 
@@ -443,7 +480,9 @@ impl Env {
         let file = File::options().create_new(true).write(true).open(&path)?;
         let fd = get_file_fd(&file);
 
-        unsafe { self.copy_to_fd(fd, option)?; }
+        unsafe {
+            self.copy_to_fd(fd, option)?;
+        }
 
         // We reopen the file to make sure the cursor is at the start,
         // even a seek to start doesn't work properly.
@@ -452,7 +491,11 @@ impl Env {
         Ok(file)
     }
 
-    pub unsafe fn copy_to_fd(&self, fd: ffi::mdb_filehandle_t, option: CompactionOption) -> Result<()> {
+    pub unsafe fn copy_to_fd(
+        &self,
+        fd: ffi::mdb_filehandle_t,
+        option: CompactionOption,
+    ) -> Result<()> {
         let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
 
         mdb_result(ffi::mdb_env_copy2fd(self.0.env, fd, flags))?;
@@ -535,8 +578,8 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use crate::{types::*, EnvOpenOptions};
-    use crate::env_closing_event;
+    use crate::types::*;
+    use crate::{env_closing_event, EnvOpenOptions};
 
     #[test]
     fn close_env() {
@@ -545,7 +588,8 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(&path).unwrap();
+            .open(&path)
+            .unwrap();
 
         // Force a thread to keep the env for 1 second.
         let env_cloned = env.clone();
@@ -586,7 +630,8 @@ mod tests {
         let path = dir.path();
         let _env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&path).unwrap();
+            .open(&path)
+            .unwrap();
 
         let env = EnvOpenOptions::new()
             .map_size(12 * 1024 * 1024) // 10MB

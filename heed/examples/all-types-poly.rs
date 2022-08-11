@@ -129,9 +129,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // or iterate over ranges too!!!
     let range = BEI64::new(35)..=BEI64::new(42);
-    let rets: Result<Vec<(BEI64, _)>, _> = db
-        .range::<_, OwnedType<BEI64>, Unit, _>(&wtxn, &range)?
-        .collect();
+    let rets: Result<Vec<(BEI64, _)>, _> =
+        db.range::<_, OwnedType<BEI64>, Unit, _>(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
