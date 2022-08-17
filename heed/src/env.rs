@@ -278,7 +278,7 @@ pub enum CompactionOption {
 impl Env {
     /// The real size used by this environment on disk.
     pub fn real_disk_size(&self) -> Result<u64> {
-        let path = if self.contain_flag(Flags::MdbNoSubDir)? {
+        let path = if self.contains_flag(Flags::MdbNoSubDir)? {
             self.path().to_path_buf()
         } else {
             self.path().join("data.mdb")
@@ -295,7 +295,7 @@ impl Env {
         Ok(or != 0)
     }
 
-    /// Return the raw flags stored the environment was opened with.
+    /// Return the raw flags the environment was opened with.
     pub fn raw_flags(&self) -> Result<u32> {
         let mut flags = std::mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
