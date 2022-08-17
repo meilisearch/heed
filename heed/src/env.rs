@@ -288,7 +288,7 @@ impl Env {
     }
 
     /// Check if a flag was specified when opening the environment.
-    pub fn contain_flag(&self, flag: Flags) -> Result<bool> {
+    pub fn contains_flag(&self, flag: Flags) -> Result<bool> {
         let flags = self.raw_flags()?;
         let or = flags & (flag as u32);
 
