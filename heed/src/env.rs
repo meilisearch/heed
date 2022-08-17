@@ -290,10 +290,7 @@ impl Env {
     /// Check if a flag was specified when opening the environment.
     pub fn contain_flag(&self, flag: Flags) -> Result<bool> {
         let flags = self.raw_flags()?;
-        println!("{flags:032b} &");
-        println!("{:032b}", flag as u32);
         let or = flags & (flag as u32);
-        println!("{or:032b}");
 
         Ok(or != 0)
     }
