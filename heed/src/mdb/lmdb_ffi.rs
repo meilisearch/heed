@@ -18,6 +18,7 @@ pub use ffi::{
     mdb_env_close,
     mdb_env_copyfd2 as mdb_env_copy2fd,
     mdb_env_create,
+    mdb_env_get_flags,
     mdb_env_info,
     mdb_env_open,
     mdb_env_set_mapsize,

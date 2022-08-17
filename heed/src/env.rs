@@ -276,8 +276,45 @@ pub enum CompactionOption {
 }
 
 impl Env {
-    /// Returns the size used by all the databases on the disk in the environment without taking the free pages into account.
-    pub fn real_disk_space_size(&self) -> Result<u64> {
+    /// The real size used by this environment on disk.
+    pub fn real_disk_size(&self) -> Result<u64> {
+        let path = if self.contains_flag(Flags::MdbNoSubDir)? {
+            self.path().to_path_buf()
+        } else {
+            self.path().join("data.mdb")
+        };
+
+        Ok(path.metadata()?.len())
+    }
+
+    /// Check if a flag was specified when opening the environment.
+    pub fn contains_flag(&self, flag: Flags) -> Result<bool> {
+        let flags = self.raw_flags()?;
+        let or = flags & (flag as u32);
+
+        Ok(or != 0)
+    }
+
+    /// Return the raw flags the environment was opened with.
+    pub fn raw_flags(&self) -> Result<u32> {
+        let mut flags = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
+        let flags = unsafe { flags.assume_init() };
+
+        Ok(flags)
+    }
+
+    /// The map size that was set when configuring the environment.
+    pub fn map_size(&self) -> Result<usize> {
+        let mut env_info = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_info(self.env_mut_ptr(), env_info.as_mut_ptr()))? };
+        let env_info = unsafe { env_info.assume_init() };
+
+        Ok(env_info.me_mapsize)
+    }
+
+    /// Returns the size used by all the databases in the environment without the free pages.
+    pub fn non_free_pages_size(&self) -> Result<u64> {
         let compute_size = |stat: lmdb_sys::MDB_stat| {
             (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
                 * stat.ms_psize as u64
@@ -286,7 +323,7 @@ impl Env {
         let mut size = 0;
 
         let mut stat = std::mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_stat(self.0.env, stat.as_mut_ptr()))? };
+        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr(), stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
         size += compute_size(stat);
 
@@ -315,7 +352,7 @@ impl Env {
 
                 // if the db wasn’t already opened
                 if !dbi_open.contains_key(&dbi) {
-                    unsafe { ffi::mdb_dbi_close(self.0.env, dbi) }
+                    unsafe { ffi::mdb_dbi_close(self.env_mut_ptr(), dbi) }
                 }
             }
         }
