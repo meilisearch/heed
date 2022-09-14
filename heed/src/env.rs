@@ -592,4 +592,15 @@ mod tests {
             .open(dir.path().join("babar.mdb"))
             .unwrap();
     }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn open_database_with_writemap_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut envbuilder = EnvOpenOptions::new();
+        envbuilder.map_size(10 * 1024 * 1024); // 10MB
+        unsafe { envbuilder.flag(crate::flags::Flags::MdbWriteMap) };
+        let env = envbuilder.open(&dir.path()).unwrap();
+        let _db = env.create_database::<Str, Str>(Some("my-super-db")).unwrap();
+    }
 }
