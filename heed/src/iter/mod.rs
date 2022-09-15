@@ -36,7 +36,10 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<ByteSlice, Str>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Str>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -73,7 +76,11 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
@@ -137,7 +144,11 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
@@ -224,7 +235,10 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -296,7 +310,10 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -369,7 +386,11 @@ mod tests {
             .max_dbs(3000)
             .open(dir.path())
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...

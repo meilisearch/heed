@@ -28,9 +28,9 @@ use crate::*;
 /// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &BEI64::new(68), &())?;
 /// db.put(&mut wtxn, &BEI64::new(35), &())?;
@@ -75,9 +75,9 @@ use crate::*;
 /// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &BEI64::new(0), &())?;
 /// db.put(&mut wtxn, &BEI64::new(68), &())?;
@@ -141,9 +141,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(dir.path())?;
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(Some("get-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, Some("get-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -188,9 +188,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEU32::new(27), &())?;
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
@@ -243,9 +243,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEU32::new(27), &())?;
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
@@ -298,9 +298,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEU32::new(27), &())?;
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
@@ -353,9 +353,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEU32::new(27), &())?;
     /// db.put(&mut wtxn, &BEU32::new(42), &())?;
@@ -407,9 +407,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("first-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -450,9 +450,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("last-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -489,9 +489,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -531,9 +531,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -573,9 +573,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -613,9 +613,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -666,9 +666,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -707,9 +707,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -762,9 +762,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -814,9 +814,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -879,9 +879,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -931,9 +931,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -996,9 +996,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
@@ -1048,9 +1048,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
@@ -1113,9 +1113,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
@@ -1165,9 +1165,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
@@ -1227,9 +1227,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1271,9 +1271,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1314,9 +1314,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1367,9 +1367,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1421,9 +1421,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1468,9 +1468,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Unit, Unit> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Unit, Unit> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// // We remap the types for ease of use.
     /// let db = db.remap_types::<OwnedType<BEI32>, Str>();
@@ -1532,9 +1532,9 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;

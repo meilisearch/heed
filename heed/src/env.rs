@@ -121,10 +121,10 @@ impl EnvOpenOptions {
     /// let env = env_builder.open(dir.path())?;
     ///
     /// // we will open the default unamed database
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
     ///
     /// // opening a write transaction
-    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, "seven", &7)?;
     /// db.put(&mut wtxn, "zero", &0)?;
     /// db.put(&mut wtxn, "five", &5)?;
@@ -513,7 +513,9 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let db = env.create_database::<Str, Str>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -574,6 +576,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
+        envbuilder.max_dbs(10);
         unsafe { envbuilder.flag(crate::flags::Flags::MdbWriteMap) };
         let env = envbuilder.open(&dir.path()).unwrap();
 

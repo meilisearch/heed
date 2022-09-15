@@ -22,9 +22,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an str
-    let db = env.create_poly_database(Some("kikou"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("kikou"))?;
+
     db.put::<OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
     let ret = db.get::<OwnedType<[i32; 2]>, Str>(&wtxn, &[2, 3])?;
 
@@ -32,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // here the key will be an str and the data will be a slice of u8
-    let db = env.create_poly_database(Some("kiki"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("kiki"))?;
+
     db.put::<Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
     let ret = db.get::<Str, ByteSlice>(&wtxn, "hello")?;
 
@@ -47,9 +47,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let db = env.create_poly_database(Some("serde"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("serde"))?;
 
     let hello = Hello { string: "hi" };
     db.put::<Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
@@ -71,9 +70,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         bytes: [u8; 12],
     }
 
-    let db = env.create_poly_database(Some("nocopy-struct"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("nocopy-struct"))?;
 
     let zerobytes = ZeroBytes { bytes: [24; 12] };
     db.put::<Str, UnalignedType<ZeroBytes>>(&mut wtxn, "zero", &zerobytes)?;
@@ -84,9 +82,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // you can ignore the data
-    let db = env.create_poly_database(Some("ignored-data"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("ignored-data"))?;
+
     db.put::<Str, Unit>(&mut wtxn, "hello", &())?;
     let ret = db.get::<Str, Unit>(&wtxn, "hello")?;
 
@@ -97,10 +95,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{:?}", ret);
     wtxn.commit()?;
 
-    // database opening and types are tested in a way
+    // database opening and types are tested in a safe way
     //
     // we try to open a database twice with the same types
-    let _db = env.create_poly_database(Some("ignored-data"))?;
+    let mut wtxn = env.write_txn()?;
+    let _db = env.create_poly_database(&mut wtxn, Some("ignored-data"))?;
 
     // and here we try to open it with other types
     // asserting that it correctly returns an error
@@ -108,15 +107,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE that those types are not saved upon runs and
     // therefore types cannot be checked upon different runs,
     // the first database opening fix the types for this run.
-    let result = env.create_database::<OwnedType<BEI64>, Unit>(Some("ignored-data"));
+    let result = env.create_database::<OwnedType<BEI64>, Unit>(&mut wtxn, Some("ignored-data"));
     assert!(result.is_err());
 
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db = env.create_poly_database(Some("big-endian-iter"))?;
+    let db = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
 
-    let mut wtxn = env.write_txn()?;
     db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
     db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
     db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(35), &())?;
