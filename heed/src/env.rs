@@ -280,109 +280,81 @@ impl Env {
         self.0.env
     }
 
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        Ok(self
-            .raw_open_database(name, Some(types))?
-            .map(|db| Database::new(self.env_mut_ptr() as _, db)))
-    }
-
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self
-            .raw_open_database(name, None)?
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
-    }
-
-    fn raw_open_database(
-        &self,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-    ) -> Result<Option<u32>> {
-        let rtxn = self.read_txn()?;
-
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        let result = unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, 0, &mut dbi)) };
-
-        drop(name);
-
-        match result {
-            Ok(()) => {
-                rtxn.commit()?;
-
-                let old_types = lock.entry(dbi).or_insert(types);
-
-                if *old_types == types {
-                    Ok(Some(dbi))
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
-            Err(e) if e.not_found() => Ok(None),
-            Err(e) => Err(e.into()),
+        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
+    /// Opens an untyped database that already exists in this environment.
+    ///
+    /// If the database was previously opened as a typed one, an error will be returned.
+    pub fn open_poly_database(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<PolyDatabase>> {
+        match self.raw_init_database(rtxn.txn, name, None, false) {
+            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
-    pub fn create_database_with_txn<KC, DC>(
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    pub fn create_database<KC, DC>(
         &self,
+        wtxn: &mut RwTxn,
         name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
     ) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
-            .map(|db| Database::new(self.env_mut_ptr() as _, db))
+        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
+            Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
     }
 
-    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
-    }
-
-    pub fn create_poly_database_with_txn(
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened as a typed one, an error will be returned.
+    pub fn create_poly_database(
         &self,
+        wtxn: &mut RwTxn,
         name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
     ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
+        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
+            Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
     }
 
-    fn raw_create_database(
+    fn raw_init_database(
         &self,
+        raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
-        parent_wtxn: &mut RwTxn,
+        create: bool,
     ) -> Result<u32> {
-        let wtxn = self.nested_write_txn(parent_wtxn)?;
-
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
         let name_ptr = match name {
@@ -391,19 +363,22 @@ impl Env {
         };
 
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
+        // safety: The name cstring is cloned by LMDB, we can drop it after.
+        //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
         let result = unsafe {
-            mdb_result(ffi::mdb_dbi_open(wtxn.txn.txn, name_ptr, ffi::MDB_CREATE, &mut dbi))
+            mdb_result(ffi::mdb_dbi_open(
+                raw_txn,
+                name_ptr,
+                if create { ffi::MDB_CREATE } else { 0 },
+                &mut dbi,
+            ))
         };
 
         drop(name);
 
         match result {
             Ok(()) => {
-                wtxn.commit()?;
-
                 let old_types = lock.entry(dbi).or_insert(types);
-
                 if *old_types == types {
                     Ok(dbi)
                 } else {
@@ -601,6 +576,54 @@ mod tests {
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         unsafe { envbuilder.flag(crate::flags::Flags::MdbWriteMap) };
         let env = envbuilder.open(&dir.path()).unwrap();
-        let _db = env.create_database::<Str, Str>(Some("my-super-db")).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
+        wtxn.commit().unwrap();
+    }
+
+    #[test]
+    fn create_database_without_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(10)
+            .open(&dir.path())
+            .unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
+        wtxn.abort().unwrap();
+
+        let rtxn = env.read_txn().unwrap();
+        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        assert!(option.is_none());
+    }
+
+    #[test]
+    fn open_already_existing_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(10)
+            .open(&dir.path())
+            .unwrap();
+
+        // we first create a database
+        let mut wtxn = env.write_txn().unwrap();
+        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
+        wtxn.commit().unwrap();
+
+        // Close the environement and reopen it, databases must not be loaded in memory.
+        env.prepare_for_closing().wait();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(10)
+            .open(&dir.path())
+            .unwrap();
+
+        let rtxn = env.read_txn().unwrap();
+        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        assert!(option.is_some());
     }
 }
