@@ -283,6 +283,12 @@ impl Env {
     /// Opens a typed database that already exists in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn,
@@ -303,6 +309,12 @@ impl Env {
     /// Opens an untyped database that already exists in this environment.
     ///
     /// If the database was previously opened as a typed one, an error will be returned.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
     pub fn open_poly_database(
         &self,
         rtxn: &RoTxn,
@@ -318,6 +330,12 @@ impl Env {
     /// Creates a typed database that can already exist in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
     pub fn create_database<KC, DC>(
         &self,
         wtxn: &mut RwTxn,
@@ -337,6 +355,12 @@ impl Env {
     /// Creates a typed database that can already exist in this environment.
     ///
     /// If the database was previously opened as a typed one, an error will be returned.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
     pub fn create_poly_database(
         &self,
         wtxn: &mut RwTxn,
