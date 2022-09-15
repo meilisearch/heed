@@ -124,3 +124,16 @@ impl From<io::Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_is_send_sync() {
+        fn give_me_send_sync<T: Send + Sync>(_: T) {}
+
+        let error = Error::Encoding(Box::from("There is an issue, you know?"));
+        give_me_send_sync(error);
+    }
+}
