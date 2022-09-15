@@ -59,7 +59,7 @@ fn main() {
         warn!("Building with `-fsanitize=fuzzer`.");
     }
 
-    if !pkg_config::find_library("liblmdb").is_ok() {
+    if !pkg_config::find_library("lmdb").is_ok() {
         let mut builder = cc::Build::new();
 
         builder
