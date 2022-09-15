@@ -1,15 +1,15 @@
 use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
-use std::ffi::CString;
 #[cfg(windows)]
 use std::ffi::OsStr;
+use std::ffi::{c_void, CString};
 use std::fs::File;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use std::{io, ptr, sync};
+use std::{io, mem, ptr, sync};
 
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
@@ -464,6 +464,22 @@ impl Env {
         &self.0.path
     }
 
+    /// Returns some basic informations about this environment.
+    pub fn info(&self) -> EnvInfo {
+        let mut raw_info = mem::MaybeUninit::uninit();
+        unsafe { ffi::mdb_env_info(self.0.env, raw_info.as_mut_ptr()) };
+        let raw_info = unsafe { raw_info.assume_init() };
+
+        EnvInfo {
+            map_addr: raw_info.me_mapaddr,
+            map_size: raw_info.me_mapsize,
+            last_page_number: raw_info.me_last_pgno,
+            last_txn_id: raw_info.me_last_txnid,
+            maximum_number_of_readers: raw_info.me_maxreaders,
+            number_of_readers: raw_info.me_numreaders,
+        }
+    }
+
     /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
     /// multiple threads can wait on this event.
     ///
@@ -500,6 +516,23 @@ impl Env {
         //         and never decrements it. It is safe to use either an u32 or u64 (usize).
         Ok(dead as usize)
     }
+}
+
+/// Contains information about the environment.
+#[derive(Debug, Clone, Copy)]
+pub struct EnvInfo {
+    /// Address of map, if fixed.
+    pub map_addr: *mut c_void,
+    /// Size of the data memory map.
+    pub map_size: usize,
+    /// ID of the last used page.
+    pub last_page_number: usize,
+    /// ID of the last committed transaction.
+    pub last_txn_id: usize,
+    /// Maximum number of reader slots in the environment.
+    pub maximum_number_of_readers: u32,
+    /// Maximum number of reader slots used in the environment.
+    pub number_of_readers: u32,
 }
 
 #[derive(Clone)]

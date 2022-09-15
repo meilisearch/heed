@@ -1,10 +1,11 @@
 pub use ffi::{
     mdb_cursor_close, mdb_cursor_del, mdb_cursor_get, mdb_cursor_open, mdb_cursor_put,
     mdb_dbi_open, mdb_del, mdb_drop, mdb_env_close, mdb_env_copyfd2 as mdb_env_copy2fd,
-    mdb_env_create, mdb_env_open, mdb_env_set_mapsize, mdb_env_set_maxdbs, mdb_env_set_maxreaders,
-    mdb_env_stat, mdb_env_sync, mdb_filehandle_t, mdb_get, mdb_put, mdb_reader_check, mdb_stat,
-    mdb_txn_abort, mdb_txn_begin, mdb_txn_commit, MDB_cursor, MDB_dbi, MDB_env,
-    MDB_stat as MDB_Stat, MDB_txn, MDB_APPEND, MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_RDONLY,
+    mdb_env_create, mdb_env_info, mdb_env_open, mdb_env_set_mapsize, mdb_env_set_maxdbs,
+    mdb_env_set_maxreaders, mdb_env_stat, mdb_env_sync, mdb_filehandle_t, mdb_get, mdb_put,
+    mdb_reader_check, mdb_stat, mdb_txn_abort, mdb_txn_begin, mdb_txn_commit, MDB_cursor, MDB_dbi,
+    MDB_env, MDB_envinfo, MDB_stat as MDB_Stat, MDB_txn, MDB_APPEND, MDB_CP_COMPACT, MDB_CREATE,
+    MDB_CURRENT, MDB_RDONLY,
 };
 use lmdb_master3_sys as ffi;
 
