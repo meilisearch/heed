@@ -4,12 +4,14 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::{c_void, CString};
 use std::fs::{File, Metadata};
 use std::io::ErrorKind::NotFound;
+use std::marker::PhantomData;
 #[cfg(unix)]
 use std::os::unix::{
     ffi::OsStrExt,
     io::{AsRawFd, BorrowedFd, RawFd},
 };
 use std::path::{Path, PathBuf};
+use std::result::Result as StdResult;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 #[cfg(windows)]
@@ -20,6 +22,7 @@ use std::{
 use std::{fmt, io, mem, ptr, sync};
 
 use heed_traits::{Comparator, LexicographicComparator};
+use lmdb_master3_sys::MDB_val;
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
@@ -40,7 +43,32 @@ static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::
 struct EnvEntry {
     env: Option<Env>,
     signal_event: Arc<SignalEvent>,
-    options: EnvOpenOptions,
+    options: SimplifiedOpenOptions,
+}
+
+/// A Simplified version of the options used to open a given [`Env`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimplifiedOpenOptions {
+    is_checksumming: bool,
+    is_encrypted: bool,
+    map_size: Option<usize>,
+    max_readers: Option<u32>,
+    max_dbs: Option<u32>,
+    flags: u32,
+}
+
+impl<E: Encrypt, C: Checksum> From<&EnvOpenOptions<E, C>> for SimplifiedOpenOptions {
+    fn from(eoo: &EnvOpenOptions<E, C>) -> SimplifiedOpenOptions {
+        let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = eoo;
+        SimplifiedOpenOptions {
+            is_checksumming: checksum.is_some(),
+            is_encrypted: encrypt.is_some(),
+            map_size: *map_size,
+            max_readers: *max_readers,
+            max_dbs: *max_dbs,
+            flags: flags.bits(),
+        }
+    }
 }
 
 // Thanks to the mozilla/rkv project
@@ -98,10 +126,58 @@ unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
     File::from(owned).metadata()
 }
 
+// TODO should it be called like this?
+pub trait Checksum {
+    const SIZE: u32;
+    fn checksum(input: &[u8], output: &mut [u8], key: Option<&[u8]>);
+}
+
+pub enum DummyChecksum {}
+
+impl Checksum for DummyChecksum {
+    const SIZE: u32 = 32 / 8;
+    fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
+}
+
+pub trait Encrypt {
+    fn encrypt_decrypt(
+        action: EncryptDecrypt,
+        input: &[u8],
+        output: &mut [u8],
+        key: &[u8],
+        iv: &[u8],
+        auth: &[u8],
+    ) -> StdResult<(), ()>;
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum EncryptDecrypt {
+    Encrypt,
+    Decrypt,
+}
+
+/// This type must not be used and is, therefore, not exposed at the library root.
+pub enum DummyEncrypt {}
+
+impl Encrypt for DummyEncrypt {
+    fn encrypt_decrypt(
+        _action: EncryptDecrypt,
+        _input: &[u8],
+        _output: &mut [u8],
+        _key: &[u8],
+        _iv: &[u8],
+        _auth: &[u8],
+    ) -> StdResult<(), ()> {
+        Err(())
+    }
+}
+
 /// Options and flags which can be used to configure how an environment is opened.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions {
+pub struct EnvOpenOptions<E: Encrypt = DummyEncrypt, C: Checksum = DummyChecksum> {
+    checksum: Option<PhantomData<C>>,
+    encrypt: Option<(PhantomData<E>, Vec<u8>, u32)>,
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
@@ -114,17 +190,35 @@ impl Default for EnvOpenOptions {
     }
 }
 
+impl<E: Encrypt, C: Checksum> fmt::Debug for EnvOpenOptions<E, C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = self;
+        f.debug_struct("EnvOpenOptions")
+            .field("checksum", &checksum.is_some())
+            .field("encrypt", &encrypt.is_some())
+            .field("map_size", &map_size)
+            .field("max_readers", &max_readers)
+            .field("max_dbs", &max_dbs)
+            .field("flags", &flags)
+            .finish()
+    }
+}
+
 impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
         EnvOpenOptions {
+            checksum: None,
+            encrypt: None,
             map_size: None,
             max_readers: None,
             max_dbs: None,
             flags: EnvFlags::empty(),
         }
     }
+}
 
+impl<E: Encrypt, C: Checksum> EnvOpenOptions<E, C> {
     /// Set the size of the memory map to use for this environment.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
@@ -141,6 +235,30 @@ impl EnvOpenOptions {
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
         self.max_dbs = Some(dbs);
         self
+    }
+
+    pub fn encrypt_with<F: Encrypt>(self, key: Vec<u8>, auth_size: u32) -> EnvOpenOptions<F, C> {
+        let EnvOpenOptions { checksum, encrypt: _, map_size, max_readers, max_dbs, flags } = self;
+        EnvOpenOptions {
+            checksum,
+            encrypt: Some((PhantomData, key, auth_size)),
+            map_size,
+            max_readers,
+            max_dbs,
+            flags,
+        }
+    }
+
+    pub fn checksum_with<D: Checksum>(self) -> EnvOpenOptions<E, D> {
+        let EnvOpenOptions { checksum: _, encrypt, map_size, max_readers, max_dbs, flags } = self;
+        EnvOpenOptions {
+            checksum: Some(PhantomData),
+            encrypt,
+            map_size,
+            max_readers,
+            max_dbs,
+            flags,
+        }
     }
 
     /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
@@ -210,14 +328,15 @@ impl EnvOpenOptions {
             Ok(path) => path,
         };
 
+        let original_options = SimplifiedOpenOptions::from(self);
         match lock.entry(path) {
             Entry::Occupied(entry) => {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
-                if &options == self {
-                    Ok(env)
+                if options == original_options {
+                    return Ok(env);
                 } else {
-                    Err(Error::BadOpenOptions { env, options })
+                    return Err(Error::BadOpenOptions { env, original_options });
                 }
             }
             Entry::Vacant(entry) => {
@@ -227,6 +346,24 @@ impl EnvOpenOptions {
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
                     mdb_result(ffi::mdb_env_create(&mut env))?;
+
+                    if let Some(_marker) = &self.checksum {
+                        mdb_result(ffi::mdb_env_set_checksum(
+                            env,
+                            Some(checksum_func_wrapper::<C>),
+                            C::SIZE,
+                        ))?;
+                    }
+
+                    if let Some((_marker, key, auth_size)) = &self.encrypt {
+                        let key = crate::into_val(key);
+                        mdb_result(ffi::mdb_env_set_encrypt(
+                            env,
+                            Some(encrypt_func_wrapper::<E>),
+                            &key,
+                            *auth_size,
+                        ))?;
+                    }
 
                     if let Some(size) = self.map_size {
                         if size % page_size::get() != 0 {
@@ -274,7 +411,7 @@ impl EnvOpenOptions {
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
                                 env: Some(env.clone()),
-                                options: self.clone(),
+                                options: original_options,
                                 signal_event,
                             };
                             entry.insert(cache_entry);
@@ -289,6 +426,47 @@ impl EnvOpenOptions {
             }
         }
     }
+}
+
+/// The wrapper function that is called by LMDB that directly calls
+/// the Rust idiomatic function internally.
+unsafe extern "C" fn encrypt_func_wrapper<E: Encrypt>(
+    src: *const MDB_val,
+    dst: *mut MDB_val,
+    key_ptr: *const MDB_val,
+    encdec: i32,
+) -> i32 {
+    let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
+    let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
+    let key = std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size);
+    let iv = std::slice::from_raw_parts(
+        (*key_ptr.offset(1)).mv_data as *const u8,
+        (*key_ptr.offset(1)).mv_size,
+    );
+    let auth = std::slice::from_raw_parts(
+        (*key_ptr.offset(2)).mv_data as *const u8,
+        (*key_ptr.offset(2)).mv_size,
+    );
+
+    let action = if encdec == 1 { EncryptDecrypt::Encrypt } else { EncryptDecrypt::Decrypt };
+    E::encrypt_decrypt(action, input, output, key, iv, auth).is_err() as i32
+}
+
+/// The wrapper function that is called by LMDB that directly calls
+/// the Rust idiomatic function internally.
+unsafe extern "C" fn checksum_func_wrapper<C: Checksum>(
+    src: *const MDB_val,
+    dst: *mut MDB_val,
+    key_ptr: *const MDB_val,
+) {
+    let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
+    let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
+    let key = if key_ptr.is_null() {
+        None
+    } else {
+        Some(std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size))
+    };
+    C::checksum(input, output, key)
 }
 
 /// Returns a struct that allows to wait for the effective closing of an environment.

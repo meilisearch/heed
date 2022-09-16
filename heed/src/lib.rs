@@ -73,8 +73,8 @@ pub use {bytemuck, byteorder, heed_types as types};
 use self::cursor::{RoCursor, RwCursor};
 pub use self::database::{Database, DatabaseOpenOptions};
 pub use self::env::{
-    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions,
+    env_closing_event, Checksum, CompactionOption, DefaultComparator, Encrypt, EncryptDecrypt, Env,
+    EnvClosingEvent, EnvInfo, EnvOpenOptions, SimplifiedOpenOptions,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
@@ -147,9 +147,9 @@ pub enum Error {
     DatabaseClosing,
     /// Attempt to open Env with different options
     BadOpenOptions {
-        /// The options that were used to originally open this env.
-        options: EnvOpenOptions,
-        /// The env opened with the original options.
+        /// The simplified options that were used to originally open this [`Env`].
+        original_options: SimplifiedOpenOptions,
+        /// The [`Env`] opened with the original options.
         env: Env,
     },
 }
