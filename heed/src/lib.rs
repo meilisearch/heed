@@ -53,6 +53,7 @@ mod env;
 mod iter;
 mod lazy_decode;
 mod mdb;
+mod reserved_space;
 mod txn;
 
 use std::{error, fmt, io, result};
@@ -71,6 +72,7 @@ pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags;
+pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 
