@@ -155,7 +155,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
 
@@ -229,7 +229,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
@@ -297,7 +297,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
@@ -369,7 +369,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
@@ -440,7 +440,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
@@ -494,7 +494,7 @@ impl PolyDatabase {
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_first() {
@@ -547,7 +547,7 @@ impl PolyDatabase {
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_last() {
@@ -600,7 +600,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
         let result = unsafe { mdb_result(ffi::mdb_stat(txn.txn, self.dbi, db_stat.as_mut_ptr())) };
@@ -653,7 +653,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
         match cursor.move_on_first()? {
@@ -699,7 +699,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
@@ -754,7 +754,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn iter_mut<'txn, KC, DC>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
@@ -796,7 +796,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn rev_iter<'txn, KC, DC>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
@@ -855,7 +855,7 @@ impl PolyDatabase {
         &self,
         txn: &'txn mut RwTxn,
     ) -> Result<RwRevIter<'txn, KC, DC>> {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
@@ -908,7 +908,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
@@ -999,7 +999,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
@@ -1077,7 +1077,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
@@ -1168,7 +1168,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
@@ -1246,7 +1246,7 @@ impl PolyDatabase {
     where
         KC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
@@ -1315,7 +1315,7 @@ impl PolyDatabase {
     where
         KC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
@@ -1371,7 +1371,7 @@ impl PolyDatabase {
     where
         KC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
@@ -1440,7 +1440,7 @@ impl PolyDatabase {
     where
         KC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
@@ -1490,7 +1490,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
@@ -1552,7 +1552,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
@@ -1613,7 +1613,7 @@ impl PolyDatabase {
     where
         KC: BytesEncode<'a>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
@@ -1681,7 +1681,7 @@ impl PolyDatabase {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         let mut count = 0;
         let mut iter = self.range_mut::<KC, DecodeIgnore, _>(txn, range)?;
@@ -1738,7 +1738,7 @@ impl PolyDatabase {
     /// # Ok(()) }
     /// ```
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
-        assert_eq!(self.env_ident, txn.txn.env.env_mut_ptr() as usize);
+        assert_matching_env_txn!(self, txn);
 
         unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }

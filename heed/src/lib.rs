@@ -137,3 +137,13 @@ mod tests {
         give_me_send_sync(error);
     }
 }
+
+#[macro_export]
+macro_rules! assert_matching_env_txn {
+    ($database:ident, $txn:ident) => {
+        assert!(
+            $database.env_ident == $txn.env_mut_ptr() as usize,
+            "The database environment doesn't match the transaction's environment"
+        );
+    };
+}

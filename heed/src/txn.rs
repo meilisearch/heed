@@ -7,7 +7,7 @@ use crate::{Env, Result};
 
 pub struct RoTxn<'e> {
     pub(crate) txn: *mut ffi::MDB_txn,
-    pub(crate) env: &'e Env,
+    env: &'e Env,
 }
 
 impl<'e> RoTxn<'e> {
@@ -24,6 +24,10 @@ impl<'e> RoTxn<'e> {
         };
 
         Ok(RoTxn { txn, env })
+    }
+
+    pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
+        self.env.env_mut_ptr()
     }
 
     pub fn commit(mut self) -> Result<()> {
@@ -77,6 +81,10 @@ impl<'e> RwTxn<'e, 'e> {
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
 
         Ok(RwTxn { txn: RoTxn { txn, env }, _parent: marker::PhantomData })
+    }
+
+    pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
+        self.txn.env.env_mut_ptr()
     }
 
     pub fn commit(self) -> Result<()> {
