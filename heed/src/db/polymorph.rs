@@ -1447,7 +1447,7 @@ impl PolyDatabase {
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
-    /// Insert a key-value pairs in this database.
+    /// Insert a key-value pair in this database.
     ///
     /// ```
     /// # use std::fs;
@@ -1504,6 +1504,71 @@ impl PolyDatabase {
         }
 
         Ok(())
+    }
+
+    /// Insert a key-value pair where the value can directly be written to disk.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use std::io::Write;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// let value = "I am a long long long value";
+    /// db.put_reserved::<OwnedType<BEI32>, _>(&mut wtxn, &BEI32::new(42), value.len(), |reserved| {
+    ///     reserved.write_all(value.as_bytes())
+    /// })?;
+    ///
+    /// let ret = db.get::<OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42))?;
+    /// assert_eq!(ret, Some(value));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn put_reserved<'a, KC, F>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data_size: usize,
+        mut write_func: F,
+    ) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        assert_matching_env_txn!(self, txn);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut reserved = ffi::reserve_size_val(data_size);
+        let flags = ffi::MDB_RESERVE;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))?
+        }
+
+        let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
+        (write_func)(&mut reserved)?;
+        if reserved.remaining() == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
+        }
     }
 
     /// Append the given key/data pair to the end of the database.
