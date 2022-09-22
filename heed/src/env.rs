@@ -289,9 +289,16 @@ impl Drop for EnvInner {
     }
 }
 
+/// Whether to perform compaction while copying an environment.
 #[derive(Debug, Copy, Clone)]
 pub enum CompactionOption {
+    /// Omit free pages and sequentially renumber all pages in output.
+    ///
+    /// This option consumes more CPU and runs more slowly than the default.
+    /// Currently it fails if the environment has suffered a page leak.
     Enabled,
+
+    /// Copy everything without taking any special action about free pages.
     Disabled,
 }
 
@@ -390,7 +397,6 @@ impl Env {
                 let mut stat = std::mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
-
                 size += compute_size(stat);
 
                 // if the db wasn’t already opened
@@ -550,8 +556,11 @@ impl Env {
         RoTxn::new(self)
     }
 
-    // TODO rename into `copy_to_file` for more clarity
-    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+    /// Copy an LMDB environment to the specified path, with options.
+    ///
+    /// This function may be used to make a backup of an existing environment.
+    /// No lockfile is created, since it gets recreated at need.
+    pub fn copy_to_file<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
         let file = File::options().create_new(true).write(true).open(&path)?;
         let fd = get_file_fd(&file);
 
@@ -564,6 +573,10 @@ impl Env {
         Ok(file)
     }
 
+    /// Copy an LMDB environment to the specified file descriptor, with compaction option.
+    ///
+    /// This function may be used to make a backup of an existing environment.
+    /// No lockfile is created, since it gets recreated at need.
     pub unsafe fn copy_to_fd(
         &self,
         fd: ffi::mdb_filehandle_t,
@@ -576,7 +589,6 @@ impl Env {
 
     pub fn force_sync(&self) -> Result<()> {
         unsafe { mdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
-
         Ok(())
     }
 
@@ -592,9 +604,7 @@ impl Env {
     /// when all references are dropped, the last one will eventually close the environment.
     pub fn prepare_for_closing(self) -> EnvClosingEvent {
         let mut lock = OPENED_ENV.write().unwrap();
-        let env = lock.get_mut(&self.0.path);
-
-        match env {
+        match lock.get_mut(self.path()) {
             None => panic!("cannot find the env that we are trying to close"),
             Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
