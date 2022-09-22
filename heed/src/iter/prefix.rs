@@ -180,6 +180,33 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the [`RwPrefix::put_current`] method.
+    pub unsafe fn put_current_reserved<'a, F>(
+        &mut self,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
+    }
+
     /// Append the given key/value pair to the end of the database.
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
@@ -460,6 +487,33 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the [`RwRevPrefix::put_current`] method.
+    pub unsafe fn put_current_reserved<'a, F>(
+        &mut self,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
     /// Append the given key/value pair to the end of the database.
