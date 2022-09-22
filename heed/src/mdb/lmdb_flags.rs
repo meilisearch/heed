@@ -1,6 +1,6 @@
 use lmdb_master3_sys as ffi;
 
-// LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html> for more details).
+/// LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html> for more details).
 #[repr(u32)]
 pub enum Flags {
     MdbFixedmap = ffi::MDB_FIXEDMAP,

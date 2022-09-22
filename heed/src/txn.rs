@@ -5,6 +5,7 @@ use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::{Env, Result};
 
+/// A read-only transaction.
 pub struct RoTxn<'e> {
     pub(crate) txn: *mut ffi::MDB_txn,
     env: &'e Env,
@@ -60,6 +61,7 @@ fn abort_txn(txn: *mut ffi::MDB_txn) -> Result<()> {
     Ok(unsafe { ffi::mdb_txn_abort(txn) })
 }
 
+/// A read-write transaction.
 pub struct RwTxn<'e, 'p> {
     pub(crate) txn: RoTxn<'e>,
     _parent: marker::PhantomData<&'p mut ()>,

@@ -15,6 +15,7 @@ fn move_on_prefix_end<'txn>(
     result
 }
 
+/// A read-only prefix iterator structure.
 pub struct RoPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
@@ -114,6 +115,7 @@ where
     }
 }
 
+/// A read-write prefix iterator structure.
 pub struct RwPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
@@ -322,6 +324,7 @@ where
     }
 }
 
+/// A reverse read-only prefix iterator structure.
 pub struct RoRevPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
@@ -423,6 +426,7 @@ where
     }
 }
 
+/// A reverse read-write prefix iterator structure.
 pub struct RwRevPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,

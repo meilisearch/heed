@@ -38,6 +38,7 @@ fn move_on_range_start<'txn>(
     }
 }
 
+/// A read-only range iterator structure.
 pub struct RoRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_start: bool,
@@ -161,6 +162,7 @@ where
     }
 }
 
+/// A read-write range iterator structure.
 pub struct RwRange<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     move_on_start: bool,
@@ -393,6 +395,7 @@ where
     }
 }
 
+/// A reverse read-only range iterator structure.
 pub struct RoRevRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_end: bool,
@@ -518,6 +521,7 @@ where
     }
 }
 
+/// A reverse read-write range iterator structure.
 pub struct RwRevRange<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     move_on_end: bool,

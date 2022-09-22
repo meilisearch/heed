@@ -20,10 +20,9 @@ use std::{io, mem, ptr, sync};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
-use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Database, Error, PolyDatabase, Result, RoCursor, RoTxn, RwTxn};
+use crate::{Database, Error, Flags, PolyDatabase, Result, RoCursor, RoTxn, RwTxn};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -93,6 +92,7 @@ unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
     File::from(owned).metadata()
 }
 
+/// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnvOpenOptions {
@@ -103,20 +103,24 @@ pub struct EnvOpenOptions {
 }
 
 impl EnvOpenOptions {
+    /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
         EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None, flags: 0 }
     }
 
+    /// Set the size of the memory map to use for this environment.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
         self
     }
 
+    /// Set the maximum number of threads/reader slots for the environment.
     pub fn max_readers(&mut self, readers: u32) -> &mut Self {
         self.max_readers = Some(readers);
         self
     }
 
+    /// Set the maximum number of named databases for the environment.
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
         self.max_dbs = Some(dbs);
         self
@@ -126,9 +130,8 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::{EnvOpenOptions, Database, Flags};
     /// use heed::types::*;
-    /// use heed::flags::Flags;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
@@ -170,6 +173,7 @@ impl EnvOpenOptions {
         self
     }
 
+    /// Open an environment that will be located at the specified path.
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let path = canonicalize_path(path.as_ref())?;
 
@@ -259,6 +263,7 @@ pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
     lock.get(path.as_ref()).map(|e| EnvClosingEvent(e.signal_event.clone()))
 }
 
+/// An environment handle constructed by using [`EnvOpenOptions`].
 #[derive(Clone)]
 pub struct Env(Arc<EnvInner>);
 
@@ -544,14 +549,23 @@ impl Env {
         }
     }
 
+    /// Create a transaction with read and write access for use with the environment.
     pub fn write_txn(&self) -> Result<RwTxn> {
         RwTxn::new(self)
     }
 
+    /// Create a nested transaction with read and write access for use with the environment.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// A parent transaction and its cursors may not issue any other operations than _commit_ and
+    /// _abort_ while it has active child transactions.
     pub fn nested_write_txn<'e, 'p: 'e>(&'e self, parent: &'p mut RwTxn) -> Result<RwTxn<'e, 'p>> {
         RwTxn::nested(self, parent)
     }
 
+    /// Create a transaction with read only access for use with the environment.
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
     }
@@ -587,6 +601,7 @@ impl Env {
         Ok(())
     }
 
+    /// Flush the data buffers to disk.
     pub fn force_sync(&self) -> Result<()> {
         unsafe { mdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
         Ok(())
@@ -650,6 +665,8 @@ pub struct EnvInfo {
     pub number_of_readers: u32,
 }
 
+/// A structure that can be used to wait for the closing event,
+/// multiple threads can wait on this event.
 #[derive(Clone)]
 pub struct EnvClosingEvent(Arc<SignalEvent>);
 
@@ -760,7 +777,7 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
-        unsafe { envbuilder.flag(crate::flags::Flags::MdbWriteMap) };
+        unsafe { envbuilder.flag(crate::Flags::MdbWriteMap) };
         let env = envbuilder.open(&dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();

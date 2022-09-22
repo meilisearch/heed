@@ -3,6 +3,7 @@ use std::marker;
 
 use crate::*;
 
+/// A read-only iterator structure.
 pub struct RoIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_first: bool,
@@ -88,6 +89,7 @@ where
     }
 }
 
+/// A read-write iterator structure.
 pub struct RwIter<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     move_on_first: bool,
@@ -282,6 +284,7 @@ where
     }
 }
 
+/// A reverse read-only iterator structure.
 pub struct RoRevIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     move_on_last: bool,
@@ -367,6 +370,7 @@ where
     }
 }
 
+/// A reverse read-write iterator structure.
 pub struct RwRevIter<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     move_on_last: bool,

@@ -71,7 +71,7 @@ pub use self::iter::{
 pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
-pub use self::mdb::flags;
+pub use self::mdb::flags::Flags;
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
@@ -125,6 +125,7 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Either a success or an [`Error`].
 pub type Result<T> = result::Result<T, Error>;
 
 #[cfg(test)]
@@ -140,7 +141,6 @@ mod tests {
     }
 }
 
-#[macro_export]
 macro_rules! assert_matching_env_txn {
     ($database:ident, $txn:ident) => {
         assert!(
@@ -149,3 +149,5 @@ macro_rules! assert_matching_env_txn {
         );
     };
 }
+
+pub(crate) use assert_matching_env_txn;
