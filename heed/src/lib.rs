@@ -11,8 +11,8 @@
 //!
 //! # Examples
 //!
-//! Discern let you open a database, that will support some typed key/data
-//! and ensures, at compile time, that you'll write those types and not others.
+//! Open a database, that will support some typed key/data and ensures, at compile time,
+//! that you'll write those types and not others.
 //!
 //! ```
 //! use std::fs;

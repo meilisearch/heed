@@ -1,14 +1,20 @@
 use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
-#[cfg(windows)]
-use std::ffi::OsStr;
 use std::ffi::{c_void, CString};
-use std::fs::File;
+use std::fs::{File, Metadata};
 #[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
+use std::os::unix::{
+    ffi::OsStrExt,
+    io::{AsRawFd, BorrowedFd, RawFd},
+};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+#[cfg(windows)]
+use std::{
+    ffi::OsStr,
+    os::windows::io::{AsRawHandle, BorrowedHandle, RawHandle},
+};
 use std::{io, mem, ptr, sync};
 
 use once_cell::sync::Lazy;
@@ -17,7 +23,7 @@ use synchronoise::event::SignalEvent;
 use crate::flags::Flags;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Database, Error, PolyDatabase, Result, RoTxn, RwTxn};
+use crate::{Database, Error, PolyDatabase, Result, RoCursor, RoTxn, RwTxn};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -61,16 +67,30 @@ impl OsStrExtLmdb for OsStr {
     }
 }
 
+#[cfg(unix)]
+fn get_file_fd(file: &File) -> RawFd {
+    file.as_raw_fd()
+}
+
 #[cfg(windows)]
-fn get_file_fd(file: &File) -> std::os::windows::io::RawHandle {
-    use std::os::windows::io::AsRawHandle;
+fn get_file_fd(file: &File) -> RawHandle {
     file.as_raw_handle()
 }
 
 #[cfg(unix)]
-fn get_file_fd(file: &File) -> std::os::unix::io::RawFd {
-    use std::os::unix::io::AsRawFd;
-    file.as_raw_fd()
+/// Get metadata from a file descriptor.
+unsafe fn metadata_from_fd(raw_fd: RawFd) -> io::Result<Metadata> {
+    let fd = BorrowedFd::borrow_raw(raw_fd);
+    let owned = fd.try_clone_to_owned()?;
+    File::from(owned).metadata()
+}
+
+#[cfg(windows)]
+/// Get metadata from a file descriptor.
+unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
+    let fd = BorrowedHandle::borrow_raw(raw_fd);
+    let owned = fd.try_clone_to_owned()?;
+    File::from(owned).metadata()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -280,6 +300,109 @@ impl Env {
         self.0.env
     }
 
+    /// The size of the data file on disk.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use heed::EnvOpenOptions;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let size_in_bytes = 1024 * 1024;
+    /// let env = EnvOpenOptions::new().map_size(size_in_bytes).open(dir.path())?;
+    ///
+    /// let actual_size = env.real_disk_size()? as usize;
+    /// assert!(actual_size < size_in_bytes);
+    /// # Ok(()) }
+    /// ```
+    pub fn real_disk_size(&self) -> Result<u64> {
+        let mut fd = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr(), fd.as_mut_ptr()))? };
+        let fd = unsafe { fd.assume_init() };
+        let metadata = unsafe { metadata_from_fd(fd)? };
+        Ok(metadata.len())
+    }
+
+    /// Check if a flag was specified when opening this environment.
+    pub fn contains_flag(&self, flag: Flags) -> Result<bool> {
+        let flags = self.raw_flags()?;
+        let set = flags & (flag as u32);
+        Ok(set != 0)
+    }
+
+    /// Return the raw flags the environment was opened with.
+    pub fn raw_flags(&self) -> Result<u32> {
+        let mut flags = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
+        let flags = unsafe { flags.assume_init() };
+
+        Ok(flags)
+    }
+
+    /// Returns some basic informations about this environment.
+    pub fn info(&self) -> EnvInfo {
+        let mut raw_info = mem::MaybeUninit::uninit();
+        unsafe { ffi::mdb_env_info(self.0.env, raw_info.as_mut_ptr()) };
+        let raw_info = unsafe { raw_info.assume_init() };
+
+        EnvInfo {
+            map_addr: raw_info.me_mapaddr,
+            map_size: raw_info.me_mapsize,
+            last_page_number: raw_info.me_last_pgno,
+            last_txn_id: raw_info.me_last_txnid,
+            maximum_number_of_readers: raw_info.me_maxreaders,
+            number_of_readers: raw_info.me_numreaders,
+        }
+    }
+
+    /// Returns the size used by all the databases in the environment without the free pages.
+    pub fn non_free_pages_size(&self) -> Result<u64> {
+        let compute_size = |stat: ffi::MDB_stat| {
+            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
+                * stat.ms_psize as u64
+        };
+
+        let mut size = 0;
+
+        let mut stat = std::mem::MaybeUninit::uninit();
+        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr(), stat.as_mut_ptr()))? };
+        let stat = unsafe { stat.assume_init() };
+        size += compute_size(stat);
+
+        let rtxn = self.read_txn()?;
+        let dbi = self.raw_open_dbi(rtxn.txn, None, 0)?;
+
+        // we don’t want anyone to open an environment while we’re computing the stats
+        // thus we take a lock on the dbi
+        let dbi_open = self.0.dbi_open_mutex.lock().unwrap();
+
+        // We’re going to iterate on the unnamed database
+        let mut cursor = RoCursor::new(&rtxn, dbi)?;
+
+        while let Some((key, _value)) = cursor.move_on_next()? {
+            if key.contains(&0) {
+                continue;
+            }
+
+            let key = String::from_utf8(key.to_vec()).unwrap();
+            if let Ok(dbi) = self.raw_open_dbi(rtxn.txn, Some(&key), 0) {
+                let mut stat = std::mem::MaybeUninit::uninit();
+                unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
+                let stat = unsafe { stat.assume_init() };
+
+                size += compute_size(stat);
+
+                // if the db wasn’t already opened
+                if !dbi_open.contains_key(&dbi) {
+                    unsafe { ffi::mdb_dbi_close(self.env_mut_ptr(), dbi) }
+                }
+            }
+        }
+
+        Ok(size)
+    }
+
     /// Opens a typed database that already exists in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
@@ -372,13 +495,12 @@ impl Env {
         }
     }
 
-    fn raw_init_database(
+    fn raw_open_dbi(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-        create: bool,
-    ) -> Result<u32> {
+        flags: u32,
+    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
         let mut dbi = 0;
         let name = name.map(|n| CString::new(n).unwrap());
         let name_ptr = match name {
@@ -386,22 +508,25 @@ impl Env {
             None => ptr::null(),
         };
 
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
         // safety: The name cstring is cloned by LMDB, we can drop it after.
         //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
-        let result = unsafe {
-            mdb_result(ffi::mdb_dbi_open(
-                raw_txn,
-                name_ptr,
-                if create { ffi::MDB_CREATE } else { 0 },
-                &mut dbi,
-            ))
-        };
+        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
 
-        drop(name);
+        Ok(dbi)
+    }
 
-        match result {
-            Ok(()) => {
+    fn raw_init_database(
+        &self,
+        raw_txn: *mut ffi::MDB_txn,
+        name: Option<&str>,
+        types: Option<(TypeId, TypeId)>,
+        create: bool,
+    ) -> Result<u32> {
+        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
+
+        let flags = if create { ffi::MDB_CREATE } else { 0 };
+        match self.raw_open_dbi(raw_txn, name, flags) {
+            Ok(dbi) => {
                 let old_types = lock.entry(dbi).or_insert(types);
                 if *old_types == types {
                     Ok(dbi)
@@ -430,9 +555,7 @@ impl Env {
         let file = File::options().create_new(true).write(true).open(&path)?;
         let fd = get_file_fd(&file);
 
-        unsafe {
-            self.copy_to_fd(fd, option)?;
-        }
+        unsafe { self.copy_to_fd(fd, option)? };
 
         // We reopen the file to make sure the cursor is at the start,
         // even a seek to start doesn't work properly.
@@ -447,9 +570,7 @@ impl Env {
         option: CompactionOption,
     ) -> Result<()> {
         let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
-
-        mdb_result(ffi::mdb_env_copy2fd(self.0.env, fd, flags))?;
-
+        mdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))?;
         Ok(())
     }
 
@@ -462,22 +583,6 @@ impl Env {
     /// Returns the canonicalized path where this env lives.
     pub fn path(&self) -> &Path {
         &self.0.path
-    }
-
-    /// Returns some basic informations about this environment.
-    pub fn info(&self) -> EnvInfo {
-        let mut raw_info = mem::MaybeUninit::uninit();
-        unsafe { ffi::mdb_env_info(self.0.env, raw_info.as_mut_ptr()) };
-        let raw_info = unsafe { raw_info.assume_init() };
-
-        EnvInfo {
-            map_addr: raw_info.me_mapaddr,
-            map_size: raw_info.me_mapsize,
-            last_page_number: raw_info.me_last_pgno,
-            last_txn_id: raw_info.me_last_txnid,
-            maximum_number_of_readers: raw_info.me_maxreaders,
-            number_of_readers: raw_info.me_numreaders,
-        }
     }
 
     /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
