@@ -8,7 +8,7 @@ repository = "https://github.com/Kerollmops/heed"
 keywords = ["lmdb", "database", "storage", "typed"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bytemuck = "1.12.1"
