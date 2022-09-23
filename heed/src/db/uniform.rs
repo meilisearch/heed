@@ -1250,6 +1250,54 @@ impl<KC, DC> Database<KC, DC> {
         self.dyndb.put::<KC, DC>(txn, key, data)
     }
 
+    /// Insert a key-value pair where the value can directly be written to disk.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use std::io::Write;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<OwnedType<BEI32>, Str>(&mut wtxn, Some("number-string"))?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// let value = "I am a long long long value";
+    /// db.put_reserved(&mut wtxn, &BEI32::new(42), value.len(), |reserved| {
+    ///     reserved.write_all(value.as_bytes())
+    /// })?;
+    ///
+    /// let ret = db.get(&mut wtxn, &BEI32::new(42))?;
+    /// assert_eq!(ret, Some(value));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn put_reserved<'a, F>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        self.dyndb.put_reserved::<KC, F>(txn, key, data_size, write_func)
+    }
+
     /// Append the given key/data pair to the end of the database.
     ///
     /// This option allows fast bulk loading when keys are already known to be in the correct order.
