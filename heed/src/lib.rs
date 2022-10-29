@@ -85,7 +85,12 @@ pub enum Error {
     Decoding(BoxedError),
     InvalidDatabaseTyping,
     DatabaseClosing,
-    BadOpenOptions,
+    BadOpenOptions {
+        /// The options that were used to originaly open this env.
+        options: EnvOpenOptions,
+        /// The env opened with the original options.
+        env: Env,
+    },
 }
 
 impl fmt::Display for Error {
@@ -101,7 +106,7 @@ impl fmt::Display for Error {
             Error::DatabaseClosing => {
                 f.write_str("database is in a closing phase, you can't open it at the same time")
             }
-            Error::BadOpenOptions => {
+            Error::BadOpenOptions { .. } => {
                 f.write_str("an environment is already opened with different options")
             }
         }

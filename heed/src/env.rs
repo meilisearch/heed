@@ -181,10 +181,13 @@ impl EnvOpenOptions {
 
         match lock.entry(path) {
             Entry::Occupied(entry) => {
-                if &entry.get().options != self {
-                    return Err(Error::BadOpenOptions);
+                let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
+                let options = entry.get().options.clone();
+                if &options == self {
+                    return Ok(env);
+                } else {
+                    return Err(Error::BadOpenOptions { env, options });
                 }
-                entry.get().env.clone().ok_or(Error::DatabaseClosing)
             }
             Entry::Vacant(entry) => {
                 let path = entry.key();
@@ -759,7 +762,7 @@ mod tests {
             .map_size(12 * 1024 * 1024) // 12MB
             .open(&dir.path());
 
-        assert!(matches!(result, Err(Error::BadOpenOptions)));
+        assert!(matches!(result, Err(Error::BadOpenOptions { .. })));
     }
 
     #[test]
