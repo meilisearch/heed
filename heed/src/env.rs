@@ -35,7 +35,7 @@ use crate::{Database, EnvFlags, Error, Result, RoCursor, RoTxn, RwTxn, Unspecifi
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
-/// noone tries to open the same environment between these two phases.
+/// no one tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
 static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
@@ -49,12 +49,18 @@ struct EnvEntry {
 /// A Simplified version of the options used to open a given [`Env`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimplifiedOpenOptions {
-    is_checksumming: bool,
-    is_encrypted: bool,
-    map_size: Option<usize>,
-    max_readers: Option<u32>,
-    max_dbs: Option<u32>,
-    flags: u32,
+    /// Whether this [`Env`] is checksum checked or not.
+    pub is_checksumming: bool,
+    /// Whether this [`Env`] is encrypted or not.
+    pub is_encrypted: bool,
+    /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
+    pub map_size: Option<usize>,
+    /// The maximum number of concurrent readers or [`None`] if it was not specified.
+    pub max_readers: Option<u32>,
+    /// The maximum number of opened database or [`None`] if it was not specified.
+    pub max_dbs: Option<u32>,
+    /// The raw flags enabled for this [`Env`] or [`None`] if it was not specified.
+    pub flags: u32,
 }
 
 impl<E: Encrypt, C: Checksum> From<&EnvOpenOptions<E, C>> for SimplifiedOpenOptions {
