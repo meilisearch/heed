@@ -15,7 +15,7 @@ use std::{
     ffi::OsStr,
     os::windows::io::{AsRawHandle, BorrowedHandle, RawHandle},
 };
-use std::{io, mem, ptr, sync};
+use std::{fmt, io, mem, ptr, sync};
 
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
@@ -266,6 +266,13 @@ pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
 /// An environment handle constructed by using [`EnvOpenOptions`].
 #[derive(Clone)]
 pub struct Env(Arc<EnvInner>);
+
+impl fmt::Debug for Env {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let EnvInner { env: _, dbi_open_mutex: _, path } = self.0.as_ref();
+        f.debug_struct("Env").field("path", &path.display()).finish_non_exhaustive()
+    }
+}
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
