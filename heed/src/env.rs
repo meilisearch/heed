@@ -46,13 +46,13 @@ struct EnvEntry {
     options: SimplifiedOpenOptions,
 }
 
-/// A Simplified version of the options used to open a given [`Env`].
+/// A simplified version of the options that were used to open a given [`Env`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimplifiedOpenOptions {
-    /// Whether this [`Env`] is checksum checked or not.
-    pub is_checksumming: bool,
-    /// Whether this [`Env`] is encrypted or not.
-    pub is_encrypted: bool,
+    /// The name of the checksum algorithm this [`Env`] has been opened with.
+    pub checksum_name: Option<String>,
+    /// The name of the encryption/decryption algorithm this [`Env`] has been opened with.
+    pub encrypt_name: Option<String>,
     /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
     pub map_size: Option<usize>,
     /// The maximum number of concurrent readers or [`None`] if it was not specified.
@@ -67,8 +67,8 @@ impl<E: Encrypt, C: Checksum> From<&EnvOpenOptions<E, C>> for SimplifiedOpenOpti
     fn from(eoo: &EnvOpenOptions<E, C>) -> SimplifiedOpenOptions {
         let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = eoo;
         SimplifiedOpenOptions {
-            is_checksumming: checksum.is_some(),
-            is_encrypted: encrypt.is_some(),
+            checksum_name: checksum.map(|_| E::name()),
+            encrypt_name: encrypt.as_ref().map(|_| C::name()),
             map_size: *map_size,
             max_readers: *max_readers,
             max_dbs: *max_dbs,
@@ -231,8 +231,8 @@ impl<E: Encrypt, C: Checksum> fmt::Debug for EnvOpenOptions<E, C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = self;
         f.debug_struct("EnvOpenOptions")
-            .field("checksum", &checksum.is_some())
-            .field("encrypt", &encrypt.is_some())
+            .field("checksum", &checksum.map(|_| C::name()))
+            .field("encrypt", &encrypt.as_ref().map(|_| E::name()))
             .field("map_size", &map_size)
             .field("max_readers", &max_readers)
             .field("max_dbs", &max_dbs)
