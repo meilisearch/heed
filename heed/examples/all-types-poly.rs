@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE that those types are not saved upon runs and
     // therefore types cannot be checked upon different runs,
     // the first database opening fix the types for this run.
-    let result = env.create_database::<OwnedType<BEI64>, Unit>(&mut wtxn, Some("ignored-data"));
+    let result = env.create_database::<BEI64, Unit>(&mut wtxn, Some("ignored-data"));
     assert!(result.is_err());
 
     // you can iterate over keys in order
@@ -115,27 +115,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let db = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
 
-    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
-    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(35), &())?;
-    db.put::<OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(42), &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &35, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &42, &())?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
 
     println!("{:?}", rets);
 
     // or iterate over ranges too!!!
-    let range = BEI64::new(35)..=BEI64::new(42);
-    let rets: Result<Vec<(BEI64, _)>, _> =
-        db.range::<OwnedType<BEI64>, Unit, _>(&wtxn, &range)?.collect();
+    let range = 35..=42;
+    let rets: Result<Vec<(i64, _)>, _> = db.range::<BEI64, Unit, _>(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
     // delete a range of key
-    let range = BEI64::new(35)..=BEI64::new(42);
-    let deleted: usize = db.delete_range::<OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+    let range = 35..=42;
+    let deleted: usize = db.delete_range::<BEI64, _>(&mut wtxn, &range)?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;

@@ -29,23 +29,23 @@ use crate::*;
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let mut wtxn = env.write_txn()?;
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+/// db.put(&mut wtxn, &68, &())?;
+/// db.put(&mut wtxn, &35, &())?;
+/// db.put(&mut wtxn, &0, &())?;
+/// db.put(&mut wtxn, &42, &())?;
 ///
 /// // you can iterate over database entries in order
 /// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
-///     (BEI64::new(68), ()),
+///     (0, ()),
+///     (35, ()),
+///     (42, ()),
+///     (68, ()),
 /// ];
 ///
 /// assert_eq!(rets, expected);
@@ -76,36 +76,36 @@ use crate::*;
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let mut wtxn = env.write_txn()?;
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+/// db.put(&mut wtxn, &0, &())?;
+/// db.put(&mut wtxn, &68, &())?;
+/// db.put(&mut wtxn, &35, &())?;
+/// db.put(&mut wtxn, &42, &())?;
 ///
 /// // you can iterate over ranges too!!!
-/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let range = 35..=42;
 /// let rets: Result<_, _> = db.range(&wtxn, &range)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
+///     (35, ()),
+///     (42, ()),
 /// ];
 ///
 /// assert_eq!(rets, expected);
 ///
 /// // even delete a range of keys
-/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let range = 35..=42;
 /// let deleted: usize = db.delete_range(&mut wtxn, &range)?;
 ///
 /// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(68), ()),
+///     (0, ()),
+///     (68, ()),
 /// ];
 ///
 /// assert_eq!(deleted, 2);
@@ -134,6 +134,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -141,8 +142,10 @@ impl<KC, DC> Database<KC, DC> {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(dir.path())?;
+    /// type BEI32= U32<BigEndian>;
+    ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, Some("get-i32"))?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("get-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
@@ -189,20 +192,20 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_lower_than(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((42, ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than(&wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -244,20 +247,20 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(26))?;
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &26)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -299,20 +302,20 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_greater_than(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than(&wtxn, &43)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -354,20 +357,20 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((42, ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(44))?;
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &44)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -408,14 +411,14 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.first(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(ret, Some((27, "i-am-twenty-seven")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -451,14 +454,14 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.last(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(ret, Some((42, "i-am-forty-two")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -490,18 +493,18 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// db.delete(&mut wtxn, &27)?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -532,13 +535,13 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
@@ -574,17 +577,17 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -614,31 +617,31 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter_mut(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// let ret = unsafe { iter.put_current(&42, "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get(&wtxn, &13)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&wtxn, &42)?;
     /// assert_eq!(ret, Some("i-am-the-new-forty-two"));
     ///
     /// wtxn.commit()?;
@@ -667,17 +670,17 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -708,31 +711,31 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter_mut(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")? };
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// let ret = unsafe { iter.put_current(&13, "i-am-the-new-thirteen")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&wtxn, &42)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get(&wtxn, &13)?;
     /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
     ///
     /// wtxn.commit()?;
@@ -763,18 +766,18 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let range = 27..=42;
     /// let mut iter = db.range(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -815,21 +818,21 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let range = 27..=42;
     /// let mut range = db.range_mut(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// let ret = unsafe { range.put_current(&42, "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -837,9 +840,9 @@ impl<KC, DC> Database<KC, DC> {
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-the-new-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-the-new-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -880,18 +883,18 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(43);
+    /// let range = 27..=43;
     /// let mut iter = db.rev_range(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -932,21 +935,21 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let range = 27..=42;
     /// let mut range = db.rev_range_mut(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")? };
+    /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// let ret = unsafe { range.put_current(&27, "i-am-the-new-twenty-seven")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -954,9 +957,9 @@ impl<KC, DC> Database<KC, DC> {
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-the-new-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -997,19 +1000,19 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.prefix_iter(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1049,23 +1052,23 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &BEI32::new(27000))? };
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
+    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &27000)? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1076,7 +1079,7 @@ impl<KC, DC> Database<KC, DC> {
     /// assert_eq!(ret, None);
     ///
     /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
-    /// assert_eq!(ret, Some(BEI32::new(27000)));
+    /// assert_eq!(ret, Some(27000));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1114,19 +1117,19 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.rev_prefix_iter(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1166,23 +1169,23 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.rev_prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &BEI32::new(28000))? };
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
+    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &28000)? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1193,7 +1196,7 @@ impl<KC, DC> Database<KC, DC> {
     /// assert_eq!(ret, None);
     ///
     /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
-    /// assert_eq!(ret, Some(BEI32::new(28000)));
+    /// assert_eq!(ret, Some(28000));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1228,15 +1231,15 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
@@ -1270,15 +1273,15 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<OwnedType<BEI32>, Str>(&mut wtxn, Some("number-string"))?;
+    /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
     /// let value = "I am a long long long value";
-    /// db.put_reserved(&mut wtxn, &BEI32::new(42), value.len(), |reserved| {
+    /// db.put_reserved(&mut wtxn, &42, value.len(), |reserved| {
     ///     reserved.write_all(value.as_bytes())
     /// })?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&mut wtxn, &42)?;
     /// assert_eq!(ret, Some(value));
     ///
     /// wtxn.commit()?;
@@ -1320,15 +1323,15 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
@@ -1363,21 +1366,21 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.delete(&mut wtxn, &27)?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(467))?;
+    /// let ret = db.delete(&mut wtxn, &467)?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
@@ -1416,22 +1419,22 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// let range = 27..=42;
     /// let ret = db.delete_range(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1470,13 +1473,13 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// db.clear(&mut wtxn)?;
     ///
@@ -1521,11 +1524,11 @@ impl<KC, DC> Database<KC, DC> {
     ///
     /// # db.clear(&mut wtxn)?;
     /// // We remap the types for ease of use.
-    /// let db = db.remap_types::<OwnedType<BEI32>, Str>();
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db = db.remap_types::<BEI32, Str>();
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1581,16 +1584,16 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// // Check if a key exists and skip potentially expensive deserializing
-    /// let ret = db.as_polymorph().get::<OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.as_polymorph().get::<BEI32, DecodeIgnore>(&wtxn, &42)?;
     /// assert!(ret.is_some());
     ///
     /// wtxn.commit()?;

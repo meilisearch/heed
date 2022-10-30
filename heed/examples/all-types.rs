@@ -121,29 +121,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db: Database<OwnedType<BEI64>, Unit> =
-        env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+    let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 
-    let _ret = db.put(&mut wtxn, &BEI64::new(0), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(68), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(35), &())?;
-    let _ret = db.put(&mut wtxn, &BEI64::new(42), &())?;
+    let _ret = db.put(&mut wtxn, &0, &())?;
+    let _ret = db.put(&mut wtxn, &68, &())?;
+    let _ret = db.put(&mut wtxn, &35, &())?;
+    let _ret = db.put(&mut wtxn, &42, &())?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter(&wtxn)?.collect();
 
     println!("{:?}", rets);
 
     // or iterate over ranges too!!!
-    let range = BEI64::new(35)..=BEI64::new(42);
-    let rets: Result<Vec<(BEI64, _)>, _> = db.range(&wtxn, &range)?.collect();
+    let range = 35..=42;
+    let rets: Result<Vec<(i64, _)>, _> = db.range(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
     // delete a range of key
-    let range = BEI64::new(35)..=BEI64::new(42);
+    let range = 35..=42;
     let deleted: usize = db.delete_range(&mut wtxn, &range)?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter(&wtxn)?.collect();
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;
