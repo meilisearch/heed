@@ -25,6 +25,10 @@ impl Checksum for Crc32Checksum {
 enum Chacha20Encrypt {}
 
 impl Encrypt for Chacha20Encrypt {
+    fn name() -> String {
+        String::from("chacha20")
+    }
+
     fn encrypt_decrypt(
         _action: EncryptDecrypt,
         input: &[u8],

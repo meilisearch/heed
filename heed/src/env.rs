@@ -161,7 +161,16 @@ impl Checksum for DummyChecksum {
     fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
 }
 
+/// Describes an encryption/decryption algorithm to ensure pages
+/// are readable only with the right key.
 pub trait Encrypt {
+    /// The name of the encryption/decryption algorithm, used for safety purposes.
+    ///
+    /// Make sure that the name corresponds to the algorithm, it will be compared
+    /// whenever an [`Env`] is opened and tried to be opened a second time.
+    fn name() -> String;
+
+    /// Takes the input bytes and writes them in the output slice of the same length.
     fn encrypt_decrypt(
         action: EncryptDecrypt,
         input: &[u8],
@@ -172,16 +181,22 @@ pub trait Encrypt {
     ) -> StdResult<(), ()>;
 }
 
+/// The action to perform on the page.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum EncryptDecrypt {
     Encrypt,
     Decrypt,
 }
 
-/// This type must not be used and is, therefore, not exposed at the library root.
+/// A dummy encryption/decryption algorithm that must never be used.
+/// Only here for Rust API purposes.
 pub enum DummyEncrypt {}
 
 impl Encrypt for DummyEncrypt {
+    fn name() -> String {
+        String::new()
+    }
+
     fn encrypt_decrypt(
         _action: EncryptDecrypt,
         _input: &[u8],
