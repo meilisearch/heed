@@ -132,16 +132,32 @@ unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
     File::from(owned).metadata()
 }
 
-// TODO should it be called like this?
+/// Describes a check-summing algorithm that ensure the correctness of the pages.
 pub trait Checksum {
+    /// The number of bytes the checksum value takes.
     const SIZE: u32;
+
+    /// The name of the check-summing algorithm, used for safety purposes.
+    ///
+    /// Make sure that the name corresponds to the algorithm, it will be compared
+    /// whenever an [`Env`] is opened and tried to be opened a second time.
+    fn name() -> String;
+
+    /// Takes the input and must write in the output that is `Self::SIZE` long.
     fn checksum(input: &[u8], output: &mut [u8], key: Option<&[u8]>);
 }
 
+/// A dummy check-summing algorithm that must never be used.
+/// Only here for Rust API purposes.
 pub enum DummyChecksum {}
 
 impl Checksum for DummyChecksum {
     const SIZE: u32 = 32 / 8;
+
+    fn name() -> String {
+        String::new()
+    }
+
     fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
 }
 

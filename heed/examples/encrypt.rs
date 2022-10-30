@@ -12,6 +12,10 @@ enum Crc32Checksum {}
 impl Checksum for Crc32Checksum {
     const SIZE: u32 = 32 / 8;
 
+    fn name() -> String {
+        String::from("crc32")
+    }
+
     fn checksum(input: &[u8], output: &mut [u8], _key: Option<&[u8]>) {
         let checksum = crc32fast::hash(input);
         output.copy_from_slice(&checksum.to_le_bytes());
