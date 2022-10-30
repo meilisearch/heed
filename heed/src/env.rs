@@ -699,6 +699,12 @@ impl EnvClosingEvent {
     }
 }
 
+impl fmt::Debug for EnvClosingEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("EnvClosingEvent").finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;

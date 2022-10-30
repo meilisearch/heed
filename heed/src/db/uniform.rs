@@ -1,5 +1,5 @@
-use std::marker;
 use std::ops::RangeBounds;
+use std::{any, fmt, marker};
 
 use crate::mdb::ffi;
 use crate::*;
@@ -1611,3 +1611,12 @@ impl<KC, DC> Clone for Database<KC, DC> {
 }
 
 impl<KC, DC> Copy for Database<KC, DC> {}
+
+impl<KC, DC> fmt::Debug for Database<KC, DC> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Database")
+            .field("key_codec", &any::type_name::<KC>())
+            .field("data_codec", &any::type_name::<DC>())
+            .finish()
+    }
+}

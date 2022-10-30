@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
-use std::{mem, ptr};
+use std::{fmt, mem, ptr};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -1853,5 +1853,11 @@ impl PolyDatabase {
     /// ```
     pub fn as_uniform<KC, DC>(&self) -> Database<KC, DC> {
         Database::new(self.env_ident, self.dbi)
+    }
+}
+
+impl fmt::Debug for PolyDatabase {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PolyDatabase").finish()
     }
 }

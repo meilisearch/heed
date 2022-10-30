@@ -1,4 +1,4 @@
-use std::io;
+use std::{fmt, io};
 
 use crate::mdb::ffi;
 
@@ -41,5 +41,11 @@ impl io::Write for ReservedSpace {
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+impl fmt::Debug for ReservedSpace {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ReservedSpace").finish()
     }
 }
