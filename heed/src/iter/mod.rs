@@ -61,7 +61,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 
     #[test]
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), None);
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((1, ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 
     #[test]
@@ -207,7 +207,7 @@ mod tests {
         let iter = db.range(&wtxn, &range).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((1, ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 
     #[test]
@@ -296,7 +296,7 @@ mod tests {
         );
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 
     #[test]
@@ -371,7 +371,7 @@ mod tests {
         );
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 
     #[test]
@@ -423,6 +423,6 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((4, ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
 
-        wtxn.abort().unwrap();
+        wtxn.abort();
     }
 }

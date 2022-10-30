@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("nested(1) \"what\": {:?}", ret);
 
     println!("nested(1) abort");
-    nwtxn.abort()?;
+    nwtxn.abort();
 
     let ret = db.get(&wtxn, "what")?;
     println!("parent \"what\": {:?}", ret);

@@ -30,24 +30,12 @@ impl<'e> RoTxn<'e> {
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.env.env_mut_ptr()
     }
-
-    pub fn commit(mut self) -> Result<()> {
-        let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn)) };
-        self.txn = ptr::null_mut();
-        result.map_err(Into::into)
-    }
-
-    pub fn abort(mut self) -> Result<()> {
-        let result = abort_txn(self.txn);
-        self.txn = ptr::null_mut();
-        result
-    }
 }
 
 impl Drop for RoTxn<'_> {
     fn drop(&mut self) {
         if !self.txn.is_null() {
-            let _ = abort_txn(self.txn);
+            abort_txn(self.txn);
         }
     }
 }
@@ -55,10 +43,10 @@ impl Drop for RoTxn<'_> {
 #[cfg(feature = "sync-read-txn")]
 unsafe impl<T> Sync for RoTxn<'_> {}
 
-fn abort_txn(txn: *mut ffi::MDB_txn) -> Result<()> {
+fn abort_txn(txn: *mut ffi::MDB_txn) {
     // Asserts that the transaction hasn't been already committed.
     assert!(!txn.is_null());
-    Ok(unsafe { ffi::mdb_txn_abort(txn) })
+    unsafe { ffi::mdb_txn_abort(txn) }
 }
 
 /// A read-write transaction.
@@ -89,12 +77,15 @@ impl<'e> RwTxn<'e, 'e> {
         self.txn.env.env_mut_ptr()
     }
 
-    pub fn commit(self) -> Result<()> {
-        self.txn.commit()
+    pub fn commit(mut self) -> Result<()> {
+        let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
+        self.txn.txn = ptr::null_mut();
+        result.map_err(Into::into)
     }
 
-    pub fn abort(self) -> Result<()> {
-        self.txn.abort()
+    pub fn abort(mut self) {
+        abort_txn(self.txn.txn);
+        self.txn.txn = ptr::null_mut();
     }
 }
 

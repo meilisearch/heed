@@ -812,7 +812,7 @@ mod tests {
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.abort().unwrap();
+        wtxn.abort();
 
         let rtxn = env.read_txn().unwrap();
         let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
