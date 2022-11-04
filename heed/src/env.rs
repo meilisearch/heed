@@ -10,6 +10,7 @@ use std::os::unix::{
     ffi::OsStrExt,
     io::{AsRawFd, BorrowedFd, RawFd},
 };
+use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::sync::{Arc, RwLock};
@@ -479,20 +480,28 @@ unsafe extern "C" fn encrypt_func_wrapper<E: Encrypt>(
     key_ptr: *const MDB_val,
     encdec: i32,
 ) -> i32 {
-    let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
-    let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
-    let key = std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size);
-    let iv = std::slice::from_raw_parts(
-        (*key_ptr.offset(1)).mv_data as *const u8,
-        (*key_ptr.offset(1)).mv_size,
-    );
-    let auth = std::slice::from_raw_parts(
-        (*key_ptr.offset(2)).mv_data as *const u8,
-        (*key_ptr.offset(2)).mv_size,
-    );
+    let result = catch_unwind(|| {
+        let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
+        let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
+        let key = std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size);
+        let iv = std::slice::from_raw_parts(
+            (*key_ptr.offset(1)).mv_data as *const u8,
+            (*key_ptr.offset(1)).mv_size,
+        );
+        let auth = std::slice::from_raw_parts(
+            (*key_ptr.offset(2)).mv_data as *const u8,
+            (*key_ptr.offset(2)).mv_size,
+        );
 
-    let action = if encdec == 1 { EncryptDecrypt::Encrypt } else { EncryptDecrypt::Decrypt };
-    E::encrypt_decrypt(action, input, output, key, iv, auth).is_err() as i32
+        let action = if encdec == 1 { EncryptDecrypt::Encrypt } else { EncryptDecrypt::Decrypt };
+
+        E::encrypt_decrypt(action, input, output, key, iv, auth).is_err() as i32
+    });
+
+    match result {
+        Ok(out) => out,
+        Err(_) => 1,
+    }
 }
 
 /// The wrapper function that is called by LMDB that directly calls
@@ -502,14 +511,22 @@ unsafe extern "C" fn checksum_func_wrapper<C: Checksum>(
     dst: *mut MDB_val,
     key_ptr: *const MDB_val,
 ) {
-    let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
-    let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
-    let key = if key_ptr.is_null() {
-        None
-    } else {
-        Some(std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size))
-    };
-    C::checksum(input, output, key)
+    let result = catch_unwind(|| {
+        let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
+        let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
+        let key = if key_ptr.is_null() {
+            None
+        } else {
+            Some(std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size))
+        };
+        C::checksum(input, output, key)
+    });
+
+    match result {
+        Ok(()) => (),
+        // TODO unfortunately there is no way to tell LMDB that the checksum failed
+        Err(_) => (),
+    }
 }
 
 /// Returns a struct that allows to wait for the effective closing of an environment.
