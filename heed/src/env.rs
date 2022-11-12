@@ -12,7 +12,6 @@ use std::os::unix::{
 };
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
-use std::result::Result as StdResult;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 #[cfg(windows)]
@@ -22,6 +21,10 @@ use std::{
 };
 use std::{fmt, io, mem, ptr, sync};
 
+use aead::consts::U0;
+use aead::generic_array::typenum::Unsigned;
+use aead::generic_array::GenericArray;
+use aead::{AeadCore, AeadMutInPlace, Key, KeyInit, KeySizeUser, Nonce, Tag};
 use heed_traits::{Comparator, LexicographicComparator};
 use lmdb_master3_sys::MDB_val;
 use once_cell::sync::Lazy;
@@ -52,8 +55,8 @@ struct EnvEntry {
 pub struct SimplifiedOpenOptions {
     /// The name of the checksum algorithm this [`Env`] has been opened with.
     pub checksum_name: Option<String>,
-    /// The name of the encryption/decryption algorithm this [`Env`] has been opened with.
-    pub encrypt_name: Option<String>,
+    /// Weither this [`Env`] has been opened with an encryption/decryption algorithm.
+    pub use_encryption: bool,
     /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
     pub map_size: Option<usize>,
     /// The maximum number of concurrent readers or [`None`] if it was not specified.
@@ -64,12 +67,14 @@ pub struct SimplifiedOpenOptions {
     pub flags: u32,
 }
 
-impl<E: Encrypt, C: Checksum> From<&EnvOpenOptions<E, C>> for SimplifiedOpenOptions {
+impl<E: AeadMutInPlace + KeyInit, C: Checksum> From<&EnvOpenOptions<E, C>>
+    for SimplifiedOpenOptions
+{
     fn from(eoo: &EnvOpenOptions<E, C>) -> SimplifiedOpenOptions {
         let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = eoo;
         SimplifiedOpenOptions {
-            checksum_name: checksum.map(|_| E::name()),
-            encrypt_name: encrypt.as_ref().map(|_| C::name()),
+            checksum_name: checksum.map(|_| C::name()),
+            use_encryption: encrypt.is_some(),
             map_size: *map_size,
             max_readers: *max_readers,
             max_dbs: *max_dbs,
@@ -162,60 +167,53 @@ impl Checksum for DummyChecksum {
     fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
 }
 
-/// Describes an encryption/decryption algorithm to ensure pages
-/// are readable only with the right key.
-pub trait Encrypt {
-    /// The name of the encryption/decryption algorithm, used for safety purposes.
-    ///
-    /// Make sure that the name corresponds to the algorithm, it will be compared
-    /// whenever an [`Env`] is opened and tried to be opened a second time.
-    fn name() -> String;
-
-    /// Takes the input bytes and writes them in the output slice of the same length.
-    fn encrypt_decrypt(
-        action: EncryptDecrypt,
-        input: &[u8],
-        output: &mut [u8],
-        key: &[u8],
-        iv: &[u8],
-        auth: &[u8],
-    ) -> StdResult<(), ()>;
-}
-
-/// The action to perform on the page.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum EncryptDecrypt {
-    Encrypt,
-    Decrypt,
-}
-
 /// A dummy encryption/decryption algorithm that must never be used.
 /// Only here for Rust API purposes.
 pub enum DummyEncrypt {}
 
-impl Encrypt for DummyEncrypt {
-    fn name() -> String {
-        String::new()
+impl AeadMutInPlace for DummyEncrypt {
+    fn encrypt_in_place_detached(
+        &mut self,
+        _nonce: &Nonce<Self>,
+        _associated_data: &[u8],
+        _buffer: &mut [u8],
+    ) -> aead::Result<Tag<Self>> {
+        Err(aead::Error)
     }
 
-    fn encrypt_decrypt(
-        _action: EncryptDecrypt,
-        _input: &[u8],
-        _output: &mut [u8],
-        _key: &[u8],
-        _iv: &[u8],
-        _auth: &[u8],
-    ) -> StdResult<(), ()> {
-        Err(())
+    fn decrypt_in_place_detached(
+        &mut self,
+        _nonce: &Nonce<Self>,
+        _associated_data: &[u8],
+        _buffer: &mut [u8],
+        _tag: &Tag<Self>,
+    ) -> aead::Result<()> {
+        Err(aead::Error)
+    }
+}
+
+impl AeadCore for DummyEncrypt {
+    type NonceSize = U0;
+    type TagSize = U0;
+    type CiphertextOverhead = U0;
+}
+
+impl KeySizeUser for DummyEncrypt {
+    type KeySize = U0;
+}
+
+impl KeyInit for DummyEncrypt {
+    fn new(_key: &GenericArray<u8, Self::KeySize>) -> Self {
+        todo!()
     }
 }
 
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions<E: Encrypt = DummyEncrypt, C: Checksum = DummyChecksum> {
+pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit = DummyEncrypt, C: Checksum = DummyChecksum> {
     checksum: Option<PhantomData<C>>,
-    encrypt: Option<(PhantomData<E>, Vec<u8>, u32)>,
+    encrypt: Option<(PhantomData<E>, Vec<u8>)>,
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
@@ -228,12 +226,12 @@ impl Default for EnvOpenOptions {
     }
 }
 
-impl<E: Encrypt, C: Checksum> fmt::Debug for EnvOpenOptions<E, C> {
+impl<E: AeadMutInPlace + KeyInit, C: Checksum> fmt::Debug for EnvOpenOptions<E, C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = self;
         f.debug_struct("EnvOpenOptions")
             .field("checksum", &checksum.map(|_| C::name()))
-            .field("encrypt", &encrypt.as_ref().map(|_| E::name()))
+            .field("encrypt", &encrypt.is_some())
             .field("map_size", &map_size)
             .field("max_readers", &max_readers)
             .field("max_dbs", &max_dbs)
@@ -256,7 +254,7 @@ impl EnvOpenOptions {
     }
 }
 
-impl<E: Encrypt, C: Checksum> EnvOpenOptions<E, C> {
+impl<E: AeadMutInPlace + KeyInit, C: Checksum> EnvOpenOptions<E, C> {
     /// Set the size of the memory map to use for this environment.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
@@ -280,11 +278,11 @@ impl<E: Encrypt, C: Checksum> EnvOpenOptions<E, C> {
     ///
     /// It is advised to use a checksum algorithm when an encryption/decryption algorithm
     /// is specified to get better error messages when the encryption key is wrong.
-    pub fn encrypt_with<F: Encrypt>(self, key: Vec<u8>, auth_size: u32) -> EnvOpenOptions<F, C> {
+    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Vec<u8>) -> EnvOpenOptions<F, C> {
         let EnvOpenOptions { checksum, encrypt: _, map_size, max_readers, max_dbs, flags } = self;
         EnvOpenOptions {
             checksum,
-            encrypt: Some((PhantomData, key, auth_size)),
+            encrypt: Some((PhantomData, key)),
             map_size,
             max_readers,
             max_dbs,
@@ -399,13 +397,13 @@ impl<E: Encrypt, C: Checksum> EnvOpenOptions<E, C> {
                         ))?;
                     }
 
-                    if let Some((_marker, key, auth_size)) = &self.encrypt {
+                    if let Some((_marker, key)) = &self.encrypt {
                         let key = crate::into_val(key);
                         mdb_result(ffi::mdb_env_set_encrypt(
                             env,
                             Some(encrypt_func_wrapper::<E>),
                             &key,
-                            *auth_size,
+                            <E as AeadCore>::TagSize::U32,
                         ))?;
                     }
 
@@ -472,9 +470,52 @@ impl<E: Encrypt, C: Checksum> EnvOpenOptions<E, C> {
     }
 }
 
+fn encrypt<A: AeadMutInPlace + KeyInit>(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    plaintext: &[u8],
+    chipertext_out: &mut [u8],
+    auth_out: &mut [u8],
+) -> aead::Result<()> {
+    chipertext_out.copy_from_slice(plaintext);
+    let key: &Key<A> = key.try_into().unwrap();
+    // TODO is it correct to do that?
+    let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
+        nonce[..A::NonceSize::USIZE].into()
+    } else {
+        return Err(aead::Error);
+    };
+    let mut aead = A::new(key);
+    let tag = aead.encrypt_in_place_detached(nonce, aad, chipertext_out)?;
+    auth_out.copy_from_slice(&tag);
+    Ok(())
+}
+
+fn decrypt<A: AeadMutInPlace + KeyInit>(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    chipher_text: &[u8],
+    output: &mut [u8],
+    auth_in: &[u8],
+) -> aead::Result<()> {
+    output.copy_from_slice(chipher_text);
+    let key: &Key<A> = key.try_into().unwrap();
+    // TODO is it correct to do that?
+    let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
+        nonce[..A::NonceSize::USIZE].into()
+    } else {
+        return Err(aead::Error);
+    };
+    let tag: &Tag<A> = auth_in.try_into().unwrap();
+    let mut aead = A::new(key);
+    aead.decrypt_in_place_detached(nonce, aad, output, tag)
+}
+
 /// The wrapper function that is called by LMDB that directly calls
 /// the Rust idiomatic function internally.
-unsafe extern "C" fn encrypt_func_wrapper<E: Encrypt>(
+unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
     src: *const MDB_val,
     dst: *mut MDB_val,
     key_ptr: *const MDB_val,
@@ -488,14 +529,20 @@ unsafe extern "C" fn encrypt_func_wrapper<E: Encrypt>(
             (*key_ptr.offset(1)).mv_data as *const u8,
             (*key_ptr.offset(1)).mv_size,
         );
-        let auth = std::slice::from_raw_parts(
-            (*key_ptr.offset(2)).mv_data as *const u8,
+        let auth = std::slice::from_raw_parts_mut(
+            (*key_ptr.offset(2)).mv_data as *mut u8,
             (*key_ptr.offset(2)).mv_size,
         );
 
-        let action = if encdec == 1 { EncryptDecrypt::Encrypt } else { EncryptDecrypt::Decrypt };
+        let aad = [];
+        let nonce = iv;
+        let result = if encdec == 1 {
+            encrypt::<E>(&key, nonce, &aad, input, output, auth)
+        } else {
+            decrypt::<E>(&key, nonce, &aad, input, output, auth)
+        };
 
-        E::encrypt_decrypt(action, input, output, key, iv, auth).is_err() as i32
+        result.is_err() as i32
     });
 
     match result {

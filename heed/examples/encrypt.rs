@@ -2,62 +2,19 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use chacha20::cipher::{KeyIvInit, StreamCipher};
-use chacha20::ChaCha20;
+use chacha20poly1305::ChaCha20Poly1305;
 use heed::types::*;
-use heed::{Checksum, Database, Encrypt, EncryptDecrypt, EnvOpenOptions};
-
-enum Crc32Checksum {}
-
-impl Checksum for Crc32Checksum {
-    const SIZE: u32 = 32 / 8;
-
-    fn name() -> String {
-        String::from("crc32")
-    }
-
-    fn checksum(input: &[u8], output: &mut [u8], _key: Option<&[u8]>) {
-        let checksum = crc32fast::hash(input);
-        output.copy_from_slice(&checksum.to_le_bytes());
-    }
-}
-
-enum Chacha20Encrypt {}
-
-impl Encrypt for Chacha20Encrypt {
-    fn name() -> String {
-        String::from("chacha20")
-    }
-
-    fn encrypt_decrypt(
-        _action: EncryptDecrypt,
-        input: &[u8],
-        output: &mut [u8],
-        key: &[u8],
-        iv: &[u8],
-        _auth: &[u8],
-    ) -> Result<(), ()> {
-        Ok(ChaCha20::new_from_slices(key, &iv[..12])
-            .map_err(drop)?
-            .apply_keystream_b2b(input, output)
-            .map_err(drop)?)
-    }
-}
+use heed::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("encrypt.mdb");
     let password: &[_; 32] = b"I told you this is my password!!";
-    let mac_size = 0;
 
     let _ = fs::remove_dir_all(&env_path);
     fs::create_dir_all(&env_path)?;
 
     // We open the environment
-    let mut options = EnvOpenOptions::new()
-        .encrypt_with::<Chacha20Encrypt>(password.to_vec(), mac_size)
-        // By setting the checksum function we will have checksum errors if the decryption
-        // fail instead of random LMDB errors due to invalid data in the decrypted pages
-        .checksum_with::<Crc32Checksum>();
+    let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(password.to_vec());
     let env = options
         .map_size(10 * 1024 * 1024) // 10MB
         .max_dbs(3)
