@@ -1,6 +1,6 @@
 [package]
 name = "heed"
-version = "0.12.2"
+version = "0.12.4"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB/MDBX wrapper with minimum overhead"
 license = "MIT"
@@ -15,7 +15,7 @@ byteorder = { version = "1.3.4", default-features = false }
 heed-traits = { version = "0.7.0", path = "../heed-traits" }
 heed-types = { version = "0.7.2", path = "../heed-types" }
 libc = "0.2.80"
-lmdb-rkv-sys = { git = "https://github.com/meilisearch/lmdb-rs", optional = true }
+lmdb-rkv-sys = { git = "https://github.com/meilisearch/lmdb-rs", features = ["vendored"], optional = true }
 mdbx-sys = { version = "0.7.1", optional = true }
 once_cell = "1.5.2"
 page_size = "0.4.2"
