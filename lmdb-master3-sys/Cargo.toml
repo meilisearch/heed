@@ -32,9 +32,10 @@ bindgen = { version = "0.60.1", default-features = false, optional = true, featu
 
 [features]
 default = []
-with-asan = []
-with-fuzzer = []
-with-fuzzer-no-link = []
+vendored = []
+with-asan = ["vendored"]
+with-fuzzer = ["vendored"]
+with-fuzzer-no-link = ["vendored"]
 
 # These features configure the MDB_IDL_LOGN macro, which determines
 # the size of the free and dirty page lists (and thus the amount of memory
