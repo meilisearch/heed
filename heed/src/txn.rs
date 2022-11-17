@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use std::{marker, ptr};
+use std::ptr;
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -50,27 +50,26 @@ fn abort_txn(txn: *mut ffi::MDB_txn) {
 }
 
 /// A read-write transaction.
-pub struct RwTxn<'e, 'p> {
-    pub(crate) txn: RoTxn<'e>,
-    _parent: marker::PhantomData<&'p mut ()>,
+pub struct RwTxn<'p> {
+    pub(crate) txn: RoTxn<'p>,
 }
 
-impl<'e> RwTxn<'e, 'e> {
-    pub(crate) fn new(env: &'e Env) -> Result<RwTxn<'e, 'e>> {
+impl<'p> RwTxn<'p> {
+    pub(crate) fn new(env: &'p Env) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), ptr::null_mut(), 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env }, _parent: marker::PhantomData })
+        Ok(RwTxn { txn: RoTxn { txn, env } })
     }
 
-    pub(crate) fn nested<'p: 'e>(env: &'e Env, parent: &'p mut RwTxn) -> Result<RwTxn<'e, 'p>> {
+    pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env }, _parent: marker::PhantomData })
+        Ok(RwTxn { txn: RoTxn { txn, env } })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
@@ -89,8 +88,8 @@ impl<'e> RwTxn<'e, 'e> {
     }
 }
 
-impl<'e, 'p> Deref for RwTxn<'e, 'p> {
-    type Target = RoTxn<'e>;
+impl<'p> Deref for RwTxn<'p> {
+    type Target = RoTxn<'p>;
 
     fn deref(&self) -> &Self::Target {
         &self.txn

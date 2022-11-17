@@ -571,11 +571,11 @@ impl Env {
     ///
     /// A parent transaction and its cursors may not issue any other operations than _commit_ and
     /// _abort_ while it has active child transactions.
-    pub fn nested_write_txn<'e, 'p: 'e>(&'e self, parent: &'p mut RwTxn) -> Result<RwTxn<'e, 'p>> {
+    pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         RwTxn::nested(self, parent)
     }
 
-    /// Create a transaction with read only access for use with the environment.
+    /// Create a transaction with read-only access for use with the environment.
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
     }
