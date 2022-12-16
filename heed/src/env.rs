@@ -154,7 +154,7 @@ impl<E: AeadMutInPlace + KeyInit> fmt::Debug for EnvOpenOptions<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let EnvOpenOptions { encrypt, map_size, max_readers, max_dbs, flags } = self;
         f.debug_struct("EnvOpenOptions")
-            .field("encrypt", &encrypt.is_some())
+            .field("encrypted", &encrypt.is_some())
             .field("map_size", &map_size)
             .field("max_readers", &max_readers)
             .field("max_dbs", &max_dbs)
@@ -196,17 +196,64 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
         self
     }
 
-    /// Specifies that the [`Env`] will be encrypted/decrypted with this `F` algorithm,
-    /// with this `key` and the `auth_size` that can be zero.
+    /// Specifies that the [`Env`] will be encrypted using the `A` algorithm with the given `key`.
     ///
-    /// It is advised to use a checksum algorithm when an encryption/decryption algorithm
-    /// is specified to get better error messages when the encryption key is wrong.
-    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Key<F>) -> EnvOpenOptions<F> {
+    /// You can find more compatible algorithms on [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
+    ///
+    /// Note that you cannot use any type of encryption algorithm as LMDB exposes a nonce of 16 bytes.
+    /// Heed makes sure to truncate it if necessary.
+    ///
+    /// As an example, XChaCha20 requires a 20 bytes long nonce. However, XChaCha20 is used to protect
+    /// against nonce misuse in systems that use randomly generated nonces i.e., to protect against
+    /// weak RNGs. There is no need to use this kind of algorithm in LMDB since LMDB nonces aren't
+    /// random and are guaranteed to be unique.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use argon2::Argon2;
+    /// use chacha20poly1305::{ChaCha20Poly1305, Key};
+    /// use heed::types::*;
+    /// use heed::{EnvOpenOptions, Database};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let password = "This is the password that will be hashed by the argon2 algorithm";
+    /// let salt = "The salt added to the password hashes to add more security when stored";
+    ///
+    /// let _ = fs::remove_dir_all(&env_path);
+    /// fs::create_dir_all(&env_path)?;
+    ///
+    /// let mut key = Key::default();
+    /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
+    ///
+    /// // We open the environment
+    /// let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
+    /// let env = options
+    ///     .map_size(10 * 1024 * 1024) // 10MB
+    ///     .max_dbs(3)
+    ///     .open(&env_path)?;
+    ///
+    /// let key1 = "first-key";
+    /// let val1 = "this is a secret info";
+    /// let key2 = "second-key";
+    /// let val2 = "this is another secret info";
+    ///
+    /// // We create database and write secret values in it
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    /// db.put(&mut wtxn, key1, val1)?;
+    /// db.put(&mut wtxn, key2, val2)?;
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn encrypt_with<A: AeadMutInPlace + KeyInit>(self, key: Key<A>) -> EnvOpenOptions<A> {
         let EnvOpenOptions { encrypt: _, map_size, max_readers, max_dbs, flags } = self;
         EnvOpenOptions { encrypt: Some((PhantomData, key)), map_size, max_readers, max_dbs, flags }
     }
 
     /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
+    ///
     /// ```
     /// use std::fs;
     /// use std::path::Path;

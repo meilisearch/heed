@@ -10,7 +10,7 @@ use heed::{Database, EnvOpenOptions};
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("encrypt.mdb");
     let password = "This is the password that will be hashed by the argon2 algorithm";
-    let salt = "The salt your application must choose for password hashes to be less leaky";
+    let salt = "The salt added to the password hashes to add more security when stored";
 
     let _ = fs::remove_dir_all(&env_path);
     fs::create_dir_all(&env_path)?;
