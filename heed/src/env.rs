@@ -53,8 +53,6 @@ struct EnvEntry {
 /// A simplified version of the options that were used to open a given [`Env`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimplifiedOpenOptions {
-    /// The name of the checksum algorithm this [`Env`] has been opened with.
-    pub checksum_name: Option<String>,
     /// Weither this [`Env`] has been opened with an encryption/decryption algorithm.
     pub use_encryption: bool,
     /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
@@ -67,13 +65,10 @@ pub struct SimplifiedOpenOptions {
     pub flags: u32,
 }
 
-impl<E: AeadMutInPlace + KeyInit, C: Checksum> From<&EnvOpenOptions<E, C>>
-    for SimplifiedOpenOptions
-{
-    fn from(eoo: &EnvOpenOptions<E, C>) -> SimplifiedOpenOptions {
-        let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = eoo;
+impl<E: AeadMutInPlace + KeyInit> From<&EnvOpenOptions<E>> for SimplifiedOpenOptions {
+    fn from(eoo: &EnvOpenOptions<E>) -> SimplifiedOpenOptions {
+        let EnvOpenOptions { encrypt, map_size, max_readers, max_dbs, flags } = eoo;
         SimplifiedOpenOptions {
-            checksum_name: checksum.map(|_| C::name()),
             use_encryption: encrypt.is_some(),
             map_size: *map_size,
             max_readers: *max_readers,
@@ -138,35 +133,6 @@ unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
     File::from(owned).metadata()
 }
 
-/// Describes a check-summing algorithm that ensure the correctness of the pages.
-pub trait Checksum {
-    /// The number of bytes the checksum value takes.
-    const SIZE: u32;
-
-    /// The name of the check-summing algorithm, used for safety purposes.
-    ///
-    /// Make sure that the name corresponds to the algorithm, it will be compared
-    /// whenever an [`Env`] is opened and tried to be opened a second time.
-    fn name() -> String;
-
-    /// Takes the input and must write in the output that is `Self::SIZE` long.
-    fn checksum(input: &[u8], output: &mut [u8], key: Option<&[u8]>);
-}
-
-/// A dummy check-summing algorithm that must never be used.
-/// Only here for Rust API purposes.
-pub enum DummyChecksum {}
-
-impl Checksum for DummyChecksum {
-    const SIZE: u32 = 32 / 8;
-
-    fn name() -> String {
-        String::new()
-    }
-
-    fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
-}
-
 /// A dummy encryption/decryption algorithm that must never be used.
 /// Only here for Rust API purposes.
 pub enum DummyEncrypt {}
@@ -211,8 +177,7 @@ impl KeyInit for DummyEncrypt {
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit = DummyEncrypt, C: Checksum = DummyChecksum> {
-    checksum: Option<PhantomData<C>>,
+pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit = DummyEncrypt> {
     encrypt: Option<(PhantomData<E>, Key<E>)>,
     map_size: Option<usize>,
     max_readers: Option<u32>,
@@ -226,11 +191,10 @@ impl Default for EnvOpenOptions {
     }
 }
 
-impl<E: AeadMutInPlace + KeyInit, C: Checksum> fmt::Debug for EnvOpenOptions<E, C> {
+impl<E: AeadMutInPlace + KeyInit> fmt::Debug for EnvOpenOptions<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvOpenOptions { checksum, encrypt, map_size, max_readers, max_dbs, flags } = self;
+        let EnvOpenOptions { encrypt, map_size, max_readers, max_dbs, flags } = self;
         f.debug_struct("EnvOpenOptions")
-            .field("checksum", &checksum.map(|_| C::name()))
             .field("encrypt", &encrypt.is_some())
             .field("map_size", &map_size)
             .field("max_readers", &max_readers)
@@ -254,7 +218,7 @@ impl EnvOpenOptions {
     }
 }
 
-impl<E: AeadMutInPlace + KeyInit, C: Checksum> EnvOpenOptions<E, C> {
+impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// Set the size of the memory map to use for this environment.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
@@ -278,29 +242,9 @@ impl<E: AeadMutInPlace + KeyInit, C: Checksum> EnvOpenOptions<E, C> {
     ///
     /// It is advised to use a checksum algorithm when an encryption/decryption algorithm
     /// is specified to get better error messages when the encryption key is wrong.
-    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Key<F>) -> EnvOpenOptions<F, C> {
-        let EnvOpenOptions { checksum, encrypt: _, map_size, max_readers, max_dbs, flags } = self;
-        EnvOpenOptions {
-            checksum,
-            encrypt: Some((PhantomData, key)),
-            map_size,
-            max_readers,
-            max_dbs,
-            flags,
-        }
-    }
-
-    /// Specifies that the [`Env`] will be checksum-checked with this `D` algorithm.
-    pub fn checksum_with<D: Checksum>(self) -> EnvOpenOptions<E, D> {
-        let EnvOpenOptions { checksum: _, encrypt, map_size, max_readers, max_dbs, flags } = self;
-        EnvOpenOptions {
-            checksum: Some(PhantomData),
-            encrypt,
-            map_size,
-            max_readers,
-            max_dbs,
-            flags,
-        }
+    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Key<F>) -> EnvOpenOptions<F> {
+        let EnvOpenOptions { encrypt: _, map_size, max_readers, max_dbs, flags } = self;
+        EnvOpenOptions { encrypt: Some((PhantomData, key)), map_size, max_readers, max_dbs, flags }
     }
 
     /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
@@ -388,14 +332,6 @@ impl<E: AeadMutInPlace + KeyInit, C: Checksum> EnvOpenOptions<E, C> {
                 unsafe {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
                     mdb_result(ffi::mdb_env_create(&mut env))?;
-
-                    if let Some(_marker) = &self.checksum {
-                        mdb_result(ffi::mdb_env_set_checksum(
-                            env,
-                            Some(checksum_func_wrapper::<C>),
-                            C::SIZE,
-                        ))?;
-                    }
 
                     if let Some((_marker, key)) = &self.encrypt {
                         let key = crate::into_val(key);
@@ -546,31 +482,6 @@ unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
     match result {
         Ok(out) => out,
         Err(_) => 1,
-    }
-}
-
-/// The wrapper function that is called by LMDB that directly calls
-/// the Rust idiomatic function internally.
-unsafe extern "C" fn checksum_func_wrapper<C: Checksum>(
-    src: *const MDB_val,
-    dst: *mut MDB_val,
-    key_ptr: *const MDB_val,
-) {
-    let result = catch_unwind(|| {
-        let input = std::slice::from_raw_parts((*src).mv_data as *const u8, (*src).mv_size);
-        let output = std::slice::from_raw_parts_mut((*dst).mv_data as *mut u8, (*dst).mv_size);
-        let key = if key_ptr.is_null() {
-            None
-        } else {
-            Some(std::slice::from_raw_parts((*key_ptr).mv_data as *const u8, (*key_ptr).mv_size))
-        };
-        C::checksum(input, output, key)
-    });
-
-    match result {
-        Ok(()) => (),
-        // TODO unfortunately there is no way to tell LMDB that the checksum failed
-        Err(_) => (),
     }
 }
 
