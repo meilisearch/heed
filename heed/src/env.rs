@@ -133,47 +133,6 @@ unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
     File::from(owned).metadata()
 }
 
-/// A dummy encryption/decryption algorithm that must never be used.
-/// Only here for Rust API purposes.
-pub enum DummyEncrypt {}
-
-impl AeadMutInPlace for DummyEncrypt {
-    fn encrypt_in_place_detached(
-        &mut self,
-        _nonce: &Nonce<Self>,
-        _associated_data: &[u8],
-        _buffer: &mut [u8],
-    ) -> aead::Result<Tag<Self>> {
-        Err(aead::Error)
-    }
-
-    fn decrypt_in_place_detached(
-        &mut self,
-        _nonce: &Nonce<Self>,
-        _associated_data: &[u8],
-        _buffer: &mut [u8],
-        _tag: &Tag<Self>,
-    ) -> aead::Result<()> {
-        Err(aead::Error)
-    }
-}
-
-impl AeadCore for DummyEncrypt {
-    type NonceSize = U0;
-    type TagSize = U0;
-    type CiphertextOverhead = U0;
-}
-
-impl KeySizeUser for DummyEncrypt {
-    type KeySize = U0;
-}
-
-impl KeyInit for DummyEncrypt {
-    fn new(_key: &GenericArray<u8, Self::KeySize>) -> Self {
-        todo!()
-    }
-}
-
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1020,6 +979,47 @@ impl EnvClosingEvent {
 impl fmt::Debug for EnvClosingEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EnvClosingEvent").finish()
+    }
+}
+
+/// A dummy encryption/decryption algorithm that must never be used.
+/// Only here for Rust API purposes.
+pub enum DummyEncrypt {}
+
+impl AeadMutInPlace for DummyEncrypt {
+    fn encrypt_in_place_detached(
+        &mut self,
+        _nonce: &Nonce<Self>,
+        _associated_data: &[u8],
+        _buffer: &mut [u8],
+    ) -> aead::Result<Tag<Self>> {
+        Err(aead::Error)
+    }
+
+    fn decrypt_in_place_detached(
+        &mut self,
+        _nonce: &Nonce<Self>,
+        _associated_data: &[u8],
+        _buffer: &mut [u8],
+        _tag: &Tag<Self>,
+    ) -> aead::Result<()> {
+        Err(aead::Error)
+    }
+}
+
+impl AeadCore for DummyEncrypt {
+    type NonceSize = U0;
+    type TagSize = U0;
+    type CiphertextOverhead = U0;
+}
+
+impl KeySizeUser for DummyEncrypt {
+    type KeySize = U0;
+}
+
+impl KeyInit for DummyEncrypt {
+    fn new(_key: &GenericArray<u8, Self::KeySize>) -> Self {
+        panic!("This DummyEncrypt type must not be used")
     }
 }
 
