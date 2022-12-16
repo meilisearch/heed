@@ -11,7 +11,7 @@ readme = "../README.md"
 edition = "2021"
 
 [dependencies]
-aead = "0.5.1"
+aead = { version = "0.5.1", default-features = false }
 bitflags = { version = "2.3.3", features = ["serde"] }
 bytemuck = "1.12.3"
 byteorder = { version = "1.4.3", default-features = false }
