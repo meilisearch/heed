@@ -15,6 +15,7 @@ aead = "0.5.1"
 bitflags = { version = "2.3.3", features = ["serde"] }
 bytemuck = "1.12.3"
 byteorder = { version = "1.4.3", default-features = false }
+generic-array = { version = "0.14.6", features = ["serde"] }
 heed-traits = { version = "0.20.0-alpha.8", path = "../heed-traits" }
 heed-types = { version = "0.20.0-alpha.8", default-features = false, path = "../heed-types" }
 libc = "0.2.139"
@@ -25,6 +26,7 @@ serde = { version = "1.0.151", features = ["derive"], optional = true }
 synchronoise = "1.0.1"
 
 [dev-dependencies]
+argon2 = { version = "0.4.1", features = ["std"] }
 bytemuck = { version = "1.12.1", features = ["derive"] }
 chacha20 = "0.9.0"
 chacha20poly1305 = "0.10.1"

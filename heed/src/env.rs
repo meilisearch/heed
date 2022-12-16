@@ -213,7 +213,7 @@ impl KeyInit for DummyEncrypt {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit = DummyEncrypt, C: Checksum = DummyChecksum> {
     checksum: Option<PhantomData<C>>,
-    encrypt: Option<(PhantomData<E>, Vec<u8>)>,
+    encrypt: Option<(PhantomData<E>, Key<E>)>,
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
@@ -278,7 +278,7 @@ impl<E: AeadMutInPlace + KeyInit, C: Checksum> EnvOpenOptions<E, C> {
     ///
     /// It is advised to use a checksum algorithm when an encryption/decryption algorithm
     /// is specified to get better error messages when the encryption key is wrong.
-    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Vec<u8>) -> EnvOpenOptions<F, C> {
+    pub fn encrypt_with<F: AeadMutInPlace + KeyInit>(self, key: Key<F>) -> EnvOpenOptions<F, C> {
         let EnvOpenOptions { checksum, encrypt: _, map_size, max_readers, max_dbs, flags } = self;
         EnvOpenOptions {
             checksum,
@@ -480,7 +480,6 @@ fn encrypt<A: AeadMutInPlace + KeyInit>(
 ) -> aead::Result<()> {
     chipertext_out.copy_from_slice(plaintext);
     let key: &Key<A> = key.try_into().unwrap();
-    // TODO is it correct to do that?
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
         nonce[..A::NonceSize::USIZE].into()
     } else {
@@ -502,7 +501,6 @@ fn decrypt<A: AeadMutInPlace + KeyInit>(
 ) -> aead::Result<()> {
     output.copy_from_slice(chipher_text);
     let key: &Key<A> = key.try_into().unwrap();
-    // TODO is it correct to do that?
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
         nonce[..A::NonceSize::USIZE].into()
     } else {
