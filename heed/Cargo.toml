@@ -32,12 +32,18 @@ url = "2.2.0"
 [features]
 # The `serde` feature makes some types serializable,
 # like the `EnvOpenOptions` struct.
-default = ["serde", "serde-bincode", "serde-json"]
+default = ["serde", "serde-bincode", "serde-json", "posix-sem"]
 
 # The NO_TLS flag is automatically set on Env opening and
 # RoTxn implements the Sync trait. This allow the user to reference
 # a read-only transaction from multiple threads at the same time.
 sync-read-txn = []
+
+# Whether to tell LMDB to use POSIX semaphores during compilation
+# (instead of System V semaphores).
+# POSIX semaphores are required for Apple's App Sandbox on iOS & macOS,
+# and are possibly faster and more appropriate for single-process use.
+posix-sem = ["lmdb-rkv-sys/posix-sem"]
 
 # Enable the serde en/decoders for bincode or serde_json
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]
