@@ -146,7 +146,7 @@ mod tests {
     }
 }
 
-macro_rules! assert_matching_env_txn {
+macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
             $database.env_ident == $txn.env_mut_ptr() as usize,
@@ -155,4 +155,13 @@ macro_rules! assert_matching_env_txn {
     };
 }
 
-pub(crate) use assert_matching_env_txn;
+macro_rules! assert_eq_env_txn {
+    ($env:ident, $txn:ident) => {
+        assert!(
+            $env.env_mut_ptr() == $txn.env_mut_ptr(),
+            "The environment doesn't match the transaction's environment"
+        );
+    };
+}
+
+pub(crate) use {assert_eq_env_db_txn, assert_eq_env_txn};

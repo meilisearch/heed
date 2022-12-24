@@ -22,7 +22,9 @@ use synchronoise::event::SignalEvent;
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Database, Error, Flags, PolyDatabase, Result, RoCursor, RoTxn, RwTxn};
+use crate::{
+    assert_eq_env_txn, Database, Error, Flags, PolyDatabase, Result, RoCursor, RoTxn, RwTxn,
+};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -297,7 +299,7 @@ impl Drop for EnvInner {
                 unsafe {
                     let _ = ffi::mdb_env_close(self.env);
                 }
-                // We signal to all the waiters that we have closed the env.
+                // We signal to all the waiters that the env is closed now.
                 signal_event.signal();
             }
         }
@@ -442,6 +444,8 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
+        assert_eq_env_txn!(self, rtxn);
+
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         match self.raw_init_database(rtxn.txn, name, Some(types), false) {
             Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
@@ -464,6 +468,8 @@ impl Env {
         rtxn: &RoTxn,
         name: Option<&str>,
     ) -> Result<Option<PolyDatabase>> {
+        assert_eq_env_txn!(self, rtxn);
+
         match self.raw_init_database(rtxn.txn, name, None, false) {
             Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
@@ -489,6 +495,8 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
+        assert_eq_env_txn!(self, wtxn);
+
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
             Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
@@ -510,6 +518,8 @@ impl Env {
         wtxn: &mut RwTxn,
         name: Option<&str>,
     ) -> Result<PolyDatabase> {
+        assert_eq_env_txn!(self, wtxn);
+
         match self.raw_init_database(wtxn.txn.txn, name, None, true) {
             Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
