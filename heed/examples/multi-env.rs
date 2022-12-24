@@ -21,19 +21,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max_dbs(3000)
         .open(env2_path)?;
 
-    let mut wtxn = env1.write_txn()?;
-    let db1: Database<Str, ByteSlice> = env1.create_database(&mut wtxn, Some("hello"))?;
+    let mut wtxn1 = env1.write_txn()?;
+    let mut wtxn2 = env2.write_txn()?;
+    let db1: Database<Str, ByteSlice> = env1.create_database(&mut wtxn1, Some("hello"))?;
     let db2: Database<OwnedType<u32>, OwnedType<u32>> =
-        env2.create_database(&mut wtxn, Some("hello"))?;
+        env2.create_database(&mut wtxn2, Some("hello"))?;
 
     // clear db
-    db1.clear(&mut wtxn)?;
-    wtxn.commit()?;
+    db1.clear(&mut wtxn1)?;
+    wtxn1.commit()?;
 
     // clear db
-    let mut wtxn = env2.write_txn()?;
-    db2.clear(&mut wtxn)?;
-    wtxn.commit()?;
+    db2.clear(&mut wtxn2)?;
+    wtxn2.commit()?;
 
     // -----
 
