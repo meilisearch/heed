@@ -7,6 +7,10 @@ use std::path::PathBuf;
 struct Callbacks;
 
 impl ParseCallbacks for Callbacks {
+    fn process_comment(&self, comment: &str) -> Option<String> {
+        Some(doxygen_rs::transform(comment))
+    }
+
     fn int_macro(&self, name: &str, _value: i64) -> Option<IntKind> {
         match name {
             "MDB_SUCCESS"

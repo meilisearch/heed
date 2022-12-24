@@ -25,9 +25,10 @@ name = "lmdb_master3_sys"
 libc = "0.2.139"
 
 [build-dependencies]
-pkg-config = "0.3.26"
-cc = "1.0.78"
 bindgen = { version = "0.63.0", default-features = false, optional = true, features = ["runtime"] }
+cc = "1.0.78"
+doxygen-rs = "0.2.2"
+pkg-config = "0.3.26"
 
 [features]
 default = []
