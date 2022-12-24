@@ -1,7 +1,7 @@
 use lmdb_master3_sys::*;
 
 use std::ffi::c_void;
-use std::fs::File;
+use std::fs::{self, File};
 use std::ptr;
 
 // https://github.com/victorporof/lmdb/blob/mdb.master/libraries/liblmdb/moz-test.c
@@ -46,6 +46,9 @@ fn get_file_fd(file: &File) -> std::os::unix::io::RawFd {
 }
 
 fn test_simple(env_path: &str) {
+    let _ = fs::remove_dir_all(env_path);
+    fs::create_dir_all(env_path).unwrap();
+
     let mut env: *mut MDB_env = ptr::null_mut();
     let mut dbi: MDB_dbi = 0;
     let mut key = MDB_val {
