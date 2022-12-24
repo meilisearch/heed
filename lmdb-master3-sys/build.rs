@@ -42,13 +42,13 @@ fn main() {
             .flag_if_supported("-Wbad-function-cast")
             .flag_if_supported("-Wuninitialized");
 
-        if env::var("CARGO_FEATURE_WITH_ASAN").is_ok() {
+        if cfg!(feature = "with-asan") {
             builder.flag("-fsanitize=address");
         }
 
-        if env::var("CARGO_FEATURE_WITH_FUZZER").is_ok() {
+        if cfg!(feature = "with-fuzzer") {
             builder.flag("-fsanitize=fuzzer");
-        } else if env::var("CARGO_FEATURE_WITH_FUZZER_NO_LINK").is_ok() {
+        } else if cfg!(feature = "with-fuzzer-no-link") {
             builder.flag("-fsanitize=fuzzer-no-link");
         }
 
