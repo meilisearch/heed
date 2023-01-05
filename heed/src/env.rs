@@ -7,6 +7,7 @@ use std::fs::File;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use std::{io, ptr, sync};
@@ -212,6 +213,7 @@ impl EnvOpenOptions {
                                 env,
                                 dbi_open_mutex: sync::Mutex::default(),
                                 path: path.clone(),
+                                closing: AtomicBool::new(false),
                             };
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
@@ -246,6 +248,7 @@ struct EnvInner {
     env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
     path: PathBuf,
+    closing: AtomicBool,
 }
 
 unsafe impl Send for EnvInner {}
@@ -490,10 +493,17 @@ impl Env {
     }
 
     pub fn write_txn(&self) -> Result<RwTxn> {
+        // Note: this call is inherently racy, we cannot prevent the state of the boolean from changing after it returned `false`,
+        // so to have a transaction open after preparing the environment for closing, and the implementation should always take
+        // this possibility into account, if only because there could be transactions already opened at the time where prepare for closing is called.
+        //
+        // However, this call **does** guarantee that once it fails, it will always consistently fail for all future transactions on this environment.
+        self.fail_if_closing()?;
         RwTxn::new(self)
     }
 
     pub fn typed_write_txn<T>(&self) -> Result<RwTxn<T>> {
+        self.fail_if_closing()?;
         RwTxn::<T>::new(self)
     }
 
@@ -505,10 +515,12 @@ impl Env {
     }
 
     pub fn read_txn(&self) -> Result<RoTxn> {
+        self.fail_if_closing()?;
         RoTxn::new(self)
     }
 
     pub fn typed_read_txn<T>(&self) -> Result<RoTxn<T>> {
+        self.fail_if_closing()?;
         RoTxn::new(self)
     }
 
@@ -565,6 +577,7 @@ impl Env {
     /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
     /// when all references are dropped, the last one will eventually close the environment.
     pub fn prepare_for_closing(self) -> EnvClosingEvent {
+        self.0.closing.store(false, sync::atomic::Ordering::SeqCst);
         let mut lock = OPENED_ENV.write().unwrap();
         let env = lock.get_mut(&self.0.path);
 
@@ -583,6 +596,28 @@ impl Env {
                 EnvClosingEvent(signal_event)
             }
         }
+    }
+
+    fn fail_if_closing(&self) -> Result<()> {
+        if self.is_closing() {
+            return Err(Error::DatabaseClosing);
+        }
+        Ok(())
+    }
+
+    /// `true` if [`Self::prepare_for_closing`] was previously called on this environment.
+    ///
+    /// # Note
+    ///
+    /// As [`Self::prepare_for_closing`] can be called concurrently from another thread, this method returning `false` does
+    /// not guarantee that a later call to [`Self::read_txn`] or any other transaction creating method will succeed.
+    ///
+    /// To only way to check for sure is to call the desired method (e.g. [`Self::read_txn`)]) and check for its return value.
+    ///
+    /// It is however guaranteed that once this call returns `true`, all future calls from any thread will always return `true`
+    /// until the environment is closed for good.
+    pub fn is_closing(&self) -> bool {
+        self.0.closing.load(sync::atomic::Ordering::SeqCst)
     }
 }
 
