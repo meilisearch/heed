@@ -11,6 +11,7 @@ license = "Apache-2.0"
 description = "Rust bindings for liblmdb on the mdb.master branch."
 documentation = "https://docs.rs/lmdb-master-sys"
 repository = "https://github.com/meilisearch/heed/tree/main/lmdb-master-sys"
+readme = "README.md"
 keywords = ["LMDB", "database", "storage-engine", "bindings", "library"]
 categories = ["database", "external-ffi-bindings"]
 edition = "2021"
