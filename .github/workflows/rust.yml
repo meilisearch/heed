@@ -1,7 +1,7 @@
 ---
 on: [pull_request]
 
-name: Cargo test
+name: Rust
 jobs:
   check:
     name: Test the heed project
@@ -27,6 +27,30 @@ jobs:
         run: |
           cargo clean
           cargo test
+
+  examples:
+    name: Run the heed examples
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run the examples
+        run: |
+          cargo clean
+          cargo run --example 2>&1 | grep -E '^ ' | xargs -n1 cargo run --example
 
   fmt:
     name: Ensure the heed project is formatted
