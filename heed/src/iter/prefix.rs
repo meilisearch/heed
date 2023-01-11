@@ -15,6 +15,7 @@ fn move_on_prefix_end<'txn>(
     result
 }
 
+/// A read-only prefix iterator structure.
 pub struct RoPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
@@ -72,8 +73,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -101,8 +102,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -114,6 +115,7 @@ where
     }
 }
 
+/// A read-write prefix iterator structure.
 pub struct RwPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
@@ -175,9 +177,36 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the [`RwPrefix::put_current`] method.
+    pub unsafe fn put_current_reserved<'a, F>(
+        &mut self,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -203,8 +232,8 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -253,8 +282,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -282,8 +311,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -295,6 +324,7 @@ where
     }
 }
 
+/// A reverse read-only prefix iterator structure.
 pub struct RoRevPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
@@ -352,8 +382,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -383,8 +413,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -396,6 +426,7 @@ where
     }
 }
 
+/// A reverse read-write prefix iterator structure.
 pub struct RwRevPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
@@ -457,9 +488,36 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the [`RwRevPrefix::put_current`] method.
+    pub unsafe fn put_current_reserved<'a, F>(
+        &mut self,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
     /// Append the given key/value pair to the end of the database.
@@ -485,8 +543,8 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).ok_or(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).ok_or(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -535,8 +593,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None
@@ -566,8 +624,8 @@ where
             Ok(Some((key, data))) => {
                 if key.starts_with(&self.prefix) {
                     match (KC::bytes_decode(key), DC::bytes_decode(data)) {
-                        (Some(key), Some(data)) => Some(Ok((key, data))),
-                        (_, _) => Some(Err(Error::Decoding)),
+                        (Ok(key), Ok(data)) => Some(Ok((key, data))),
+                        (Err(e), _) | (_, Err(e)) => Some(Err(Error::Decoding(e))),
                     }
                 } else {
                     None

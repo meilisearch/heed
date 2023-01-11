@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 use std::{fmt, str};
 
 use libc::c_int;
-use lmdb_sys as ffi;
+use lmdb_master_sys as ffi;
 
 /// An LMDB error kind.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -53,6 +53,8 @@ pub enum Error {
     BadValSize,
     /// The specified DBI was changed unexpectedly.
     BadDbi,
+    /// Unexpected problem - transaction should abort.
+    Problem,
     /// Other error.
     Other(c_int),
 }
@@ -85,6 +87,7 @@ impl Error {
             ffi::MDB_BAD_TXN => Error::BadTxn,
             ffi::MDB_BAD_VALSIZE => Error::BadValSize,
             ffi::MDB_BAD_DBI => Error::BadDbi,
+            ffi::MDB_PROBLEM => Error::Problem,
             other => Error::Other(other),
         }
     }
@@ -113,6 +116,7 @@ impl Error {
             Error::BadTxn => ffi::MDB_BAD_TXN,
             Error::BadValSize => ffi::MDB_BAD_VALSIZE,
             Error::BadDbi => ffi::MDB_BAD_DBI,
+            Error::Problem => ffi::MDB_PROBLEM,
             Error::Other(err_code) => err_code,
         }
     }

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use heed_traits::{BytesDecode, BytesEncode};
+use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 use serde::{Deserialize, Serialize};
 
 /// Describes a type that is [`Serialize`]/[`Deserialize`] and uses `serde_json` to do so.
@@ -14,8 +14,8 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Option<Cow<[u8]>> {
-        serde_json::to_vec(item).map(Cow::Owned).ok()
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+        serde_json::to_vec(item).map(Cow::Owned).map_err(Into::into)
     }
 }
 
@@ -25,8 +25,8 @@ where
 {
     type DItem = T;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        serde_json::from_slice(bytes).ok()
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
+        serde_json::from_slice(bytes).map_err(Into::into)
     }
 }
 

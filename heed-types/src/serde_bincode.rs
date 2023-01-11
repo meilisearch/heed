@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use heed_traits::{BytesDecode, BytesEncode};
+use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 use serde::{Deserialize, Serialize};
 
 /// Describes a type that is [`Serialize`]/[`Deserialize`] and uses `bincode` to do so.
@@ -14,8 +14,8 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<[u8]>> {
-        bincode::serialize(item).map(Cow::Owned).ok()
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+        bincode::serialize(item).map(Cow::Owned).map_err(Into::into)
     }
 }
 
@@ -25,8 +25,8 @@ where
 {
     type DItem = T;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
-        bincode::deserialize(bytes).ok()
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
+        bincode::deserialize(bytes).map_err(Into::into)
     }
 }
 

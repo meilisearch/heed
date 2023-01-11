@@ -1,5 +1,5 @@
-use std::marker;
 use std::ops::RangeBounds;
+use std::{any, fmt, marker};
 
 use crate::mdb::ffi;
 use crate::*;
@@ -18,34 +18,34 @@ use crate::*;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+/// # let dir = tempfile::tempdir()?;
 /// # let env = EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+/// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+/// db.put(&mut wtxn, &68, &())?;
+/// db.put(&mut wtxn, &35, &())?;
+/// db.put(&mut wtxn, &0, &())?;
+/// db.put(&mut wtxn, &42, &())?;
 ///
 /// // you can iterate over database entries in order
 /// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
-///     (BEI64::new(68), ()),
+///     (0, ()),
+///     (35, ()),
+///     (42, ()),
+///     (68, ()),
 /// ];
 ///
 /// assert_eq!(rets, expected);
@@ -65,47 +65,47 @@ use crate::*;
 /// # use heed::EnvOpenOptions;
 /// use heed::Database;
 /// use heed::types::*;
-/// use heed::{zerocopy::I64, byteorder::BigEndian};
+/// use heed::byteorder::BigEndian;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+/// # let dir = tempfile::tempdir()?;
 /// # let env = EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+/// #     .open(dir.path())?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
-/// db.put(&mut wtxn, &BEI64::new(0), &())?;
-/// db.put(&mut wtxn, &BEI64::new(68), &())?;
-/// db.put(&mut wtxn, &BEI64::new(35), &())?;
-/// db.put(&mut wtxn, &BEI64::new(42), &())?;
+/// db.put(&mut wtxn, &0, &())?;
+/// db.put(&mut wtxn, &68, &())?;
+/// db.put(&mut wtxn, &35, &())?;
+/// db.put(&mut wtxn, &42, &())?;
 ///
 /// // you can iterate over ranges too!!!
-/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let range = 35..=42;
 /// let rets: Result<_, _> = db.range(&wtxn, &range)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(35), ()),
-///     (BEI64::new(42), ()),
+///     (35, ()),
+///     (42, ()),
 /// ];
 ///
 /// assert_eq!(rets, expected);
 ///
 /// // even delete a range of keys
-/// let range = BEI64::new(35)..=BEI64::new(42);
+/// let range = 35..=42;
 /// let deleted: usize = db.delete_range(&mut wtxn, &range)?;
 ///
 /// let rets: Result<_, _> = db.iter(&wtxn)?.collect();
-/// let rets: Vec<(BEI64, _)> = rets?;
+/// let rets: Vec<(i64, _)> = rets?;
 ///
 /// let expected = vec![
-///     (BEI64::new(0), ()),
-///     (BEI64::new(68), ()),
+///     (0, ()),
+///     (68, ()),
 /// ];
 ///
 /// assert_eq!(deleted, 2);
@@ -134,16 +134,19 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(Some("get-i32"))?;
+    /// #     .open(dir.path())?;
+    /// type BEI32= U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("get-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -157,16 +160,12 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T>(
-        &self,
-        txn: &'txn RoTxn<T>,
-        key: &'a KC::EItem,
-    ) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get::<T, KC, DC>(txn, key)
+        self.dyndb.get::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair lower than the given one in this database.
@@ -182,46 +181,46 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_lower_than(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((42, ())));
     ///
-    /// let ret = db.get_lower_than(&wtxn, &BEU32::new(27))?;
+    /// let ret = db.get_lower_than(&wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn, T>(
+    pub fn get_lower_than<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than::<T, KC, DC>(txn, key)
+        self.dyndb.get_lower_than::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair lower than or equal to the given one in this database.
@@ -237,46 +236,46 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(4404))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(43))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &BEU32::new(26))?;
+    /// let ret = db.get_lower_than_or_equal_to(&wtxn, &26)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_lower_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_lower_than_or_equal_to::<T, KC, DC>(txn, key)
+        self.dyndb.get_lower_than_or_equal_to::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair greater than the given one in this database.
@@ -292,46 +291,46 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(43), ())));
+    /// let ret = db.get_greater_than(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((43, ())));
     ///
-    /// let ret = db.get_greater_than(&wtxn, &BEU32::new(43))?;
+    /// let ret = db.get_greater_than(&wtxn, &43)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn, T>(
+    pub fn get_greater_than<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than::<KC, DC>(txn, key)
     }
 
     /// Retrieves the key/value pair greater than or equal to the given one in this database.
@@ -347,46 +346,46 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::U32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_database::<OwnedType<BEU32>, Unit>(Some("get-lt-u32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEU32::new(27), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(42), &())?;
-    /// db.put(&mut wtxn, &BEU32::new(43), &())?;
+    /// db.put(&mut wtxn, &27, &())?;
+    /// db.put(&mut wtxn, &42, &())?;
+    /// db.put(&mut wtxn, &43, &())?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(0))?;
-    /// assert_eq!(ret, Some((BEU32::new(27), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(42))?;
-    /// assert_eq!(ret, Some((BEU32::new(42), ())));
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((42, ())));
     ///
-    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &BEU32::new(44))?;
+    /// let ret = db.get_greater_than_or_equal_to(&wtxn, &44)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_greater_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.get_greater_than_or_equal_to::<T, KC, DC>(txn, key)
+        self.dyndb.get_greater_than_or_equal_to::<KC, DC>(txn, key)
     }
 
     /// Retrieves the first key/value pair of this database.
@@ -401,35 +400,35 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("first-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.first(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(ret, Some((27, "i-am-twenty-seven")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.first::<T, KC, DC>(txn)
+        self.dyndb.first::<KC, DC>(txn)
     }
 
     /// Retrieves the last key/value pair of this database.
@@ -444,35 +443,35 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("last-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.last(&wtxn)?;
-    /// assert_eq!(ret, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(ret, Some((42, "i-am-forty-two")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
     {
-        self.dyndb.last::<T, KC, DC>(txn)
+        self.dyndb.last::<KC, DC>(txn)
     }
 
     /// Returns the number of elements in this database.
@@ -483,29 +482,29 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// db.delete(&mut wtxn, &27)?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -513,7 +512,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<usize> {
+    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
         self.dyndb.len(txn)
     }
 
@@ -525,24 +524,24 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
@@ -555,7 +554,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<bool> {
+    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
         self.dyndb.is_empty(txn)
     }
 
@@ -567,36 +566,36 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
-        self.dyndb.iter::<T, KC, DC>(txn)
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
+        self.dyndb.iter::<KC, DC>(txn)
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -607,49 +606,49 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter_mut(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// let ret = unsafe { iter.put_current(&42, "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get(&wtxn, &13)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&wtxn, &42)?;
     /// assert_eq!(ret, Some("i-am-the-new-forty-two"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn<T>) -> Result<RwIter<'txn, KC, DC>> {
-        self.dyndb.iter_mut::<T, KC, DC>(txn)
+    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+        self.dyndb.iter_mut::<KC, DC>(txn)
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
@@ -660,36 +659,36 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter::<T, KC, DC>(txn)
+    pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
+        self.dyndb.rev_iter::<KC, DC>(txn)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value\
@@ -701,52 +700,49 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter_mut(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// let ret = unsafe { iter.put_current(&BEI32::new(13), "i-am-the-new-thirteen")? };
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// let ret = unsafe { iter.put_current(&13, "i-am-the-new-thirteen")? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.get(&wtxn, &42)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.get(&wtxn, &BEI32::new(13))?;
+    /// let ret = db.get(&wtxn, &13)?;
     /// assert_eq!(ret, Some("i-am-the-new-thirteen"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-    ) -> Result<RwRevIter<'txn, KC, DC>> {
-        self.dyndb.rev_iter_mut::<T, KC, DC>(txn)
+    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
+        self.dyndb.rev_iter_mut::<KC, DC>(txn)
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -759,45 +755,45 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = 27..=42;
     /// let mut iter = db.range(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, T, R>(
+    pub fn range<'a, 'txn, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range::<T, KC, DC, R>(txn, range)
+        self.dyndb.range::<KC, DC, R>(txn, range)
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -811,32 +807,32 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = 27..=42;
     /// let mut range = db.range_mut(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(42), "i-am-the-new-forty-two")? };
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// let ret = unsafe { range.put_current(&42, "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -844,25 +840,25 @@ impl<KC, DC> Database<KC, DC> {
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-the-new-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-the-new-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, T, R>(
+    pub fn range_mut<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.range_mut::<T, KC, DC, R>(txn, range)
+        self.dyndb.range_mut::<KC, DC, R>(txn, range)
     }
 
     /// Return a reversed lexicographically ordered iterator of a range of key-value
@@ -876,45 +872,45 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(43);
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = 27..=43;
     /// let mut iter = db.rev_range(&wtxn, &range)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, T, R>(
+    pub fn rev_range<'a, 'txn, R>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         range: &'a R,
     ) -> Result<RoRevRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range::<T, KC, DC, R>(txn, range)
+        self.dyndb.rev_range::<KC, DC, R>(txn, range)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of a range of
@@ -928,32 +924,32 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = 27..=42;
     /// let mut range = db.rev_range_mut(&mut wtxn, &range)?;
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(42), "i-am-forty-two")));
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((BEI32::new(27), "i-am-twenty-seven")));
-    /// let ret = unsafe { range.put_current(&BEI32::new(27), "i-am-the-new-twenty-seven")? };
+    /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// let ret = unsafe { range.put_current(&27, "i-am-the-new-twenty-seven")? };
     /// assert!(ret);
     ///
     /// assert_eq!(range.next().transpose()?, None);
@@ -961,25 +957,25 @@ impl<KC, DC> Database<KC, DC> {
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(27), "i-am-the-new-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-the-new-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, T, R>(
+    pub fn rev_range_mut<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         range: &'a R,
     ) -> Result<RwRevRange<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.rev_range_mut::<T, KC, DC, R>(txn, range)
+        self.dyndb.rev_range_mut::<KC, DC, R>(txn, range)
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -993,45 +989,45 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.prefix_iter(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn, T>(
+    pub fn prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter::<T, KC, DC>(txn, prefix)
+        self.dyndb.prefix_iter::<KC, DC>(txn, prefix)
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1045,34 +1041,34 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &BEI32::new(27000))? };
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
+    /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &27000)? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1083,20 +1079,20 @@ impl<KC, DC> Database<KC, DC> {
     /// assert_eq!(ret, None);
     ///
     /// let ret = db.get(&wtxn, "i-am-twenty-seven")?;
-    /// assert_eq!(ret, Some(BEI32::new(27000)));
+    /// assert_eq!(ret, Some(27000));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn, T>(
+    pub fn prefix_iter_mut<'a, 'txn>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        self.dyndb.prefix_iter_mut::<KC, DC>(txn, prefix)
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1110,45 +1106,45 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.rev_prefix_iter(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn, T>(
+    pub fn rev_prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn RoTxn<T>,
+        txn: &'txn RoTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RoRevPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter::<T, KC, DC>(txn, prefix)
+        self.dyndb.rev_prefix_iter::<KC, DC>(txn, prefix)
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
@@ -1162,34 +1158,34 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Str, OwnedType<BEI32>> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
-    /// db.put(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
-    /// db.put(&mut wtxn, "i-am-twenty-nine",  &BEI32::new(29))?;
-    /// db.put(&mut wtxn, "i-am-forty-one",    &BEI32::new(41))?;
-    /// db.put(&mut wtxn, "i-am-forty-two",    &BEI32::new(42))?;
+    /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put(&mut wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put(&mut wtxn, "i-am-forty-one",    &41)?;
+    /// db.put(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.rev_prefix_iter_mut(&mut wtxn, "i-am-twenty")?;
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", BEI32::new(27))));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", BEI32::new(29))));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", BEI32::new(28))));
-    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &BEI32::new(28000))? };
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
+    /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &28000)? };
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, None);
@@ -1200,20 +1196,20 @@ impl<KC, DC> Database<KC, DC> {
     /// assert_eq!(ret, None);
     ///
     /// let ret = db.get(&wtxn, "i-am-twenty-eight")?;
-    /// assert_eq!(ret, Some(BEI32::new(28000)));
+    /// assert_eq!(ret, Some(28000));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn, T>(
+    pub fn rev_prefix_iter_mut<'a, 'txn>(
         &self,
-        txn: &'txn mut RwTxn<T>,
+        txn: &'txn mut RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwRevPrefix<'txn, KC, DC>>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.rev_prefix_iter_mut::<T, KC, DC>(txn, prefix)
+        self.dyndb.rev_prefix_iter_mut::<KC, DC>(txn, prefix)
     }
 
     /// Insert a key-value pairs in this database.
@@ -1224,42 +1220,85 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn put<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
+    pub fn put<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.put::<T, KC, DC>(txn, key, data)
+        self.dyndb.put::<KC, DC>(txn, key, data)
+    }
+
+    /// Insert a key-value pair where the value can directly be written to disk.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use std::io::Write;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// let value = "I am a long long long value";
+    /// db.put_reserved(&mut wtxn, &42, value.len(), |reserved| {
+    ///     reserved.write_all(value.as_bytes())
+    /// })?;
+    ///
+    /// let ret = db.get(&mut wtxn, &42)?;
+    /// assert_eq!(ret, Some(value));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn put_reserved<'a, F>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        self.dyndb.put_reserved::<KC, F>(txn, key, data_size, write_func)
     }
 
     /// Append the given key/data pair to the end of the database.
@@ -1273,42 +1312,37 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a, T>(
-        &self,
-        txn: &mut RwTxn<T>,
-        key: &'a KC::EItem,
-        data: &'a DC::EItem,
-    ) -> Result<()>
+    pub fn append<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        self.dyndb.append::<T, KC, DC>(txn, key, data)
+        self.dyndb.append::<KC, DC>(txn, key, data)
     }
 
     /// Deletes a key-value pairs in this database.
@@ -1321,42 +1355,42 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(27))?;
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let ret = db.delete(&mut wtxn, &27)?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get(&mut wtxn, &BEI32::new(27))?;
+    /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete(&mut wtxn, &BEI32::new(467))?;
+    /// let ret = db.delete(&mut wtxn, &467)?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, T>(&self, txn: &mut RwTxn<T>, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
-        self.dyndb.delete::<T, KC>(txn, key)
+        self.dyndb.delete::<KC>(txn, key)
     }
 
     /// Deletes a range of key-value pairs in this database.
@@ -1374,49 +1408,45 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
-    /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// let range = BEI32::new(27)..=BEI32::new(42);
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let range = 27..=42;
     /// let ret = db.delete_range(&mut wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
     ///
     /// let mut iter = db.iter(&wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(13), "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((BEI32::new(521), "i-am-five-hundred-and-twenty-one")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, T, R>(
-        &self,
-        txn: &'txn mut RwTxn<T>,
-        range: &'a R,
-    ) -> Result<usize>
+    pub fn delete_range<'a, 'txn, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        self.dyndb.delete_range::<T, KC, R>(txn, range)
+        self.dyndb.delete_range::<KC, R>(txn, range)
     }
 
     /// Deletes all key/value pairs in this database.
@@ -1432,24 +1462,24 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// db.clear(&mut wtxn)?;
     ///
@@ -1459,7 +1489,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear<T>(&self, txn: &mut RwTxn<T>) -> Result<()> {
+    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         self.dyndb.clear(txn)
     }
 
@@ -1479,26 +1509,26 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::{Database, PolyDatabase};
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<Unit, Unit> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Unit, Unit> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// // We remap the types for ease of use.
-    /// let db = db.remap_types::<OwnedType<BEI32>, Str>();
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// let db = db.remap_types::<BEI32, Str>();
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1543,27 +1573,27 @@ impl<KC, DC> Database<KC, DC> {
     /// # use heed::EnvOpenOptions;
     /// use heed::Database;
     /// use heed::types::*;
-    /// use heed::{zerocopy::I32, byteorder::BigEndian};
+    /// use heed::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # fs::create_dir_all(Path::new("target").join("zerocopy.mdb"))?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
+    /// #     .open(dir.path())?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db: Database<OwnedType<BEI32>, Str> = env.create_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &BEI32::new(521), "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// // Check if a key exists and skip potentially expensive deserializing
-    /// let ret = db.as_polymorph().get::<_, OwnedType<BEI32>, DecodeIgnore>(&wtxn, &BEI32::new(42))?;
+    /// let ret = db.as_polymorph().get::<BEI32, DecodeIgnore>(&wtxn, &42)?;
     /// assert!(ret.is_some());
     ///
     /// wtxn.commit()?;
@@ -1581,3 +1611,12 @@ impl<KC, DC> Clone for Database<KC, DC> {
 }
 
 impl<KC, DC> Copy for Database<KC, DC> {}
+
+impl<KC, DC> fmt::Debug for Database<KC, DC> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Database")
+            .field("key_codec", &any::type_name::<KC>())
+            .field("data_codec", &any::type_name::<DC>())
+            .finish()
+    }
+}

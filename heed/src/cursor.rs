@@ -11,7 +11,7 @@ pub struct RoCursor<'txn> {
 }
 
 impl<'txn> RoCursor<'txn> {
-    pub(crate) fn new<T>(txn: &'txn RoTxn<T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
+    pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
 
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
@@ -184,7 +184,7 @@ pub struct RwCursor<'txn> {
 }
 
 impl<'txn> RwCursor<'txn> {
-    pub(crate) fn new<T>(txn: &'txn RwTxn<T>, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
+    pub(crate) fn new(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
         Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
     }
 
@@ -251,6 +251,51 @@ impl<'txn> RwCursor<'txn> {
             Ok(()) => Ok(true),
             Err(e) if e.not_found() => Ok(false),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the `[put_current]` method.
+    pub unsafe fn put_current_reserved<F>(
+        &mut self,
+        key: &[u8],
+        data_size: usize,
+        mut write_func: F,
+    ) -> Result<bool>
+    where
+        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let mut key_val = crate::into_val(&key);
+        let mut reserved = ffi::reserve_size_val(data_size);
+        let flags = ffi::MDB_RESERVE;
+
+        let result =
+            mdb_result(ffi::mdb_cursor_put(self.cursor.cursor, &mut key_val, &mut reserved, flags));
+
+        let found = match result {
+            Ok(()) => true,
+            Err(e) if e.not_found() => false,
+            Err(e) => return Err(e.into()),
+        };
+
+        let mut reserved = ReservedSpace::from_val(reserved);
+        (write_func)(&mut reserved)?;
+
+        if reserved.remaining() == 0 {
+            Ok(found)
+        } else {
+            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
         }
     }
 

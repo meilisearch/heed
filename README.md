@@ -1,5 +1,5 @@
 # heed
-A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, uses zerocopy internally.
+A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, uses bytemuck internally.
 
 [![License](https://img.shields.io/badge/license-MIT-green)](#LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/heed)](https://crates.io/crates/heed)
@@ -11,36 +11,22 @@ A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Datab
 
 This library is able to serialize all kind of types, not just bytes slices, even _Serde_ types are supported.
 
-## Example Usage
+Go check out [the examples](heed/examples/).
 
-```rust
-fs::create_dir_all("target/heed.mdb")?;
-let env = EnvOpenOptions::new().open("target/heed.mdb")?;
+## Building from Source
 
-// We open the default unamed database.
-// Specifying the type of the newly created database.
-// Here we specify that the key is an str and the value a simple integer.
-let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+### Using the system LMDB if available
 
-// We then open a write transaction and start writing into the database.
-// All of those puts are type checked at compile time,
-// therefore you cannot write an integer instead of a string.
-let mut wtxn = env.write_txn()?;
-db.put(&mut wtxn, "seven", &7)?;
-db.put(&mut wtxn, "zero", &0)?;
-db.put(&mut wtxn, "five", &5)?;
-db.put(&mut wtxn, "three", &3)?;
-wtxn.commit()?;
+If you don't already have clone the repository you can use this command:
 
-// We open a read transaction to check if those values are available.
-// When we read we also type check at compile time.
-let rtxn = env.read_txn()?;
-
-let ret = db.get(&rtxn, "zero")?;
-assert_eq!(ret, Some(0));
-
-let ret = db.get(&rtxn, "five")?;
-assert_eq!(ret, Some(5));
+```bash
+git clone --recursive https://github.com/meilisearch/heed.git
+cd heed
+cargo build
 ```
 
-You want to see more about all the possibilities? Go check out [the examples](heed/examples/).
+However, if you already cloned it and forgot about the initialising the submodules:
+
+```bash
+git submodule update --init
+```

@@ -18,22 +18,12 @@
 //! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignement is always valid |
 //! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignement is always valid |
 //!
-//! Note that **all** those types above must implement [`AsBytes`] and [`FromBytes`]. <br/>
-//! The `UnalignedSlice/Type` types also need to implement the [`Unaligned`] trait.
-//!
-//! If you don't want to/cannot deal with `AsBytes`, `Frombytes` or `Unaligned` requirements
-//! we recommend you to use the `SerdeBincode` or `SerdeJson` types and deal with the `Serialize`/`Deserialize` traits.
-//!
-//! [`AsBytes`]: zerocopy::AsBytes
-//! [`FromBytes`]: zerocopy::FromBytes
-//! [`Unaligned`]: zerocopy::Unaligned
-//!
 //! [`Serialize`]: serde::Serialize
 //! [`Deserialize`]: serde::Deserialize
-//!
 
 mod cow_slice;
 mod cow_type;
+mod integer;
 mod owned_slice;
 mod owned_type;
 mod str;
@@ -47,8 +37,11 @@ mod serde_bincode;
 #[cfg(feature = "serde-json")]
 mod serde_json;
 
+use heed_traits::BoxedError;
+
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
+pub use self::integer::*;
 pub use self::owned_slice::OwnedSlice;
 pub use self::owned_type::OwnedType;
 pub use self::str::Str;
@@ -71,8 +64,8 @@ pub struct DecodeIgnore;
 impl heed_traits::BytesDecode<'_> for DecodeIgnore {
     type DItem = ();
 
-    fn bytes_decode(_bytes: &[u8]) -> Option<Self::DItem> {
-        Some(())
+    fn bytes_decode(_bytes: &[u8]) -> Result<Self::DItem, BoxedError> {
+        Ok(())
     }
 }
 
@@ -80,7 +73,3 @@ impl heed_traits::BytesDecode<'_> for DecodeIgnore {
 pub use self::serde_bincode::SerdeBincode;
 #[cfg(feature = "serde-json")]
 pub use self::serde_json::SerdeJson;
-
-fn aligned_to(bytes: &[u8], align: usize) -> bool {
-    (bytes as *const _ as *const () as usize) % align == 0
-}

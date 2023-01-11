@@ -1,0 +1,39 @@
+[package]
+name = "lmdb-master-sys"
+# NB: When modifying, also modify html_root_url in lib.rs
+version = "0.1.0"
+authors = [
+    "Kerollmops <clement@meilisearch.com>",
+    "Dan Burkert <dan@danburkert.com>",
+    "Victor Porof <vporof@mozilla.com>",
+]
+license = "Apache-2.0"
+description = "Rust bindings for liblmdb on the mdb.master branch."
+documentation = "https://docs.rs/lmdb-master-sys"
+repository = "https://github.com/meilisearch/heed/tree/main/lmdb-master-sys"
+readme = "README.md"
+keywords = ["LMDB", "database", "storage-engine", "bindings", "library"]
+categories = ["database", "external-ffi-bindings"]
+edition = "2021"
+
+# NB: Use "--features bindgen" to generate bindings.
+build = "build.rs"
+
+[lib]
+name = "lmdb_master_sys"
+
+[dependencies]
+libc = "0.2.139"
+
+[build-dependencies]
+bindgen = { version = "0.63.0", default-features = false, optional = true, features = ["runtime"] }
+cc = "1.0.78"
+doxygen-rs = "0.2.2"
+pkg-config = "0.3.26"
+
+[features]
+default = []
+asan = []
+fuzzer = []
+fuzzer-no-link = []
+posix-sem = []

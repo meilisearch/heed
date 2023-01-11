@@ -2,9 +2,9 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+use bytemuck::{Pod, Zeroable};
 use heed::byteorder::BE;
 use heed::types::*;
-use heed::zerocopy::{AsBytes, FromBytes, Unaligned, I64};
 use heed::EnvOpenOptions;
 use serde::{Deserialize, Serialize};
 
@@ -22,21 +22,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an str
-    let db = env.create_poly_database(Some("kikou"))?;
-
     let mut wtxn = env.write_txn()?;
-    db.put::<_, OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
-    let ret = db.get::<_, OwnedType<[i32; 2]>, Str>(&wtxn, &[2, 3])?;
+    let db = env.create_poly_database(&mut wtxn, Some("kikou"))?;
+
+    db.put::<OwnedType<[i32; 2]>, Str>(&mut wtxn, &[2, 3], "what's up?")?;
+    let ret = db.get::<OwnedType<[i32; 2]>, Str>(&wtxn, &[2, 3])?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
 
     // here the key will be an str and the data will be a slice of u8
-    let db = env.create_poly_database(Some("kiki"))?;
-
     let mut wtxn = env.write_txn()?;
-    db.put::<_, Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
-    let ret = db.get::<_, Str, ByteSlice>(&wtxn, "hello")?;
+    let db = env.create_poly_database(&mut wtxn, Some("kiki"))?;
+
+    db.put::<Str, ByteSlice>(&mut wtxn, "hello", &[2, 3][..])?;
+    let ret = db.get::<Str, ByteSlice>(&wtxn, "hello")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
@@ -47,61 +47,59 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let db = env.create_poly_database(Some("serde"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("serde"))?;
 
     let hello = Hello { string: "hi" };
-    db.put::<_, Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
+    db.put::<Str, SerdeBincode<Hello>>(&mut wtxn, "hello", &hello)?;
 
-    let ret = db.get::<_, Str, SerdeBincode<Hello>>(&wtxn, "hello")?;
+    let ret = db.get::<Str, SerdeBincode<Hello>>(&wtxn, "hello")?;
     println!("serde-bincode:\t{:?}", ret);
 
     let hello = Hello { string: "hi" };
-    db.put::<_, Str, SerdeJson<Hello>>(&mut wtxn, "hello", &hello)?;
+    db.put::<Str, SerdeJson<Hello>>(&mut wtxn, "hello", &hello)?;
 
-    let ret = db.get::<_, Str, SerdeJson<Hello>>(&wtxn, "hello")?;
+    let ret = db.get::<Str, SerdeJson<Hello>>(&wtxn, "hello")?;
     println!("serde-json:\t{:?}", ret);
 
     wtxn.commit()?;
 
-    // it is prefered to use zerocopy when possible
-    #[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Unaligned)]
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Pod, Zeroable)]
     #[repr(C)]
     struct ZeroBytes {
         bytes: [u8; 12],
     }
 
-    let db = env.create_poly_database(Some("zerocopy-struct"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db = env.create_poly_database(&mut wtxn, Some("nocopy-struct"))?;
 
     let zerobytes = ZeroBytes { bytes: [24; 12] };
-    db.put::<_, Str, UnalignedType<ZeroBytes>>(&mut wtxn, "zero", &zerobytes)?;
+    db.put::<Str, UnalignedType<ZeroBytes>>(&mut wtxn, "zero", &zerobytes)?;
 
-    let ret = db.get::<_, Str, UnalignedType<ZeroBytes>>(&wtxn, "zero")?;
+    let ret = db.get::<Str, UnalignedType<ZeroBytes>>(&wtxn, "zero")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
 
     // you can ignore the data
-    let db = env.create_poly_database(Some("ignored-data"))?;
-
     let mut wtxn = env.write_txn()?;
-    db.put::<_, Str, Unit>(&mut wtxn, "hello", &())?;
-    let ret = db.get::<_, Str, Unit>(&wtxn, "hello")?;
+    let db = env.create_poly_database(&mut wtxn, Some("ignored-data"))?;
+
+    db.put::<Str, Unit>(&mut wtxn, "hello", &())?;
+    let ret = db.get::<Str, Unit>(&wtxn, "hello")?;
 
     println!("{:?}", ret);
 
-    let ret = db.get::<_, Str, Unit>(&wtxn, "non-existant")?;
+    let ret = db.get::<Str, Unit>(&wtxn, "non-existant")?;
 
     println!("{:?}", ret);
     wtxn.commit()?;
 
-    // database opening and types are tested in a way
+    // database opening and types are tested in a safe way
     //
     // we try to open a database twice with the same types
-    let _db = env.create_poly_database(Some("ignored-data"))?;
+    let mut wtxn = env.write_txn()?;
+    let _db = env.create_poly_database(&mut wtxn, Some("ignored-data"))?;
 
     // and here we try to open it with other types
     // asserting that it correctly returns an error
@@ -109,36 +107,34 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE that those types are not saved upon runs and
     // therefore types cannot be checked upon different runs,
     // the first database opening fix the types for this run.
-    let result = env.create_database::<OwnedType<BEI64>, Unit>(Some("ignored-data"));
+    let result = env.create_database::<BEI64, Unit>(&mut wtxn, Some("ignored-data"));
     assert!(result.is_err());
 
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db = env.create_poly_database(Some("big-endian-iter"))?;
+    let db = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
 
-    let mut wtxn = env.write_txn()?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(68), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(35), &())?;
-    db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(42), &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &35, &())?;
+    db.put::<BEI64, Unit>(&mut wtxn, &42, &())?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
 
     println!("{:?}", rets);
 
     // or iterate over ranges too!!!
-    let range = BEI64::new(35)..=BEI64::new(42);
-    let rets: Result<Vec<(BEI64, _)>, _> =
-        db.range::<_, OwnedType<BEI64>, Unit, _>(&wtxn, &range)?.collect();
+    let range = 35..=42;
+    let rets: Result<Vec<(i64, _)>, _> = db.range::<BEI64, Unit, _>(&wtxn, &range)?.collect();
 
     println!("{:?}", rets);
 
     // delete a range of key
-    let range = BEI64::new(35)..=BEI64::new(42);
-    let deleted: usize = db.delete_range::<_, OwnedType<BEI64>, _>(&mut wtxn, &range)?;
+    let range = 35..=42;
+    let deleted: usize = db.delete_range::<BEI64, _>(&mut wtxn, &range)?;
 
-    let rets: Result<Vec<(BEI64, _)>, _> = db.iter::<_, OwnedType<BEI64>, Unit>(&wtxn)?.collect();
+    let rets: Result<Vec<(i64, _)>, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
 
     println!("deleted: {:?}, {:?}", deleted, rets);
     wtxn.commit()?;

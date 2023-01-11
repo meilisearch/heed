@@ -1,2 +1,2 @@
 [workspace]
-members = ["heed", "heed-traits", "heed-types"]
+members = ["lmdb-master-sys", "heed", "heed-traits", "heed-types"]

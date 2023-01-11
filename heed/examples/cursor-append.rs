@@ -18,10 +18,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max_dbs(3)
         .open(env_path)?;
 
-    let first: Database<Str, Str> = env.create_database(Some("first"))?;
-    let second: Database<Str, Str> = env.create_database(Some("second"))?;
-
     let mut wtxn = env.write_txn()?;
+    let first: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    let second: Database<Str, Str> = env.create_database(&mut wtxn, Some("second"))?;
 
     // We fill the first database with entries.
     first.put(&mut wtxn, "I am here", "to test things")?;
