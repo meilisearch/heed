@@ -41,6 +41,10 @@ fn main() {
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized");
 
+    if cfg!(feature = "posix-sem") {
+        builder.define("MDB_USE_POSIX_SEM", None);
+    }
+
     if cfg!(feature = "asan") {
         builder.flag("-fsanitize=address");
     }
