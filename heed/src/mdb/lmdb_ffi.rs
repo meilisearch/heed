@@ -9,7 +9,7 @@ pub use ffi::{
     MDB_cursor, MDB_dbi, MDB_env, MDB_envinfo, MDB_stat, MDB_txn, MDB_val, MDB_APPEND,
     MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_RDONLY, MDB_RESERVE,
 };
-use lmdb_master3_sys as ffi;
+use lmdb_master_sys as ffi;
 
 pub mod cursor_op {
     use super::ffi::{self, MDB_cursor_op};

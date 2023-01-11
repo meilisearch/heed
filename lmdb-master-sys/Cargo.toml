@@ -1,5 +1,5 @@
 [package]
-name = "lmdb-master3-sys"
+name = "lmdb-master-sys"
 # NB: When modifying, also modify html_root_url in lib.rs
 version = "0.1.0"
 authors = [
@@ -8,9 +8,9 @@ authors = [
     "Victor Porof <vporof@mozilla.com>",
 ]
 license = "Apache-2.0"
-description = "Rust bindings for liblmdb on the mdb.master3 branch."
-documentation = "https://docs.rs/lmdb-master3-sys"
-repository = "https://github.com/meilisearch/heed/tree/main/lmdb-master3-sys"
+description = "Rust bindings for liblmdb on the mdb.master branch."
+documentation = "https://docs.rs/lmdb-master-sys"
+repository = "https://github.com/meilisearch/heed/tree/main/lmdb-master-sys"
 keywords = ["LMDB", "database", "storage-engine", "bindings", "library"]
 categories = ["database", "external-ffi-bindings"]
 edition = "2021"
@@ -19,7 +19,7 @@ edition = "2021"
 build = "build.rs"
 
 [lib]
-name = "lmdb_master3_sys"
+name = "lmdb_master_sys"
 
 [dependencies]
 libc = "0.2.139"

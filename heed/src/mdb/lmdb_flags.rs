@@ -1,4 +1,4 @@
-use lmdb_master3_sys as ffi;
+use lmdb_master_sys as ffi;
 
 /// LMDB flags (see <http://www.lmdb.tech/doc/group__mdb__env.html> for more details).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -2,7 +2,7 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(non_camel_case_types)]
 #![allow(clippy::all)]
-#![doc(html_root_url = "https://docs.rs/lmdb-master3-sys/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/lmdb-master-sys/0.1.0")]
 
 extern crate libc;
 

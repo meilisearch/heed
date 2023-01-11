@@ -1,4 +1,4 @@
-use lmdb_master3_sys::*;
+use lmdb_master_sys::*;
 
 use std::ffi::c_void;
 use std::fs::{self, File};
@@ -9,7 +9,7 @@ use std::ptr;
 macro_rules! E {
     ($expr:expr) => {{
         match $expr {
-            lmdb_master3_sys::MDB_SUCCESS => (),
+            lmdb_master_sys::MDB_SUCCESS => (),
             err_code => assert!(false, "Failed with code {}", err_code),
         }
     }};
