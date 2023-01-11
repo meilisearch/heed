@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 use std::{fmt, str};
 
 use libc::c_int;
-use lmdb_master_sys as ffi;
+use lmdb_master3_sys as ffi;
 
 /// An LMDB error kind.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -58,6 +58,12 @@ pub enum Error {
     BadDbi,
     /// Unexpected problem - transaction should abort.
     Problem,
+    /// Page checksum incorrect.
+    BadChecksum,
+    /// Encryption/decryption failed.
+    CryptoFail,
+    /// Environment encryption mismatch.
+    EnvEncryption,
     /// Other error.
     Other(c_int),
 }
@@ -92,6 +98,9 @@ impl Error {
             ffi::MDB_BAD_VALSIZE => Error::BadValSize,
             ffi::MDB_BAD_DBI => Error::BadDbi,
             ffi::MDB_PROBLEM => Error::Problem,
+            ffi::MDB_BAD_CHECKSUM => Error::BadChecksum,
+            ffi::MDB_CRYPTO_FAIL => Error::CryptoFail,
+            ffi::MDB_ENV_ENCRYPTION => Error::EnvEncryption,
             other => Error::Other(other),
         }
     }
@@ -121,6 +130,9 @@ impl Error {
             Error::BadValSize => ffi::MDB_BAD_VALSIZE,
             Error::BadDbi => ffi::MDB_BAD_DBI,
             Error::Problem => ffi::MDB_PROBLEM,
+            Error::BadChecksum => ffi::MDB_BAD_CHECKSUM,
+            Error::CryptoFail => ffi::MDB_CRYPTO_FAIL,
+            Error::EnvEncryption => ffi::MDB_ENV_ENCRYPTION,
             Error::Other(err_code) => err_code,
         }
     }

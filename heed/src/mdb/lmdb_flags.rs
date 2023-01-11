@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use lmdb_master_sys as ffi;
+use lmdb_master3_sys as ffi;
 
 bitflags! {
     /// LMDB environment flags (see <http://www.lmdb.tech/doc/group__mdb__env.html> for more details).
