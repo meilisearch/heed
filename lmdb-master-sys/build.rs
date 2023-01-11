@@ -41,13 +41,13 @@ fn main() {
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized");
 
-    if cfg!(feature = "with-asan") {
+    if cfg!(feature = "asan") {
         builder.flag("-fsanitize=address");
     }
 
-    if cfg!(feature = "with-fuzzer") {
+    if cfg!(feature = "fuzzer") {
         builder.flag("-fsanitize=fuzzer");
-    } else if cfg!(feature = "with-fuzzer-no-link") {
+    } else if cfg!(feature = "fuzzer-no-link") {
         builder.flag("-fsanitize=fuzzer-no-link");
     }
 

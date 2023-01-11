@@ -32,6 +32,6 @@ pkg-config = "0.3.26"
 
 [features]
 default = []
-with-asan = []
-with-fuzzer = []
-with-fuzzer-no-link = []
+asan = []
+fuzzer = []
+fuzzer-no-link = []
