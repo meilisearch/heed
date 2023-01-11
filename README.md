@@ -13,11 +13,6 @@ This library is able to serialize all kind of types, not just bytes slices, even
 
 Go check out [the examples](heed/examples/).
 
-## Vendoring
-
-By default, if LMDB is installed on the system, this crate will attempt to make use of the system-available LMDB.
-To force installation from source, build this crate with the `vendored` feature.
-
 ## Building from Source
 
 ### Using the system LMDB if available
@@ -34,12 +29,4 @@ However, if you already cloned it and forgot about the initialising the submodul
 
 ```bash
 git submodule update --init
-```
-
-### Always vendoring
-
-```bash
-git clone --recursive https://github.com/meilisearch/heed.git
-cd heed
-cargo build --features vendored
 ```

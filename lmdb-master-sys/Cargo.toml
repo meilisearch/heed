@@ -32,7 +32,6 @@ pkg-config = "0.3.26"
 
 [features]
 default = []
-vendored = []
-with-asan = ["vendored"]
-with-fuzzer = ["vendored"]
-with-fuzzer-no-link = ["vendored"]
+with-asan = []
+with-fuzzer = []
+with-fuzzer-no-link = []

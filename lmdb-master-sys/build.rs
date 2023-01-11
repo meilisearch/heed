@@ -31,27 +31,25 @@ fn main() {
         warn!("Building with `-fsanitize=fuzzer`.");
     }
 
-    if cfg!(feature = "vendored") || pkg_config::find_library("lmdb").is_err() {
-        let mut builder = cc::Build::new();
+    let mut builder = cc::Build::new();
 
-        builder
-            .file(lmdb.join("mdb.c"))
-            .file(lmdb.join("midl.c"))
-            // https://github.com/mozilla/lmdb/blob/b7df2cac50fb41e8bd16aab4cc5fd167be9e032a/libraries/liblmdb/Makefile#L23
-            .flag_if_supported("-Wno-unused-parameter")
-            .flag_if_supported("-Wbad-function-cast")
-            .flag_if_supported("-Wuninitialized");
+    builder
+        .file(lmdb.join("mdb.c"))
+        .file(lmdb.join("midl.c"))
+        // https://github.com/mozilla/lmdb/blob/b7df2cac50fb41e8bd16aab4cc5fd167be9e032a/libraries/liblmdb/Makefile#L23
+        .flag_if_supported("-Wno-unused-parameter")
+        .flag_if_supported("-Wbad-function-cast")
+        .flag_if_supported("-Wuninitialized");
 
-        if cfg!(feature = "with-asan") {
-            builder.flag("-fsanitize=address");
-        }
-
-        if cfg!(feature = "with-fuzzer") {
-            builder.flag("-fsanitize=fuzzer");
-        } else if cfg!(feature = "with-fuzzer-no-link") {
-            builder.flag("-fsanitize=fuzzer-no-link");
-        }
-
-        builder.compile("liblmdb.a")
+    if cfg!(feature = "with-asan") {
+        builder.flag("-fsanitize=address");
     }
+
+    if cfg!(feature = "with-fuzzer") {
+        builder.flag("-fsanitize=fuzzer");
+    } else if cfg!(feature = "with-fuzzer-no-link") {
+        builder.flag("-fsanitize=fuzzer-no-link");
+    }
+
+    builder.compile("liblmdb.a")
 }

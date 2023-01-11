@@ -35,9 +35,6 @@ url = "2.3.1"
 # like the `EnvOpenOptions` struct.
 default = ["serde", "serde-bincode", "serde-json"]
 
-# Use the provided version of LMDB instead of the one that is installed on the system.
-vendored = ["lmdb-master-sys/vendored"]
-
 # The NO_TLS flag is automatically set on Env opening and
 # RoTxn implements the Sync trait. This allow the user to reference
 # a read-only transaction from multiple threads at the same time.
