@@ -449,11 +449,11 @@ impl Env {
     /// LMDB have an important restriction on the unnamed database when named ones are opened,
     /// the names of the named databases are stored as keys in the unnamed one and are immutable,
     /// these keys can only be read and not written.
-    pub fn open_database<KC, DC>(
+    pub fn open_database<'t, KC, DC>(
         &self,
-        rtxn: &RoTxn,
+        rtxn: &'t RoTxn,
         name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC>>>
+    ) -> Result<Option<Database<'t, KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
@@ -477,11 +477,11 @@ impl Env {
     /// LMDB have an important restriction on the unnamed database when named ones are opened,
     /// the names of the named databases are stored as keys in the unnamed one and are immutable,
     /// these keys can only be read and not written.
-    pub fn open_poly_database(
+    pub fn open_poly_database<'t>(
         &self,
-        rtxn: &RoTxn,
+        rtxn: &'t RoTxn,
         name: Option<&str>,
-    ) -> Result<Option<PolyDatabase>> {
+    ) -> Result<Option<PolyDatabase<'t>>> {
         assert_eq_env_txn!(self, rtxn);
 
         match self.raw_init_database(rtxn.txn, name, None, false) {
@@ -500,11 +500,11 @@ impl Env {
     /// LMDB have an important restriction on the unnamed database when named ones are opened,
     /// the names of the named databases are stored as keys in the unnamed one and are immutable,
     /// these keys can only be read and not written.
-    pub fn create_database<KC, DC>(
+    pub fn create_database<'t, KC, DC>(
         &self,
-        wtxn: &mut RwTxn,
+        wtxn: &'t mut RwTxn,
         name: Option<&str>,
-    ) -> Result<Database<KC, DC>>
+    ) -> Result<Database<'t, KC, DC>>
     where
         KC: 'static,
         DC: 'static,
@@ -527,11 +527,11 @@ impl Env {
     /// LMDB have an important restriction on the unnamed database when named ones are opened,
     /// the names of the named databases are stored as keys in the unnamed one and are immutable,
     /// these keys can only be read and not written.
-    pub fn create_poly_database(
+    pub fn create_poly_database<'t>(
         &self,
-        wtxn: &mut RwTxn,
+        wtxn: &'t mut RwTxn,
         name: Option<&str>,
-    ) -> Result<PolyDatabase> {
+    ) -> Result<PolyDatabase<'t>> {
         assert_eq_env_txn!(self, wtxn);
 
         match self.raw_init_database(wtxn.txn.txn, name, None, true) {
