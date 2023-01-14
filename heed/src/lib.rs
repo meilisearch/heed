@@ -71,7 +71,7 @@ pub use self::iter::{
 pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
-pub use self::mdb::flags::Flags;
+pub use self::mdb::flags::Flag;
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
