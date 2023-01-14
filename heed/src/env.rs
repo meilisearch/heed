@@ -812,6 +812,14 @@ mod tests {
     }
 
     #[test]
+    fn open_database_with_nosubdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flags::MdbNoSubDir) };
+        let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+    }
+
+    #[test]
     fn create_database_without_commit() {
         let dir = tempfile::tempdir().unwrap();
         let env = EnvOpenOptions::new()
