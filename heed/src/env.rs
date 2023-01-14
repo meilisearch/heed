@@ -2,6 +2,7 @@ use std::any::TypeId;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::{c_void, CString};
 use std::fs::{File, Metadata};
+use std::io::ErrorKind::NotFound;
 #[cfg(unix)]
 use std::os::unix::{
     ffi::OsStrExt,
@@ -177,7 +178,20 @@ impl EnvOpenOptions {
 
     /// Open an environment that will be located at the specified path.
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
-        let path = canonicalize_path(path.as_ref())?;
+        let path = match canonicalize_path(path.as_ref()) {
+            Err(err) => {
+                if err.kind() == NotFound && self.flags & (Flags::MdbNoSubDir as u32) != 0 {
+                    let path = path.as_ref();
+                    match path.parent().zip(path.file_name()) {
+                        Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
+                        None => return Err(err.into()),
+                    }
+                } else {
+                    return Err(err.into());
+                }
+            }
+            Ok(path) => path,
+        };
 
         let mut lock = OPENED_ENV.write().unwrap();
 
