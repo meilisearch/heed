@@ -178,6 +178,8 @@ impl EnvOpenOptions {
 
     /// Open an environment that will be located at the specified path.
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+        let mut lock = OPENED_ENV.write().unwrap();
+
         let path = match canonicalize_path(path.as_ref()) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags & (Flags::MdbNoSubDir as u32) != 0 {
@@ -192,8 +194,6 @@ impl EnvOpenOptions {
             }
             Ok(path) => path,
         };
-
-        let mut lock = OPENED_ENV.write().unwrap();
 
         match lock.entry(path) {
             Entry::Occupied(entry) => {
