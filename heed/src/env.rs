@@ -24,7 +24,7 @@ use synchronoise::event::SignalEvent;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::{
-    assert_eq_env_txn, Database, Error, Flags, PolyDatabase, Result, RoCursor, RoTxn, RwTxn,
+    assert_eq_env_txn, Database, Error, Flag, PolyDatabase, Result, RoCursor, RoTxn, RwTxn,
 };
 
 /// The list of opened environments, the value is an optional environment, it is None
@@ -133,15 +133,15 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, Flags};
+    /// use heed::{EnvOpenOptions, Database, Flag};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe {
-    ///     env_builder.flag(Flags::MdbNoTls);
-    ///     env_builder.flag(Flags::MdbNoMetaSync);
+    ///     env_builder.flag(Flag::NoTls);
+    ///     env_builder.flag(Flag::NoMetaSync);
     /// }
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = env_builder.open(dir.path())?;
@@ -157,7 +157,7 @@ impl EnvOpenOptions {
     /// db.put(&mut wtxn, "three", &3)?;
     /// wtxn.commit()?;
     ///
-    /// // Force the OS to flush the buffers (see Flags::MdbNoSync and Flags::MdbNoMetaSync).
+    /// // Force the OS to flush the buffers (see Flag::NoSync and Flag::NoMetaSync).
     /// env.force_sync();
     ///
     /// // opening a read transaction
@@ -171,7 +171,7 @@ impl EnvOpenOptions {
     /// assert_eq!(ret, Some(5));
     /// # Ok(()) }
     /// ```
-    pub unsafe fn flag(&mut self, flag: Flags) -> &mut Self {
+    pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
         self.flags = self.flags | flag as u32;
         self
     }
@@ -182,7 +182,7 @@ impl EnvOpenOptions {
 
         let path = match canonicalize_path(path.as_ref()) {
             Err(err) => {
-                if err.kind() == NotFound && self.flags & (Flags::MdbNoSubDir as u32) != 0 {
+                if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
                         Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
@@ -240,7 +240,7 @@ impl EnvOpenOptions {
                     // to avoid using the thread local storage, this way we allow users
                     // to use references of RoTxn between threads safely.
                     let flags = if cfg!(feature = "sync-read-txn") {
-                        self.flags | Flags::MdbNoTls as u32
+                        self.flags | Flag::NoTls as u32
                     } else {
                         self.flags
                     };
@@ -363,7 +363,7 @@ impl Env {
     }
 
     /// Check if a flag was specified when opening this environment.
-    pub fn contains_flag(&self, flag: Flags) -> Result<bool> {
+    pub fn contains_flag(&self, flag: Flag) -> Result<bool> {
         let flags = self.raw_flags()?;
         let set = flags & (flag as u32);
         Ok(set != 0)
@@ -817,7 +817,7 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
-        unsafe { envbuilder.flag(crate::Flags::MdbWriteMap) };
+        unsafe { envbuilder.flag(crate::Flag::WriteMap) };
         let env = envbuilder.open(&dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
@@ -829,7 +829,7 @@ mod tests {
     fn open_database_with_nosubdir() {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
-        unsafe { envbuilder.flag(crate::Flags::MdbNoSubDir) };
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
         let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
     }
 
