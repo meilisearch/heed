@@ -5,7 +5,7 @@ A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Datab
 [![Crates.io](https://img.shields.io/crates/v/heed)](https://crates.io/crates/heed)
 [![Docs](https://docs.rs/heed/badge.svg)](https://docs.rs/heed)
 [![dependency status](https://deps.rs/repo/github/meilisearch/heed/status.svg)](https://deps.rs/repo/github/meilisearch/heed)
-[![Build](https://github.com/meilisearch/heed/actions/workflows/test.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/test.yml)
+[![Build](https://github.com/meilisearch/heed/actions/workflows/rust.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/rust.yml)
 
 ![the opposite of heed](https://thesaurus.plus/img/antonyms/153/heed.png)
 
