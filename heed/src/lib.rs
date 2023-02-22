@@ -56,6 +56,7 @@ mod mdb;
 mod reserved_space;
 mod txn;
 
+use std::convert::Infallible;
 use std::{error, fmt, io, result};
 
 use heed_traits as traits;
@@ -73,16 +74,16 @@ pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::Flags;
 pub use self::reserved_space::ReservedSpace;
-pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
+pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
-pub enum Error {
+pub enum Error<E, D> {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding(BoxedError),
-    Decoding(BoxedError),
+    Encoding(E),
+    Decoding(D),
     InvalidDatabaseTyping,
     DatabaseClosing,
     BadOpenOptions {
@@ -93,7 +94,7 @@ pub enum Error {
     },
 }
 
-impl fmt::Display for Error {
+impl<E: fmt::Display, D: fmt::Display> fmt::Display for Error<E, D> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Io(error) => write!(f, "{}", error),
@@ -113,10 +114,10 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {}
+impl<E: error::Error, D: error::Error> error::Error for Error<E, D> {}
 
-impl From<MdbError> for Error {
-    fn from(error: MdbError) -> Error {
+impl<E, D> From<MdbError> for Error<E, D> {
+    fn from(error: MdbError) -> Error<E, D> {
         match error {
             MdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
             _ => Error::Mdb(error),
@@ -124,14 +125,14 @@ impl From<MdbError> for Error {
     }
 }
 
-impl From<io::Error> for Error {
-    fn from(error: io::Error) -> Error {
+impl<E, D> From<io::Error> for Error<E, D> {
+    fn from(error: io::Error) -> Error<E, D> {
         Error::Io(error)
     }
 }
 
 /// Either a success or an [`Error`].
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T, E = Infallible, D = Infallible> = result::Result<T, Error<E, D>>;
 
 #[cfg(test)]
 mod tests {

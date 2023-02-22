@@ -153,7 +153,7 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn,
         key: &'a KC::EItem,
-    ) -> Result<Option<DC::DItem>>
+    ) -> Result<Option<DC::DItem>, KC::Err, DC::Err>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
@@ -227,7 +227,7 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn,
         key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>>
+    ) -> Result<Option<(KC::DItem, DC::DItem)>, KC::Err, DC::Err>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,

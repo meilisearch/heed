@@ -1,7 +1,8 @@
 use std::borrow::Cow;
+use std::convert::Infallible;
 
-use bytemuck::{bytes_of, try_from_bytes, AnyBitPattern, NoUninit};
-use heed_traits::{BoxedError, BytesDecode, BytesEncode};
+use bytemuck::{bytes_of, try_from_bytes, AnyBitPattern, NoUninit, PodCastError};
+use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes a slice that is totally borrowed and doesn't
 /// depends on any [memory alignment].
@@ -21,17 +22,19 @@ pub struct UnalignedType<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: NoUninit> BytesEncode<'a> for UnalignedType<T> {
     type EItem = T;
+    type Err = Infallible;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Self::Err> {
         Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
 
 impl<'a, T: AnyBitPattern> BytesDecode<'a> for UnalignedType<T> {
     type DItem = &'a T;
+    type Err = PodCastError;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
-        try_from_bytes(bytes).map_err(Into::into)
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Self::Err> {
+        try_from_bytes(bytes)
     }
 }
 

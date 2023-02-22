@@ -37,7 +37,7 @@ mod serde_bincode;
 #[cfg(feature = "serde-json")]
 mod serde_json;
 
-use heed_traits::BoxedError;
+use std::convert::Infallible;
 
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
@@ -63,8 +63,9 @@ pub struct DecodeIgnore;
 
 impl heed_traits::BytesDecode<'_> for DecodeIgnore {
     type DItem = ();
+    type Err = Infallible;
 
-    fn bytes_decode(_bytes: &[u8]) -> Result<Self::DItem, BoxedError> {
+    fn bytes_decode(_bytes: &[u8]) -> Result<Self::DItem, Self::Err> {
         Ok(())
     }
 }

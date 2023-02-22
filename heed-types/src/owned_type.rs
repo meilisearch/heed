@@ -1,7 +1,8 @@
 use std::borrow::Cow;
+use std::convert::Infallible;
 
-use bytemuck::{bytes_of, AnyBitPattern, NoUninit};
-use heed_traits::{BoxedError, BytesDecode, BytesEncode};
+use bytemuck::{bytes_of, AnyBitPattern, NoUninit, PodCastError};
+use heed_traits::{BytesDecode, BytesEncode};
 
 use crate::CowType;
 
@@ -28,16 +29,18 @@ pub struct OwnedType<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: NoUninit> BytesEncode<'a> for OwnedType<T> {
     type EItem = T;
+    type Err = Infallible;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Self::Err> {
         Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
 
 impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for OwnedType<T> {
     type DItem = T;
+    type Err = PodCastError;
 
-    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, BoxedError> {
+    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, Self::Err> {
         CowType::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }

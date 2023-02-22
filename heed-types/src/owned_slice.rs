@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use bytemuck::{try_cast_slice, AnyBitPattern, NoUninit};
-use heed_traits::{BoxedError, BytesDecode, BytesEncode};
+use bytemuck::{try_cast_slice, AnyBitPattern, NoUninit, PodCastError};
+use heed_traits::{BytesDecode, BytesEncode};
 
 use crate::CowSlice;
 
@@ -22,16 +22,18 @@ pub struct OwnedSlice<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: NoUninit> BytesEncode<'a> for OwnedSlice<T> {
     type EItem = [T];
+    type Err = PodCastError;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-        try_cast_slice(item).map(Cow::Borrowed).map_err(Into::into)
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Self::Err> {
+        try_cast_slice(item).map(Cow::Borrowed)
     }
 }
 
 impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for OwnedSlice<T> {
     type DItem = Vec<T>;
+    type Err = PodCastError;
 
-    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, BoxedError> {
+    fn bytes_decode(bytes: &[u8]) -> Result<Self::DItem, Self::Err> {
         CowSlice::<T>::bytes_decode(bytes).map(Cow::into_owned)
     }
 }
