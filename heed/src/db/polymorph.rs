@@ -153,14 +153,14 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn,
         key: &'a KC::EItem,
-    ) -> Result<Option<DC::DItem>, KC::Err, DC::Err>
+    ) -> Result<Option<DC::DItem>, KC::Err, Infallible, Infallible, DC::Err>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::KeyEncoding)?;
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = mem::MaybeUninit::uninit();
@@ -172,7 +172,7 @@ impl PolyDatabase {
         match result {
             Ok(()) => {
                 let data = unsafe { crate::from_val(data_val.assume_init()) };
-                let data = DC::bytes_decode(data).map_err(Error::Decoding)?;
+                let data = DC::bytes_decode(data).map_err(Error::DataDecoding)?;
                 Ok(Some(data))
             }
             Err(e) if e.not_found() => Ok(None),
@@ -227,7 +227,13 @@ impl PolyDatabase {
         &self,
         txn: &'txn RoTxn,
         key: &'a KC::EItem,
-    ) -> Result<Option<(KC::DItem, DC::DItem)>, KC::Err, DC::Err>
+    ) -> Result<
+        Option<(KC::DItem, DC::DItem)>,
+        <KC as BytesEncode<'a>>::Err,
+        <KC as BytesDecode<'txn>>::Err,
+        Infallible,
+        DC::Err,
+    >
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -235,13 +241,14 @@ impl PolyDatabase {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::KeyEncoding)?;
         cursor.move_on_key_greater_than_or_equal_to(&key_bytes)?;
 
         match cursor.move_on_prev() {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
-                (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
+                (Err(e), _) => Err(Error::KeyDecoding(e)),
+                (_, Err(e)) => Err(Error::DataDecoding(e)),
             },
             Ok(None) => Ok(None),
             Err(e) => Err(e),
