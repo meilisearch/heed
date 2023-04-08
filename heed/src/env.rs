@@ -295,7 +295,7 @@ impl fmt::Debug for Env {
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, DatabaseType>>,
     path: PathBuf,
 }
 
@@ -318,6 +318,17 @@ impl Drop for EnvInner {
             }
         }
     }
+}
+
+/// The type of the database.
+pub enum DatabaseType {
+    /// The first state of a database, unknown until an [`open_database`] method
+    /// is called to define the type for the first time.
+    UnknownYet,
+    /// Defines the types of a [`Database`].
+    Typed { key_type: TypeId, data_type: TypeId },
+    /// Defines the types of a [`PolyDatabase`].
+    Untyped,
 }
 
 /// Whether to perform compaction while copying an environment.
@@ -572,6 +583,11 @@ impl Env {
         let flags = if create { ffi::MDB_CREATE } else { 0 };
         match self.raw_open_dbi(raw_txn, name, flags) {
             Ok(dbi) => {
+                let types = match types {
+                    Some((key_type, data_type)) => DatabaseType::Typed { key_type, data_type },
+                    None => DatabaseType::Untyped,
+                };
+
                 let old_types = lock.entry(dbi).or_insert(types);
                 if *old_types == types {
                     Ok(dbi)

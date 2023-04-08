@@ -3,7 +3,7 @@ use std::ptr;
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Env, Result};
+use crate::{Database, Env, PolyDatabase, Result};
 
 /// A read-only transaction.
 pub struct RoTxn<'e> {
@@ -29,6 +29,21 @@ impl<'e> RoTxn<'e> {
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.env.env_mut_ptr()
+    }
+
+    pub fn open_database<'t, KC, DC>(
+        &self,
+        name: Option<&str>,
+    ) -> Result<Option<Database<'t, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        todo!("get the dbi from the env without any call to LMDB")
+    }
+
+    pub fn open_poly_database<'t>(&self, name: Option<&str>) -> Result<Option<PolyDatabase<'t>>> {
+        todo!("get the dbi from the env without any call to LMDB")
     }
 }
 
@@ -74,6 +89,33 @@ impl<'p> RwTxn<'p> {
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.txn.env.env_mut_ptr()
+    }
+
+    pub fn open_database<'t, KC, DC>(
+        &self,
+        name: Option<&str>,
+    ) -> Result<Option<Database<'t, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        todo!("call mdb_dbi_open and store the new type in the env")
+    }
+
+    pub fn open_poly_database<'t>(&self, name: Option<&str>) -> Result<Option<PolyDatabase<'t>>> {
+        todo!("call mdb_dbi_open and store the new type in the env")
+    }
+
+    pub fn create_database<'t, KC, DC>(&self, name: Option<&str>) -> Result<Database<'t, KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        todo!("call mdb_dbi_open(create) and store the new type in the env")
+    }
+
+    pub fn create_poly_database<'t>(&self, name: Option<&str>) -> Result<PolyDatabase<'t>> {
+        todo!("call mdb_dbi_open(create) and store the new type in the env")
     }
 
     pub fn commit(mut self) -> Result<()> {
