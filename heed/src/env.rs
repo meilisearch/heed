@@ -284,7 +284,7 @@ pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
 
 /// An environment handle constructed by using [`EnvOpenOptions`].
 #[derive(Clone)]
-pub struct Env(Arc<EnvInner>);
+pub struct Env(pub(crate) Arc<EnvInner>);
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -295,7 +295,9 @@ impl fmt::Debug for Env {
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, DatabaseType>>,
+    /// The first state of a database is `None` until an [`open_database`]
+    /// method is called to define the type for the first time.
+    pub(crate) dbi_open_mutex: sync::Mutex<HashMap<Option<String>, (u32, Option<DatabaseType>)>>,
     path: PathBuf,
 }
 
@@ -321,10 +323,9 @@ impl Drop for EnvInner {
 }
 
 /// The type of the database.
-pub enum DatabaseType {
-    /// The first state of a database, unknown until an [`open_database`] method
-    /// is called to define the type for the first time.
-    UnknownYet,
+// TODO replace the UnknownYet by an Option<DatabaseType> in the HashMap
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DatabaseType {
     /// Defines the types of a [`Database`].
     Typed { key_type: TypeId, data_type: TypeId },
     /// Defines the types of a [`PolyDatabase`].
@@ -442,7 +443,7 @@ impl Env {
                 size += compute_size(stat);
 
                 // if the db wasn’t already opened
-                if !dbi_open.contains_key(&dbi) {
+                if !dbi_open.contains_key(&Some(key)) {
                     unsafe { ffi::mdb_dbi_close(self.env_mut_ptr(), dbi) }
                 }
             }
@@ -451,153 +452,105 @@ impl Env {
         Ok(size)
     }
 
-    /// Opens a typed database that already exists in this environment.
-    ///
-    /// If the database was previously opened in this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn open_database<'t, KC, DC>(
-        &self,
-        rtxn: &'t RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<Database<'t, KC, DC>>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        assert_eq_env_txn!(self, rtxn);
+    // /// Opens a typed database that already exists in this environment.
+    // ///
+    // /// If the database was previously opened in this program run, types will be checked.
+    // ///
+    // /// ## Important Information
+    // ///
+    // /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    // /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    // /// these keys can only be read and not written.
+    // pub fn open_database<'t, KC, DC>(
+    //     &self,
+    //     rtxn: &'t RoTxn,
+    //     name: Option<&str>,
+    // ) -> Result<Option<Database<'t, KC, DC>>>
+    // where
+    //     KC: 'static,
+    //     DC: 'static,
+    // {
+    //     assert_eq_env_txn!(self, rtxn);
 
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
-            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
+    //     let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+    //     match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+    //         Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
+    //         Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
-    /// Opens an untyped database that already exists in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn open_poly_database<'t>(
-        &self,
-        rtxn: &'t RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<PolyDatabase<'t>>> {
-        assert_eq_env_txn!(self, rtxn);
+    // /// Opens an untyped database that already exists in this environment.
+    // ///
+    // /// If the database was previously opened as a typed one, an error will be returned.
+    // ///
+    // /// ## Important Information
+    // ///
+    // /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    // /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    // /// these keys can only be read and not written.
+    // pub fn open_poly_database<'t>(
+    //     &self,
+    //     rtxn: &'t RoTxn,
+    //     name: Option<&str>,
+    // ) -> Result<Option<PolyDatabase<'t>>> {
+    //     assert_eq_env_txn!(self, rtxn);
 
-        match self.raw_init_database(rtxn.txn, name, None, false) {
-            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
+    //     match self.raw_init_database(rtxn.txn, name, None, false) {
+    //         Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
+    //         Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened in this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn create_database<'t, KC, DC>(
-        &self,
-        wtxn: &'t mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<Database<'t, KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        assert_eq_env_txn!(self, wtxn);
+    // /// Creates a typed database that can already exist in this environment.
+    // ///
+    // /// If the database was previously opened in this program run, types will be checked.
+    // ///
+    // /// ## Important Information
+    // ///
+    // /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    // /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    // /// these keys can only be read and not written.
+    // pub fn create_database<'t, KC, DC>(
+    //     &self,
+    //     wtxn: &'t mut RwTxn,
+    //     name: Option<&str>,
+    // ) -> Result<Database<'t, KC, DC>>
+    // where
+    //     KC: 'static,
+    //     DC: 'static,
+    // {
+    //     assert_eq_env_txn!(self, wtxn);
 
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
-            Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
-        }
-    }
+    //     let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+    //     match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
+    //         Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn create_poly_database<'t>(
-        &self,
-        wtxn: &'t mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<PolyDatabase<'t>> {
-        assert_eq_env_txn!(self, wtxn);
+    // /// Creates a typed database that can already exist in this environment.
+    // ///
+    // /// If the database was previously opened as a typed one, an error will be returned.
+    // ///
+    // /// ## Important Information
+    // ///
+    // /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    // /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    // /// these keys can only be read and not written.
+    // pub fn create_poly_database<'t>(
+    //     &self,
+    //     wtxn: &'t mut RwTxn,
+    //     name: Option<&str>,
+    // ) -> Result<PolyDatabase<'t>> {
+    //     assert_eq_env_txn!(self, wtxn);
 
-        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
-            Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
-        }
-    }
-
-    fn raw_open_dbi(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        flags: u32,
-    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
-        // safety: The name cstring is cloned by LMDB, we can drop it after.
-        //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
-        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
-
-        Ok(dbi)
-    }
-
-    fn raw_init_database(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-        create: bool,
-    ) -> Result<u32> {
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        let flags = if create { ffi::MDB_CREATE } else { 0 };
-        match self.raw_open_dbi(raw_txn, name, flags) {
-            Ok(dbi) => {
-                let types = match types {
-                    Some((key_type, data_type)) => DatabaseType::Typed { key_type, data_type },
-                    None => DatabaseType::Untyped,
-                };
-
-                let old_types = lock.entry(dbi).or_insert(types);
-                if *old_types == types {
-                    Ok(dbi)
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
-            Err(e) => Err(e.into()),
-        }
-    }
+    //     match self.raw_init_database(wtxn.txn.txn, name, None, true) {
+    //         Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
     /// Create a transaction with read and write access for use with the environment.
     pub fn write_txn(&self) -> Result<RwTxn> {
