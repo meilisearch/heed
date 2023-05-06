@@ -680,6 +680,26 @@ impl Env {
         //         and never decrements it. It is safe to use either an u32 or u64 (usize).
         Ok(dead as usize)
     }
+
+    /// Resize the memory map to a new size.
+    ///
+    /// # Safety
+    ///
+    /// According to the [lmdb docs](http://www.lmdb.tech/doc/group__mdb.html#gaa2506ec8dab3d969b0e609cd82e619e5),
+    /// it is ok to call mdb_env_set_mapsize for an open environment as long as no transactions are active,
+    /// but the library does not check for this condition, the caller must ensure it explicitly.
+    pub unsafe fn resize(&self, new_size: usize) -> Result<()> {
+        if new_size % page_size::get() != 0 {
+            let msg = format!(
+                "map size ({}) must be a multiple of the system page size ({})",
+                new_size,
+                page_size::get()
+            );
+            return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
+        }
+        mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr(), new_size) })
+            .map_err(Into::into)
+    }
 }
 
 /// Contains information about the environment.
@@ -876,5 +896,38 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
         assert!(option.is_some());
+    }
+
+    #[test]
+    fn resize_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(&dir.path()).unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
+        wtxn.commit().unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        for i in 0..64 {
+            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+        }
+        wtxn.commit().unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        for i in 64..128 {
+            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+        }
+        wtxn.commit().expect_err("cannot commit a transaction that would reach the map size limit");
+
+        unsafe {
+            env.resize(10 * 4096).unwrap();
+        }
+        let mut wtxn = env.write_txn().unwrap();
+        for i in 64..128 {
+            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+        }
+        wtxn.commit().expect("transaction should commit after resizing the map size");
+
+        assert_eq!(10 * 4096, env.info().map_size);
     }
 }
