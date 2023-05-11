@@ -364,45 +364,32 @@ impl Env {
         self.0.env
     }
 
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        Ok(self
-            .raw_open_database(name, Some(types))?
-            .map(|db| Database::new(self.env_mut_ptr() as _, db)))
+        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self
-            .raw_open_database(name, None)?
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
-    }
-
-    fn raw_open_database(
+    pub fn open_poly_database(
         &self,
+        rtxn: &RoTxn,
         name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-    ) -> Result<Option<u32>> {
-        let rtxn = self.read_txn()?;
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        match self.raw_open_dbi(rtxn.txn, name, 0) {
-            Ok(dbi) => {
-                rtxn.commit()?;
-
-                let old_types = lock.entry(dbi).or_insert(types);
-
-                if *old_types == types {
-                    Ok(Some(dbi))
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
-            Err(e) if e.not_found() => Ok(None),
-            Err(e) => Err(e.into()),
+    ) -> Result<Option<PolyDatabase>> {
+        match self.raw_init_database(rtxn.txn, name, None, false) {
+            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
