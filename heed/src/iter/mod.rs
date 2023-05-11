@@ -39,10 +39,10 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("prefix_iter_with_byte_255.mdb"))
             .unwrap();
-        let db = env.create_database::<ByteSlice, Str>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Str>(&mut wtxn, None).unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
@@ -80,11 +80,11 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("iter_last.mdb"))
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
@@ -148,11 +148,11 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("iter_last.mdb"))
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();
@@ -238,10 +238,10 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("prefix_iter_last.mdb"))
             .unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
@@ -313,10 +313,10 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("prefix_iter_last.mdb"))
             .unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
         db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
@@ -390,11 +390,11 @@ mod tests {
             .max_dbs(3000)
             .open(Path::new("target").join("range_iter_last.mdb"))
             .unwrap();
-        let db = env.create_database::<OwnedType<BEI32>, Unit>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<OwnedType<BEI32>, Unit>(&mut wtxn, None).unwrap();
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, &BEI32::new(1), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(2), &()).unwrap();
         db.put(&mut wtxn, &BEI32::new(3), &()).unwrap();

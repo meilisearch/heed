@@ -622,10 +622,10 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let db = env.create_database::<Str, Str>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, "hello", "hello").unwrap();
         db.put(&mut wtxn, "world", "world").unwrap();
 
