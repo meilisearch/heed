@@ -31,9 +31,9 @@ use crate::*;
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: PolyDatabase = env.create_poly_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: PolyDatabase = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
 /// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
 /// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
@@ -74,9 +74,9 @@ use crate::*;
 /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let db: PolyDatabase = env.create_poly_database(Some("big-endian-iter"))?;
-///
 /// let mut wtxn = env.write_txn()?;
+/// let db: PolyDatabase = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
+///
 /// # db.clear(&mut wtxn)?;
 /// db.put::<_, OwnedType<BEI64>, Unit>(&mut wtxn, &BEI64::new(0), &())?;
 /// db.put::<_, OwnedType<BEI64>, Str>(&mut wtxn, &BEI64::new(35), "thirty five")?;
@@ -130,7 +130,9 @@ impl PolyDatabase {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db = env.create_poly_database(Some("use-sequence-1"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("use-sequence-1"))?;
+    /// wtxn.commit()?;
     ///
     /// // The sequence starts at zero
     /// let rtxn = env.read_txn()?;
@@ -195,7 +197,9 @@ impl PolyDatabase {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db = env.create_poly_database(Some("use-sequence-2"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("use-sequence-2"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// let incr = db.increase_sequence(&mut wtxn, 32)?;
@@ -246,7 +250,9 @@ impl PolyDatabase {
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
-    /// let db = env.create_poly_database(Some("get-poly-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("get-poly-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -316,7 +322,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -384,7 +392,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lte-u32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("get-lte-u32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -456,7 +466,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -527,7 +539,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("get-lt-u32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -592,7 +606,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("first-poly-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("first-poly-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -648,7 +664,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("last-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("last-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -700,7 +718,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -756,7 +776,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -804,7 +826,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -846,7 +870,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -904,7 +930,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -950,7 +978,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1010,7 +1040,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1088,7 +1120,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1179,7 +1213,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1257,7 +1293,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1348,7 +1386,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1404,7 +1444,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1473,7 +1515,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1529,9 +1573,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-eight", &BEI32::new(28))?;
     /// db.put::<_, Str, OwnedType<BEI32>>(&mut wtxn, "i-am-twenty-seven", &BEI32::new(27))?;
@@ -1595,9 +1639,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(42), "i-am-forty-two")?;
     /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1657,9 +1701,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("append-i32"))?;
-    ///
     /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("append-i32"))?;
+    ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(13), "i-am-thirteen")?;
     /// db.put::<_, OwnedType<BEI32>, Str>(&mut wtxn, &BEI32::new(27), "i-am-twenty-seven")?;
@@ -1718,7 +1762,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1784,7 +1830,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1854,7 +1902,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
@@ -1903,7 +1953,9 @@ impl PolyDatabase {
     /// #     .open(Path::new("target").join("zerocopy.mdb"))?;
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let db = env.create_poly_database(Some("iter-i32"))?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
+    /// wtxn.commit()?;
     ///
     /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;

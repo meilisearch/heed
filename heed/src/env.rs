@@ -121,10 +121,10 @@ impl EnvOpenOptions {
     /// let env = env_builder.open(Path::new("target").join("zerocopy.mdb"))?;
     ///
     /// // we will open the default unamed database
-    /// let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
     ///
     /// // opening a write transaction
-    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, "seven", &7)?;
     /// db.put(&mut wtxn, "zero", &0)?;
     /// db.put(&mut wtxn, "five", &5)?;
@@ -328,7 +328,7 @@ impl Env {
         size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
-        let dbi = self.raw_open_dbi(&rtxn, None, 0)?;
+        let dbi = self.raw_open_dbi(rtxn.txn, None, 0)?;
 
         // we don’t want anyone to open an environment while we’re computing the stats
         // thus we take a lock on the dbi
@@ -343,7 +343,7 @@ impl Env {
             }
 
             let key = String::from_utf8(key.to_vec()).unwrap();
-            if let Ok(dbi) = self.raw_open_dbi(&rtxn, Some(&key), 0) {
+            if let Ok(dbi) = self.raw_open_dbi(rtxn.txn, Some(&key), 0) {
                 let mut stat = std::mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
@@ -364,26 +364,65 @@ impl Env {
         self.0.env
     }
 
-    pub fn open_database<KC, DC>(&self, name: Option<&str>) -> Result<Option<Database<KC, DC>>>
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
     {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        Ok(self
-            .raw_open_database(name, Some(types))?
-            .map(|db| Database::new(self.env_mut_ptr() as _, db)))
+        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
-    pub fn open_poly_database(&self, name: Option<&str>) -> Result<Option<PolyDatabase>> {
-        Ok(self
-            .raw_open_database(name, None)?
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db)))
+    pub fn open_poly_database(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<PolyDatabase>> {
+        match self.raw_init_database(rtxn.txn, name, None, false) {
+            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn create_database<KC, DC>(
+        &self,
+        wtxn: &mut RwTxn,
+        name: Option<&str>,
+    ) -> Result<Database<KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
+            Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn create_poly_database(
+        &self,
+        wtxn: &mut RwTxn,
+        name: Option<&str>,
+    ) -> Result<PolyDatabase> {
+        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
+            Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
     }
 
     fn raw_open_dbi(
         &self,
-        rtxn: &RoTxn,
+        raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         flags: u32,
     ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
@@ -393,92 +432,27 @@ impl Env {
             Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
             None => ptr::null(),
         };
-        unsafe { mdb_result(ffi::mdb_dbi_open(rtxn.txn, name_ptr, flags, &mut dbi))? };
+
+        // safety: The name cstring is cloned by LMDB, we can drop it after.
+        //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
+        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
 
         Ok(dbi)
     }
 
-    fn raw_open_database(
+    fn raw_init_database(
         &self,
+        raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
-    ) -> Result<Option<u32>> {
-        let rtxn = self.read_txn()?;
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        match self.raw_open_dbi(&rtxn, name, 0) {
-            Ok(dbi) => {
-                rtxn.commit()?;
-
-                let old_types = lock.entry(dbi).or_insert(types);
-
-                if *old_types == types {
-                    Ok(Some(dbi))
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
-            Err(e) if e.not_found() => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
-    }
-
-    pub fn create_database_with_txn<KC, DC>(
-        &self,
-        name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
-    ) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        self.raw_create_database(name, Some(types), parent_wtxn)
-            .map(|db| Database::new(self.env_mut_ptr() as _, db))
-    }
-
-    pub fn create_poly_database(&self, name: Option<&str>) -> Result<PolyDatabase> {
-        let mut parent_wtxn = self.write_txn()?;
-        let db = self.create_poly_database_with_txn(name, &mut parent_wtxn)?;
-        parent_wtxn.commit()?;
-        Ok(db)
-    }
-
-    pub fn create_poly_database_with_txn(
-        &self,
-        name: Option<&str>,
-        parent_wtxn: &mut RwTxn,
-    ) -> Result<PolyDatabase> {
-        self.raw_create_database(name, None, parent_wtxn)
-            .map(|db| PolyDatabase::new(self.env_mut_ptr() as _, db))
-    }
-
-    fn raw_create_database(
-        &self,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-        parent_wtxn: &mut RwTxn,
+        create: bool,
     ) -> Result<u32> {
-        let wtxn = self.nested_write_txn(parent_wtxn)?;
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        match self.raw_open_dbi(&wtxn, name, ffi::MDB_CREATE) {
+        let flags = if create { ffi::MDB_CREATE } else { 0 };
+        match self.raw_open_dbi(raw_txn, name, flags) {
             Ok(dbi) => {
-                wtxn.commit()?;
-
                 let old_types = lock.entry(dbi).or_insert(types);
-
                 if *old_types == types {
                     Ok(dbi)
                 } else {
@@ -635,10 +609,10 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let db = env.create_database::<Str, Str>(None).unwrap();
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
         db.put(&mut wtxn, "hello", "hello").unwrap();
         db.put(&mut wtxn, "world", "world").unwrap();
 

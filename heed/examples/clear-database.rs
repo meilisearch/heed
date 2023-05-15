@@ -18,8 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max_dbs(3)
         .open(env_path)?;
 
-    let db: Database<Str, Str> = env.create_database(Some("first"))?;
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
 
     // We fill the db database with entries.
     db.put(&mut wtxn, "I am here", "to test things")?;

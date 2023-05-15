@@ -25,10 +25,10 @@
 //! let env = EnvOpenOptions::new().open(Path::new("target").join("zerocopy.mdb"))?;
 //!
 //! // we will open the default unamed database
-//! let db: Database<Str, OwnedType<i32>> = env.create_database(None)?;
+//! let mut wtxn = env.write_txn()?;
+//! let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
-//! let mut wtxn = env.write_txn()?;
 //! db.put(&mut wtxn, "seven", &7)?;
 //! db.put(&mut wtxn, "zero", &0)?;
 //! db.put(&mut wtxn, "five", &5)?;

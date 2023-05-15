@@ -22,9 +22,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     //
     // like here we specify that the key will be an array of two i32
     // and the data will be an str
-    let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(Some("kikou"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(&mut wtxn, Some("kikou"))?;
+
     let _ret = db.put(&mut wtxn, &[2, 3], "what's up?")?;
     let ret: Option<&str> = db.get(&wtxn, &[2, 3])?;
 
@@ -32,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // here the key will be an str and the data will be a slice of u8
-    let db: Database<Str, ByteSlice> = env.create_database(Some("kiki"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, ByteSlice> = env.create_database(&mut wtxn, Some("kiki"))?;
+
     let _ret = db.put(&mut wtxn, "hello", &[2, 3][..])?;
     let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
 
@@ -47,9 +47,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let db: Database<Str, SerdeBincode<Hello>> = env.create_database(Some("serde-bincode"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, SerdeBincode<Hello>> =
+        env.create_database(&mut wtxn, Some("serde-bincode"))?;
 
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
@@ -59,9 +59,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    let db: Database<Str, SerdeJson<Hello>> = env.create_database(Some("serde-json"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, SerdeJson<Hello>> = env.create_database(&mut wtxn, Some("serde-json"))?;
 
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
@@ -78,10 +77,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         bytes: [u8; 12],
     }
 
-    let db: Database<Str, UnalignedType<ZeroBytes>> =
-        env.create_database(Some("zerocopy-struct"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, UnalignedType<ZeroBytes>> =
+        env.create_database(&mut wtxn, Some("zerocopy-struct"))?;
 
     let zerobytes = ZeroBytes { bytes: [24; 12] };
     db.put(&mut wtxn, "zero", &zerobytes)?;
@@ -92,9 +90,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // you can ignore the data
-    let db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
+
     let _ret = db.put(&mut wtxn, "hello", &())?;
     let ret: Option<()> = db.get(&wtxn, "hello")?;
 
@@ -108,7 +106,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // database opening and types are tested in a way
     //
     // we try to open a database twice with the same types
-    let _db: Database<Str, Unit> = env.create_database(Some("ignored-data"))?;
+    let mut wtxn = env.write_txn()?;
+    let _db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
 
     // and here we try to open it with other types
     // asserting that it correctly returns an error
@@ -116,15 +115,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE that those types are not saved upon runs and
     // therefore types cannot be checked upon different runs,
     // the first database opening fix the types for this run.
-    let result = env.create_database::<Str, OwnedSlice<i32>>(Some("ignored-data"));
+    let result = env.create_database::<Str, OwnedSlice<i32>>(&mut wtxn, Some("ignored-data"));
     assert!(result.is_err());
 
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db: Database<OwnedType<BEI64>, Unit> = env.create_database(Some("big-endian-iter"))?;
-
     let mut wtxn = env.write_txn()?;
+    let db: Database<OwnedType<BEI64>, Unit> =
+        env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+
     let _ret = db.put(&mut wtxn, &BEI64::new(0), &())?;
     let _ret = db.put(&mut wtxn, &BEI64::new(68), &())?;
     let _ret = db.put(&mut wtxn, &BEI64::new(35), &())?;
