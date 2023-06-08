@@ -3,7 +3,7 @@ on: [pull_request]
 
 name: Rust
 jobs:
-  check:
+  test:
     name: Test the heed project
     runs-on: ${{ matrix.os }}
     strategy:
@@ -27,6 +27,31 @@ jobs:
         run: |
           cargo clean
           cargo test
+
+  check_all_features:
+    name: Check all the features of the heed project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        run: |
+          cd heed
+          cargo clean
+          cargo check --all-features
 
   examples:
     name: Run the heed examples

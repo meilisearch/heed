@@ -41,7 +41,7 @@ impl Drop for RoTxn<'_> {
 }
 
 #[cfg(feature = "sync-read-txn")]
-unsafe impl<T> Sync for RoTxn<'_> {}
+unsafe impl Sync for RoTxn<'_> {}
 
 fn abort_txn(txn: *mut ffi::MDB_txn) {
     // Asserts that the transaction hasn't been already committed.
