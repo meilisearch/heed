@@ -56,6 +56,7 @@ mod mdb;
 mod reserved_space;
 mod txn;
 
+use std::convert::Infallible;
 use std::{error, fmt, io, result};
 
 use heed_traits as traits;
@@ -73,16 +74,18 @@ pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::Flag;
 pub use self::reserved_space::ReservedSpace;
-pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
+pub use self::traits::{BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
-pub enum Error {
+pub enum Error<KE, KD, DE, DD> {
     Io(io::Error),
     Mdb(MdbError),
-    Encoding(BoxedError),
-    Decoding(BoxedError),
+    KeyEncoding(KE),
+    KeyDecoding(KD),
+    DataEncoding(DE),
+    DataDecoding(DD),
     InvalidDatabaseTyping,
     DatabaseClosing,
     BadOpenOptions {
@@ -93,13 +96,17 @@ pub enum Error {
     },
 }
 
-impl fmt::Display for Error {
+impl<KE: fmt::Display, KD: fmt::Display, DE: fmt::Display, DD: fmt::Display> fmt::Display
+    for Error<KE, KD, DE, DD>
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Io(error) => write!(f, "{}", error),
             Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding(error) => write!(f, "error while encoding: {}", error),
-            Error::Decoding(error) => write!(f, "error while decoding: {}", error),
+            Error::KeyEncoding(error) => write!(f, "error while encoding a key: {}", error),
+            Error::KeyDecoding(error) => write!(f, "error while decoding a key: {}", error),
+            Error::DataEncoding(error) => write!(f, "error while encoding a data: {}", error),
+            Error::DataDecoding(error) => write!(f, "error while decoding a data: {}", error),
             Error::InvalidDatabaseTyping => {
                 f.write_str("database was previously opened with different types")
             }
@@ -113,10 +120,13 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {}
+impl<KE: error::Error, KD: error::Error, DE: error::Error, DD: error::Error> error::Error
+    for Error<KE, KD, DE, DD>
+{
+}
 
-impl From<MdbError> for Error {
-    fn from(error: MdbError) -> Error {
+impl<KE, KD, DE, DD> From<MdbError> for Error<KE, KD, DE, DD> {
+    fn from(error: MdbError) -> Error<KE, KD, DE, DD> {
         match error {
             MdbError::Other(e) => Error::Io(io::Error::from_raw_os_error(e)),
             _ => Error::Mdb(error),
@@ -124,27 +134,15 @@ impl From<MdbError> for Error {
     }
 }
 
-impl From<io::Error> for Error {
-    fn from(error: io::Error) -> Error {
+impl<KE, KD, DE, DD> From<io::Error> for Error<KE, KD, DE, DD> {
+    fn from(error: io::Error) -> Error<KE, KD, DE, DD> {
         Error::Io(error)
     }
 }
 
 /// Either a success or an [`Error`].
-pub type Result<T> = result::Result<T, Error>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_is_send_sync() {
-        fn give_me_send_sync<T: Send + Sync>(_: T) {}
-
-        let error = Error::Encoding(Box::from("There is an issue, you know?"));
-        give_me_send_sync(error);
-    }
-}
+pub type Result<T, KE = Infallible, KD = Infallible, DE = Infallible, DD = Infallible> =
+    result::Result<T, Error<KE, KD, DE, DD>>;
 
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {

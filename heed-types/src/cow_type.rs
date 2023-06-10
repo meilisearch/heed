@@ -1,7 +1,8 @@
 use std::borrow::Cow;
+use std::convert::Infallible;
 
 use bytemuck::{bytes_of, bytes_of_mut, try_from_bytes, AnyBitPattern, NoUninit, PodCastError};
-use heed_traits::{BoxedError, BytesDecode, BytesEncode};
+use heed_traits::{BytesDecode, BytesEncode};
 
 /// Describes a type that must be [memory aligned] and
 /// will be reallocated if it is not.
@@ -28,16 +29,18 @@ pub struct CowType<T>(std::marker::PhantomData<T>);
 
 impl<'a, T: NoUninit> BytesEncode<'a> for CowType<T> {
     type EItem = T;
+    type Err = Infallible;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, Self::Err> {
         Ok(Cow::Borrowed(bytes_of(item)))
     }
 }
 
 impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for CowType<T> {
     type DItem = Cow<'a, T>;
+    type Err = PodCastError;
 
-    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
+    fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, Self::Err> {
         match try_from_bytes(bytes) {
             Ok(item) => Ok(Cow::Borrowed(item)),
             Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned) => {
@@ -45,7 +48,7 @@ impl<'a, T: AnyBitPattern + NoUninit> BytesDecode<'a> for CowType<T> {
                 bytes_of_mut(&mut item).copy_from_slice(bytes);
                 Ok(Cow::Owned(item))
             }
-            Err(error) => Err(error.into()),
+            Err(error) => Err(error),
         }
     }
 }
