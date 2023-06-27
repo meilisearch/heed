@@ -31,6 +31,9 @@ cc = "1.0.78"
 doxygen-rs = "0.2.2"
 pkg-config = "0.3.26"
 
+[dev-dependencies]
+cstr = "0.2.11"
+
 [features]
 default = []
 asan = []

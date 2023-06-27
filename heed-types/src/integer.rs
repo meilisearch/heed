@@ -49,9 +49,9 @@ macro_rules! define_type {
             type EItem = $native;
 
             fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-                let mut buf = [0; size_of::<Self::EItem>()];
+                let mut buf = vec![0; size_of::<Self::EItem>()];
                 O::$write_method(&mut buf, *item);
-                Ok(Cow::from(buf.to_vec()))
+                Ok(Cow::from(buf))
             }
         }
 

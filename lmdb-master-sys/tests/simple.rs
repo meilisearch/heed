@@ -1,6 +1,7 @@
+use cstr::cstr;
 use lmdb_master_sys::*;
 
-use std::ffi::c_void;
+use std::ffi::{c_void, CString};
 use std::fs::{self, File};
 use std::ptr;
 
@@ -13,12 +14,6 @@ macro_rules! E {
             err_code => assert!(false, "Failed with code {}", err_code),
         }
     }};
-}
-
-macro_rules! str {
-    ($expr:expr) => {
-        std::ffi::CString::new($expr).unwrap().as_ptr()
-    };
 }
 
 #[test]
@@ -60,16 +55,22 @@ fn test_simple(env_path: &str) {
         mv_data: ptr::null_mut(),
     };
     let mut txn: *mut MDB_txn = ptr::null_mut();
-    let sval = str!("foo") as *mut c_void;
-    let dval = str!("bar") as *mut c_void;
+    let sval = cstr!("foo").as_ptr() as *mut c_void;
+    let dval = cstr!("bar").as_ptr() as *mut c_void;
 
     unsafe {
         E!(mdb_env_create(&mut env));
         E!(mdb_env_set_maxdbs(env, 2));
-        E!(mdb_env_open(env, str!(env_path), 0, 0664));
+        let env_path = CString::new(env_path).unwrap();
+        E!(mdb_env_open(env, env_path.as_ptr(), 0, 0664));
 
         E!(mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn));
-        E!(mdb_dbi_open(txn, str!("subdb"), MDB_CREATE, &mut dbi));
+        E!(mdb_dbi_open(
+            txn,
+            cstr!("subdb").as_ptr(),
+            MDB_CREATE,
+            &mut dbi
+        ));
         E!(mdb_txn_commit(txn));
 
         key.mv_size = 3;
