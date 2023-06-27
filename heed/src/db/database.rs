@@ -114,13 +114,13 @@ use crate::*;
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct Database<KC, DC> {
-    pub(crate) dyndb: PolyDatabase,
-    marker: marker::PhantomData<(KC, DC)>,
+pub struct Database<'t, KC, DC> {
+    pub(crate) dyndb: PolyDatabase<'t>,
+    pub(crate) marker: marker::PhantomData<(KC, DC)>,
 }
 
-impl<KC, DC> Database<KC, DC> {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC> {
+impl<KC, DC> Database<'_, KC, DC> {
+    pub(crate) fn new<'t>(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<'t, KC, DC> {
         Database { dyndb: PolyDatabase::new(env_ident, dbi), marker: std::marker::PhantomData }
     }
 
@@ -1604,15 +1604,15 @@ impl<KC, DC> Database<KC, DC> {
     }
 }
 
-impl<KC, DC> Clone for Database<KC, DC> {
-    fn clone(&self) -> Database<KC, DC> {
+impl<'t, KC, DC> Clone for Database<'t, KC, DC> {
+    fn clone(&self) -> Database<'t, KC, DC> {
         Database { dyndb: self.dyndb, marker: marker::PhantomData }
     }
 }
 
-impl<KC, DC> Copy for Database<KC, DC> {}
+impl<KC, DC> Copy for Database<'_, KC, DC> {}
 
-impl<KC, DC> fmt::Debug for Database<KC, DC> {
+impl<KC, DC> fmt::Debug for Database<'_, KC, DC> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Database")
             .field("key_codec", &any::type_name::<KC>())

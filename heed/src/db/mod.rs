@@ -1,5 +1,5 @@
-mod polymorph;
-mod uniform;
+mod database;
+mod poly_database;
 
-pub use self::polymorph::PolyDatabase;
-pub use self::uniform::Database;
+pub use self::database::Database;
+pub use self::poly_database::PolyDatabase;

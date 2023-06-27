@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
-use std::{fmt, mem, ptr};
+use std::{fmt, marker, mem, ptr};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -103,14 +103,15 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Copy, Clone)]
-pub struct PolyDatabase {
+pub struct PolyDatabase<'t> {
     pub(crate) env_ident: usize,
+    pub(crate) txn: marker::PhantomData<&'t ()>,
     pub(crate) dbi: ffi::MDB_dbi,
 }
 
-impl PolyDatabase {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> PolyDatabase {
-        PolyDatabase { env_ident, dbi }
+impl PolyDatabase<'_> {
+    pub(crate) fn new<'t>(env_ident: usize, dbi: ffi::MDB_dbi) -> PolyDatabase<'t> {
+        PolyDatabase { env_ident, txn: marker::PhantomData, dbi }
     }
 
     /// Retrieves the value associated with a key.
@@ -1856,7 +1857,7 @@ impl PolyDatabase {
     }
 }
 
-impl fmt::Debug for PolyDatabase {
+impl fmt::Debug for PolyDatabase<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PolyDatabase").finish()
     }
