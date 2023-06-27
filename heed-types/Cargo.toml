@@ -1,6 +1,6 @@
 [package]
 name = "heed-types"
-version = "0.20.0-alpha.1"
+version = "0.20.0-alpha.2"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "The types used with the fully typed LMDB wrapper, heed"
 license = "MIT"
