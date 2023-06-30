@@ -6,6 +6,24 @@ use crate::mdb::ffi;
 use crate::{Env, Result};
 
 /// A read-only transaction.
+///
+/// ## LMDB Limitations
+///
+/// It's a must to keep read transactions short-lived.
+///
+/// Active Read transactions prevent the reuse of pages freed
+/// by newer write transactions, thus the database can grow quickly.
+///
+/// ## OSX/Darwin Limitation
+///
+/// At least 10 transactions can be active at the same time in the same process, since only 10 Posix semaphores can
+/// be active at the same time for a process. Threads are in the same process space.
+///
+/// If the process crash in the Posix semaphore locking section of the transaction, the semaphore will be kept locked.
+///
+/// Note: if you program already use Posix Semaphore then you will have less available for heed/lmdb!
+///
+/// You may changing it by editing at **your own risk**: `/Library/LaunchDaemons/sysctl.plist`
 pub struct RoTxn<'e> {
     pub(crate) txn: *mut ffi::MDB_txn,
     env: &'e Env,
@@ -50,6 +68,23 @@ fn abort_txn(txn: *mut ffi::MDB_txn) {
 }
 
 /// A read-write transaction.
+///
+/// ## LMDB Limitations
+///
+/// Only one [RwTxn] may exist in the same environment at the same time,
+/// it two exist, the new one may wait on a Mutex for [RwTxn::commit] or [RwTxn::abort] of
+/// the first one.
+///
+/// ## OSX/Darwin Limitation
+///
+/// At least 10 transactions can be active at the same time in the same process, since only 10 Posix semaphores can
+/// be active at the same time for a process. Threads are in the same process space.
+///
+/// If the process crash in the Posix semaphore locking section of the transaction, the semaphore will be kept locked.
+///
+/// Note: if you program already use Posix Semaphore then you will have less available for heed/lmdb!
+///
+/// You may changing it by editing at **your own risk**: `/Library/LaunchDaemons/sysctl.plist`
 pub struct RwTxn<'p> {
     pub(crate) txn: RoTxn<'p>,
 }
