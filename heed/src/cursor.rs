@@ -228,7 +228,7 @@ impl<'txn> RwCursor<'txn> {
     /// modifying it, so you can't use the key/value that comes from the cursor to feed
     /// this function.
     ///
-    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// In other words: Transform the key and value that you borrow from this database into an owned
     /// version of them i.e. `&str` into `String`.
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
@@ -310,7 +310,7 @@ impl<'txn> RwCursor<'txn> {
     /// modifying it, so you can't use the key/value that comes from the cursor to feed
     /// this function.
     ///
-    /// In other words: Tranform the key and value that you borrow from this database into an owned
+    /// In other words: Transform the key and value that you borrow from this database into an owned
     /// version of them i.e. `&str` into `String`.
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,

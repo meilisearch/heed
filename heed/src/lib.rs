@@ -24,7 +24,7 @@
 //! let dir = tempfile::tempdir()?;
 //! let env = EnvOpenOptions::new().open(dir.path())?;
 //!
-//! // we will open the default unamed database
+//! // we will open the default unnamed database
 //! let mut wtxn = env.write_txn()?;
 //! let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
 //!
@@ -86,7 +86,7 @@ pub enum Error {
     InvalidDatabaseTyping,
     DatabaseClosing,
     BadOpenOptions {
-        /// The options that were used to originaly open this env.
+        /// The options that were used to originally open this env.
         options: EnvOpenOptions,
         /// The env opened with the original options.
         env: Env,
