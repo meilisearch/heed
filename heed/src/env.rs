@@ -177,6 +177,9 @@ impl EnvOpenOptions {
     /// assert_eq!(ret, Some(5));
     /// # Ok(()) }
     /// ```
+    ///
+    /// # Safety
+    /// It is unsafe to use unsafe LMDB flags such as Mdb_NoSync, Mdb_NoMetaSync, Mdb_NoLock
     pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
         self.flags |= flag as u32;
         self
