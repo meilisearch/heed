@@ -48,6 +48,21 @@ impl<'e> RoTxn<'e> {
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.env.env_mut_ptr()
     }
+
+    /// Commit a read transaction.
+    ///
+    /// Synchronizing some [Env] metadata with the global handle.
+    ///
+    /// ## Lmdb
+    ///
+    /// It's mandatory in a multi-process setup to call [RoTxn::commit] upon read-only database opening.
+    /// After the transaction opening, the database is `drop`ed. The next transaction might return
+    /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
+    pub fn commit(mut self) -> Result<()> {
+        let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn)) };
+        self.txn = ptr::null_mut();
+        result.map_err(Into::into)
+    }
 }
 
 impl Drop for RoTxn<'_> {

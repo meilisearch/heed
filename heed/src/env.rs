@@ -459,6 +459,15 @@ impl Env {
     /// LMDB have an important restriction on the unnamed database when named ones are opened,
     /// the names of the named databases are stored as keys in the unnamed one and are immutable,
     /// these keys can only be read and not written.
+    ///
+    /// ## Lmdb read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote you might need to call manually `RoTxn::commit` to get metadata
+    /// and the databases handles opened and shared with the global [Env] handle.
+    ///
+    /// If not done you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn,
@@ -791,6 +800,7 @@ impl fmt::Debug for EnvClosingEvent {
 
 #[cfg(test)]
 mod tests {
+    use std::io::ErrorKind;
     use std::time::Duration;
     use std::{fs, thread};
 
@@ -969,5 +979,99 @@ mod tests {
         wtxn.commit().expect("transaction should commit after resizing the map size");
 
         assert_eq!(10 * 4096, env.info().map_size);
+    }
+
+    /// Non-regression test for
+    /// <https://github.com/meilisearch/heed/issues/183>
+    ///
+    /// We should be able to open database Read-Only Env with
+    /// no prior Read-Write Env opening. And query data.
+    #[test]
+    fn open_read_only_without_no_env_opened_before() {
+        let expected_data0 = "Data Expected db0";
+        let dir = tempfile::tempdir().unwrap();
+
+        {
+            // We really need this env to be dropped before the read-only access.
+            let env = EnvOpenOptions::new()
+                .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                .max_dbs(32)
+                .open(dir.path())
+                .unwrap();
+            let mut wtxn = env.write_txn().unwrap();
+            let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
+
+            wtxn.commit().unwrap();
+            let mut wtxn = env.write_txn().unwrap();
+            database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
+            wtxn.commit().unwrap();
+            // We also really need that no other env reside in memory in other thread doing tests.
+            env.prepare_for_closing().wait();
+        }
+
+        {
+            // Open now we do a read-only opening
+            let env = EnvOpenOptions::new()
+                .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                .max_dbs(32)
+                .open(dir.path())
+                .unwrap();
+            let database0 = {
+                let rtxn = env.read_txn().unwrap();
+                let database0 =
+                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
+                // This commit is mandatory if not committed you might get
+                // Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })
+                rtxn.commit().unwrap();
+                database0
+            };
+
+            {
+                // If we didn't committed the opening it might fail with EINVAL.
+                let rtxn = env.read_txn().unwrap();
+                let value = database0.get(&rtxn, "shared0").unwrap().unwrap();
+                assert_eq!(value, expected_data0);
+            }
+
+            env.prepare_for_closing().wait();
+        }
+
+        // To avoid reintroducing the bug let's try to open again but without the commit
+        {
+            // Open now we do a read-only opening
+            let env = EnvOpenOptions::new()
+                .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                .max_dbs(32)
+                .open(dir.path())
+                .unwrap();
+            let database0 = {
+                let rtxn = env.read_txn().unwrap();
+                let database0 =
+                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
+                // No commit it's important, dropping explicitly
+                drop(rtxn);
+                database0
+            };
+
+            {
+                // We didn't committed the opening we will get EINVAL.
+                let rtxn = env.read_txn().unwrap();
+                // The dbg!() is intentional in case of a change in rust-std or in lmdb related
+                // to the windows error.
+                let err = dbg!(database0.get(&rtxn, "shared0"));
+
+                // The error kind is still ErrorKind Uncategorized on windows.
+                // Behind it's a ERROR_BAD_COMMAND code 22 like EINVAL.
+                if cfg!(windows) {
+                    assert!(err.is_err());
+                } else {
+                    assert!(
+                        matches!(err, Err(Error::Io(ref e)) if e.kind() == ErrorKind::InvalidInput)
+                    );
+                }
+            }
+
+            env.prepare_for_closing().wait();
+        }
     }
 }
