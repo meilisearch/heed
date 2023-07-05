@@ -200,9 +200,9 @@ impl EnvOpenOptions {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
                 if &options == self {
-                    return Ok(env);
+                    Ok(env)
                 } else {
-                    return Err(Error::BadOpenOptions { env, options });
+                    Err(Error::BadOpenOptions { env, options })
                 }
             }
             Entry::Vacant(entry) => {
