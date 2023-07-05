@@ -21,6 +21,8 @@
 //! [`Serialize`]: serde::Serialize
 //! [`Deserialize`]: serde::Deserialize
 
+#![warn(missing_docs)]
+
 mod cow_slice;
 mod cow_type;
 mod integer;

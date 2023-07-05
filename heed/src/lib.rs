@@ -46,6 +46,7 @@
 //! assert_eq!(ret, Some(5));
 //! # Ok(()) }
 //! ```
+#![warn(missing_docs)]
 
 mod cursor;
 mod db;
@@ -79,12 +80,19 @@ pub use self::txn::{RoTxn, RwTxn};
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
+    /// I/O error: can come from the std or be a rewrapped [`MdbError`]
     Io(io::Error),
+    /// Lmdb error
     Mdb(MdbError),
+    /// Encoding error
     Encoding(BoxedError),
+    /// Decoding error
     Decoding(BoxedError),
+    /// Incoherent types when opening a database
     InvalidDatabaseTyping,
+    /// Database closing in progress
     DatabaseClosing,
+    /// Attempt to open Env with different options
     BadOpenOptions {
         /// The options that were used to originally open this env.
         options: EnvOpenOptions,

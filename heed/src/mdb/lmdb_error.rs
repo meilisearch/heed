@@ -60,6 +60,7 @@ pub enum Error {
 }
 
 impl Error {
+    /// Return true if the given error is [`Error::NotFound`]
     pub fn not_found(&self) -> bool {
         *self == Error::NotFound
     }

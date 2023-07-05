@@ -76,12 +76,16 @@ impl<'p> RwTxn<'p> {
         self.txn.env.env_mut_ptr()
     }
 
+    /// Commit all the operations of a transaction into the database.
+    /// The transaction is reset.
     pub fn commit(mut self) -> Result<()> {
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
         self.txn.txn = ptr::null_mut();
         result.map_err(Into::into)
     }
 
+    /// Abandon all the operations of the transaction instead of saving them.
+    /// The transaction is reset.
     pub fn abort(mut self) {
         abort_txn(self.txn.txn);
         self.txn.txn = ptr::null_mut();
