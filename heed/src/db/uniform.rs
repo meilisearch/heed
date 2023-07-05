@@ -1395,7 +1395,7 @@ impl<KC, DC> Database<KC, DC> {
 
     /// Deletes a range of key-value pairs in this database.
     ///
-    /// Perfer using [`clear`] instead of a call to this method with a full range ([`..`]).
+    /// Prefer using [`clear`] instead of a call to this method with a full range ([`..`]).
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
@@ -1451,7 +1451,7 @@ impl<KC, DC> Database<KC, DC> {
 
     /// Deletes all key/value pairs in this database.
     ///
-    /// Perfer using this method instead of a call to [`delete_range`] with a full range ([`..`]).
+    /// Prefer using this method instead of a call to [`delete_range`] with a full range ([`..`]).
     ///
     /// [`delete_range`]: crate::Database::delete_range
     /// [`..`]: std::ops::RangeFull

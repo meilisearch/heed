@@ -9,14 +9,14 @@
 //! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:
 //!
-//! | Available types    | Encoding type | Decoding type | allocations                                              |
-//! |--------------------|:-------------:|:-------------:|----------------------------------------------------------|
-//! | [`CowSlice`]       | `&[T]`        | `Cow<[T]>`    | will allocate if memory is miss-aligned                  |
-//! | [`CowType`]        | `&T`          | `Cow<T>`      | will allocate if memory is miss-aligned                  |
-//! | [`OwnedSlice`]     | `&[T]`        | `Vec<T>`      | will _always_ allocate                                   |
-//! | [`OwnedType`]      | `&T`          | `T`           | will _always_ allocate                                   |
-//! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignement is always valid |
-//! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignement is always valid |
+//! | Available types    | Encoding type | Decoding type | allocations                                             |
+//! |--------------------|:-------------:|:-------------:|---------------------------------------------------------|
+//! | [`CowSlice`]       | `&[T]`        | `Cow<[T]>`    | will allocate if memory is miss-aligned                 |
+//! | [`CowType`]        | `&T`          | `Cow<T>`      | will allocate if memory is miss-aligned                 |
+//! | [`OwnedSlice`]     | `&[T]`        | `Vec<T>`      | will _always_ allocate                                  |
+//! | [`OwnedType`]      | `&T`          | `T`           | will _always_ allocate                                  |
+//! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignment is always valid |
+//! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignment is always valid |
 //!
 //! [`Serialize`]: serde::Serialize
 //! [`Deserialize`]: serde::Deserialize

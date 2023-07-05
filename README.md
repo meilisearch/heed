@@ -25,7 +25,7 @@ cd heed
 cargo build
 ```
 
-However, if you already cloned it and forgot about the initialising the submodules:
+However, if you already cloned it and forgot about the initializing the submodules:
 
 ```bash
 git submodule update --init
