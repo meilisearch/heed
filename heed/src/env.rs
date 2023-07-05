@@ -311,7 +311,7 @@ impl Drop for EnvInner {
             None => panic!("It seems another env closed this env before"),
             Some(EnvEntry { signal_event, .. }) => {
                 unsafe {
-                    let _ = ffi::mdb_env_close(self.env);
+                    ffi::mdb_env_close(self.env);
                 }
                 // We signal to all the waiters that the env is closed now.
                 signal_event.signal();
