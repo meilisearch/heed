@@ -150,8 +150,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -178,7 +178,7 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
@@ -205,8 +205,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -431,8 +431,8 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -459,7 +459,7 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
@@ -472,8 +472,8 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
