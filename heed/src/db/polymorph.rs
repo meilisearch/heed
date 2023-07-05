@@ -602,7 +602,7 @@ impl PolyDatabase {
     ///
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
+    pub fn len(&self, txn: &RoTxn) -> Result<u64> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
@@ -655,7 +655,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
+    pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
