@@ -178,7 +178,7 @@ impl EnvOpenOptions {
     /// # Ok(()) }
     /// ```
     pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
-        self.flags = self.flags | flag as u32;
+        self.flags |= flag as u32;
         self
     }
 
