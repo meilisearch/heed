@@ -105,6 +105,12 @@ pub struct EnvOpenOptions {
     flags: u32, // LMDB flags
 }
 
+impl Default for EnvOpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
