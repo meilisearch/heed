@@ -19,6 +19,7 @@ use std::{
 use std::{fmt, io, mem, ptr, sync};
 
 use once_cell::sync::Lazy;
+use same_file::Handle;
 use synchronoise::event::SignalEvent;
 
 use crate::mdb::error::mdb_result;
@@ -32,7 +33,10 @@ use crate::{
 /// noone tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
+///
+/// [samefile::Handle] abstract the platform details of checking if the given paths points to
+///  the same file on the filesystem.
+static OPENED_ENV: Lazy<RwLock<HashMap<Handle, EnvEntry>>> = Lazy::new(RwLock::default);
 
 struct EnvEntry {
     env: Option<Env>,
@@ -180,22 +184,29 @@ impl EnvOpenOptions {
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        let path = match canonicalize_path(path.as_ref()) {
+        let (path, handle) = match canonicalize_path(path.as_ref()) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
-                        Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
+                        Some((dir, file_name)) => {
+                            let handle = Handle::from_path(dir)?;
+                            let path = canonicalize_path(dir)?.join(file_name);
+                            (path, handle)
+                        }
                         None => return Err(err.into()),
                     }
                 } else {
                     return Err(err.into());
                 }
             }
-            Ok(path) => path,
+            Ok(path) => {
+                let handle = Handle::from_path(&path)?;
+                (path, handle)
+            }
         };
 
-        match lock.entry(path) {
+        match lock.entry(handle) {
             Entry::Occupied(entry) => {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
@@ -206,7 +217,6 @@ impl EnvOpenOptions {
                 }
             }
             Entry::Vacant(entry) => {
-                let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
@@ -255,6 +265,7 @@ impl EnvOpenOptions {
                                 env,
                                 dbi_open_mutex: sync::Mutex::default(),
                                 path: path.clone(),
+                                handle: Handle::from_path(path)?,
                             };
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
@@ -277,9 +288,11 @@ impl EnvOpenOptions {
 }
 
 /// Returns a struct that allows to wait for the effective closing of an environment.
-pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
+pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Result<Option<EnvClosingEvent>> {
     let lock = OPENED_ENV.read().unwrap();
-    lock.get(path.as_ref()).map(|e| EnvClosingEvent(e.signal_event.clone()))
+    let handle = Handle::from_path(path)?;
+
+    Ok(lock.get(&handle).map(|e| EnvClosingEvent(e.signal_event.clone())))
 }
 
 /// An environment handle constructed by using [`EnvOpenOptions`].
@@ -288,7 +301,7 @@ pub struct Env(Arc<EnvInner>);
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvInner { env: _, dbi_open_mutex: _, path } = self.0.as_ref();
+        let EnvInner { env: _, dbi_open_mutex: _, path, .. } = self.0.as_ref();
         f.debug_struct("Env").field("path", &path.display()).finish_non_exhaustive()
     }
 }
@@ -297,6 +310,7 @@ struct EnvInner {
     env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
     path: PathBuf,
+    handle: Handle,
 }
 
 unsafe impl Send for EnvInner {}
@@ -307,7 +321,7 @@ impl Drop for EnvInner {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        match lock.remove(&self.path) {
+        match lock.remove(&self.handle) {
             None => panic!("It seems another env closed this env before"),
             Some(EnvEntry { signal_event, .. }) => {
                 unsafe {
@@ -653,7 +667,7 @@ impl Env {
     /// when all references are dropped, the last one will eventually close the environment.
     pub fn prepare_for_closing(self) -> EnvClosingEvent {
         let mut lock = OPENED_ENV.write().unwrap();
-        match lock.get_mut(self.path()) {
+        match lock.get_mut(&self.0.handle) {
             None => panic!("cannot find the env that we are trying to close"),
             Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
@@ -797,7 +811,7 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&dir.path()).is_none());
+        assert!(env_closing_event(&dir.path()).unwrap().is_none());
     }
 
     #[test]
@@ -831,6 +845,75 @@ mod tests {
     }
 
     #[test]
+    fn open_env_with_named_path_hardlink_and_no_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+        let env_name = dir.path().join("babar.mdb");
+        let hardlink_name = dir_symlink.path().join("babar.mdb.link");
+
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+
+        std::os::unix::fs::symlink(&dir.path(), &hardlink_name).unwrap();
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&hardlink_name)
+            .unwrap();
+
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn open_env_with_named_path_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        fs::create_dir_all(&env_name).unwrap();
+
+        std::os::unix::fs::symlink(&env_name, &symlink_name).unwrap();
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+    }
+
+    #[test]
+    fn open_env_with_named_path_rename() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        fs::create_dir_all(&env_name).unwrap();
+
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+
+        let env_renamed = dir.path().join("serafina.mdb");
+        std::fs::rename(&env_name, &env_renamed).unwrap();
+
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_renamed)
+            .unwrap();
+    }
+
+    #[test]
     #[cfg(not(windows))]
     fn open_database_with_writemap_flag() {
         let dir = tempfile::tempdir().unwrap();
@@ -851,6 +934,82 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
         let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn open_env_with_named_path_symlink_and_no_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+
+        std::os::unix::fs::symlink(&dir.path(), &symlink_name).unwrap();
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn open_env_with_named_path_symlinkfile_and_no_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+
+        std::os::windows::fs::symlink_file(&dir.path(), &symlink_name).unwrap();
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn open_env_with_named_path_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        fs::create_dir_all(&env_name).unwrap();
+
+        std::os::windows::fs::symlink_dir(&env_name, &symlink_name).unwrap();
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let _env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
     }
 
     #[test]
