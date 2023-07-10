@@ -49,23 +49,6 @@ struct EnvEntry {
     options: EnvOpenOptions,
 }
 
-// Thanks to the mozilla/rkv project
-// Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
-// Otherwise, `Env::from_env()` will panic with error_no(123).
-#[cfg(not(windows))]
-fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
-    path.canonicalize()
-}
-
-#[cfg(windows)]
-fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
-    let canonical = path.canonicalize()?;
-    let url = url::Url::from_file_path(&canonical)
-        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
-    url.to_file_path()
-        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
-}
-
 #[cfg(windows)]
 /// Adding a 'missing' trait from windows OsStrExt
 trait OsStrExtLmdb {
@@ -189,14 +172,14 @@ impl EnvOpenOptions {
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        let (path, handle) = match canonicalize_path(path.as_ref()) {
+        let (path, handle) = match Handle::from_path(&path) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
                         Some((dir, file_name)) => {
-                            let handle = Handle::from_path(dir)?;
-                            let path = canonicalize_path(dir)?.join(file_name);
+                            let handle = Handle::from_path(&dir)?;
+                            let path = dir.join(file_name);
                             (path, handle)
                         }
                         None => return Err(err.into()),
@@ -205,10 +188,7 @@ impl EnvOpenOptions {
                     return Err(err.into());
                 }
             }
-            Ok(path) => {
-                let handle = Handle::from_path(&path)?;
-                (path, handle)
-            }
+            Ok(handle) => (path.as_ref().to_path_buf(), handle),
         };
 
         match lock.entry(handle) {
