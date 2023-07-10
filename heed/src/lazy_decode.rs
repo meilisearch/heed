@@ -23,6 +23,7 @@ pub struct Lazy<'a, C> {
 }
 
 impl<'a, C: heed_traits::BytesDecode<'a>> Lazy<'a, C> {
+    /// Decode the given bytes as DItem
     pub fn decode(&self) -> Result<C::DItem, BoxedError> {
         C::bytes_decode(self.data)
     }

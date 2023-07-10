@@ -5,6 +5,7 @@ use std::mem::size_of;
 use byteorder::{ByteOrder, ReadBytesExt};
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
+/// Encodable version of [`u8`]
 pub struct U8;
 
 impl BytesEncode<'_> for U8 {
@@ -23,6 +24,7 @@ impl BytesDecode<'_> for U8 {
     }
 }
 
+/// Encodable version of [`i8`]
 pub struct I8;
 
 impl BytesEncode<'_> for I8 {
@@ -43,6 +45,10 @@ impl BytesDecode<'_> for I8 {
 
 macro_rules! define_type {
     ($name:ident, $native:ident, $read_method:ident, $write_method:ident) => {
+        #[doc = "Encodable version of [`"]
+        #[doc = stringify!($native)]
+        #[doc = "`]."]
+
         pub struct $name<O>(PhantomData<O>);
 
         impl<O: ByteOrder> BytesEncode<'_> for $name<O> {
