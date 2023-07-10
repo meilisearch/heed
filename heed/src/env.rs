@@ -301,7 +301,8 @@ pub struct Env(Arc<EnvInner>);
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvInner { env: _, dbi_open_mutex: _, path, .. } = self.0.as_ref();
+        // We don't include the header since it's containing platform specifics details
+        let EnvInner { env: _, dbi_open_mutex: _, path, handle: _ } = self.0.as_ref();
         f.debug_struct("Env").field("path", &path.display()).finish_non_exhaustive()
     }
 }
