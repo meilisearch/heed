@@ -584,6 +584,13 @@ impl Env {
     }
 
     /// Create a transaction with read and write access for use with the environment.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// Only one [RwTxn] may exist simultaneously in the current environment.
+    /// If another write transaction is initiated, while another write transaction exists
+    /// the thread initiating the new one will wait on a mutex upon completion of the previous
+    /// transaction.
     pub fn write_txn(&self) -> Result<RwTxn> {
         RwTxn::new(self)
     }
@@ -600,6 +607,25 @@ impl Env {
     }
 
     /// Create a transaction with read-only access for use with the environment.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// It's possible to have multiple read transactions in the same environment
+    /// while there is a write transaction ongoing.
+    ///
+    /// But read transactions prevent reuse of pages freed by newer write transactions,
+    /// thus the database can grow quickly. Write transactions prevent other write transactions,
+    /// since writes are serialized.
+    ///
+    /// So avoid long-lived read transactions.
+    ///
+    /// ## Errors
+    ///
+    /// * [heed::mdb::lmdb_error::Error::Panic]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [heed::mdb::lmdb_error::Error::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
+    /// map must be resized
+    /// * [heed::mdb::lmdb_error::Error::ReadersFull]: a read-only transaction was requested, and the reader lock table is
+    /// full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
     }
