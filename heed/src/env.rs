@@ -30,12 +30,17 @@ use crate::{
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
-/// noone tries to open the same environment between these two phases.
+/// none tries to open the same environment between these two phases.
 ///
-/// Trying to open a None marked environment returns an error to the user trying to open it.
+/// Trying to open a `None` marked environment returns an error to the user trying to open it.
 ///
-/// [samefile::Handle] abstract the platform details of checking if the given paths points to
+/// [same_file::Handle] abstract the platform details of checking if the given paths points to
 ///  the same file on the filesystem.
+///
+/// ## Safety
+///
+/// Mind that Handle currently open the file, so avoid writing through the fd held by [same_file::Handle],
+/// since the file will also be opened by LMDB.
 static OPENED_ENV: Lazy<RwLock<HashMap<Handle, EnvEntry>>> = Lazy::new(RwLock::default);
 
 struct EnvEntry {
