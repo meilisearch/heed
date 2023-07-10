@@ -641,7 +641,10 @@ impl Env {
         Ok(())
     }
 
-    /// Returns the canonicalized path where this env lives.
+    /// Returns the `Path` where this [Env] lives.
+    ///
+    /// The `Path` returned will be the one from the first opening. Like if you `EnvOpenOptions::open` through
+    /// a symlink or a moved the directory containing it will be the case.
     pub fn path(&self) -> &Path {
         &self.0.path
     }
