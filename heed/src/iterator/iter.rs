@@ -150,8 +150,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -178,7 +178,7 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
@@ -205,8 +205,8 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
@@ -431,8 +431,8 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
@@ -459,7 +459,7 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         KC: BytesEncode<'a>,
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
@@ -467,13 +467,27 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     ///
     /// If a key is inserted that is less than any previous key a `KeyExist` error
     /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Transform the key and value that you borrow from this database into an owned
+    /// version of them i.e. `&str` into `String`.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(&data).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
     }
 

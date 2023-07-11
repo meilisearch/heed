@@ -98,7 +98,7 @@ impl<'txn> RoCursor<'txn> {
         &mut self,
         key: &[u8],
     ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-        let mut key_val = unsafe { crate::into_val(&key) };
+        let mut key_val = unsafe { crate::into_val(key) };
         let mut data_val = mem::MaybeUninit::uninit();
 
         // Move the cursor to the specified key
@@ -236,8 +236,8 @@ impl<'txn> RwCursor<'txn> {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
-        let mut key_val = crate::into_val(&key);
-        let mut data_val = crate::into_val(&data);
+        let mut key_val = crate::into_val(key);
+        let mut data_val = crate::into_val(data);
 
         // Modify the pointed data
         let result = mdb_result(ffi::mdb_cursor_put(
@@ -276,7 +276,7 @@ impl<'txn> RwCursor<'txn> {
     where
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
-        let mut key_val = crate::into_val(&key);
+        let mut key_val = crate::into_val(key);
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = ffi::MDB_RESERVE;
 
@@ -318,8 +318,8 @@ impl<'txn> RwCursor<'txn> {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn append(&mut self, key: &[u8], data: &[u8]) -> Result<()> {
-        let mut key_val = crate::into_val(&key);
-        let mut data_val = crate::into_val(&data);
+        let mut key_val = crate::into_val(key);
+        let mut data_val = crate::into_val(data);
 
         // Modify the pointed data
         let result = mdb_result(ffi::mdb_cursor_put(

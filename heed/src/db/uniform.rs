@@ -512,7 +512,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
+    pub fn len(&self, txn: &RoTxn) -> Result<u64> {
         self.dyndb.len(txn)
     }
 
@@ -554,7 +554,7 @@ impl<KC, DC> Database<KC, DC> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
+    pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         self.dyndb.is_empty(txn)
     }
 

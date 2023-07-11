@@ -105,6 +105,12 @@ pub struct EnvOpenOptions {
     flags: u32, // LMDB flags
 }
 
+impl Default for EnvOpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
@@ -171,8 +177,12 @@ impl EnvOpenOptions {
     /// assert_eq!(ret, Some(5));
     /// # Ok(()) }
     /// ```
+    ///
+    /// # Safety
+    ///
+    /// It is unsafe to use unsafe LMDB flags such as `NoSync`, `NoMetaSync`, or `NoLock`.
     pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
-        self.flags = self.flags | flag as u32;
+        self.flags |= flag as u32;
         self
     }
 
@@ -200,9 +210,9 @@ impl EnvOpenOptions {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
                 if &options == self {
-                    return Ok(env);
+                    Ok(env)
                 } else {
-                    return Err(Error::BadOpenOptions { env, options });
+                    Err(Error::BadOpenOptions { env, options })
                 }
             }
             Entry::Vacant(entry) => {
@@ -311,7 +321,7 @@ impl Drop for EnvInner {
             None => panic!("It seems another env closed this env before"),
             Some(EnvEntry { signal_event, .. }) => {
                 unsafe {
-                    let _ = ffi::mdb_env_close(self.env);
+                    ffi::mdb_env_close(self.env);
                 }
                 // We signal to all the waiters that the env is closed now.
                 signal_event.signal();
@@ -651,6 +661,10 @@ impl Env {
     ///
     /// This function may be used to make a backup of an existing environment.
     /// No lockfile is created, since it gets recreated at need.
+    ///
+    /// # Safety
+    ///
+    /// The [`ffi::mdb_filehandle_t`] must have already been opened for Write access.
     pub unsafe fn copy_to_fd(
         &self,
         fd: ffi::mdb_filehandle_t,
