@@ -843,37 +843,47 @@ mod tests {
         let symlink_name = dir_symlink.path().join("babar.mdb.link");
         fs::create_dir_all(&env_name).unwrap();
 
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+        assert_eq!(env_name, env.path());
+
         std::os::unix::fs::symlink(&env_name, &symlink_name).unwrap();
-        let _env = EnvOpenOptions::new()
+
+        let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&symlink_name)
             .unwrap();
 
-        let _env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(&env_name)
-            .unwrap();
+        // The path is recycle from the first opening of the env.
+        assert_eq!(env_name, env.path());
     }
 
     #[test]
     fn open_env_with_named_path_rename() {
         let dir = tempfile::tempdir().unwrap();
+        // We make a tmp dir where to move the env to avoid directly writing to /tmp.
+        // Windows CI had issue if not done.
+        let moved_parent = tempfile::tempdir().unwrap();
 
         let env_name = dir.path().join("babar.mdb");
         fs::create_dir_all(&env_name).unwrap();
 
-        let _env = EnvOpenOptions::new()
+        let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&env_name)
             .unwrap();
+        assert_eq!(env_name, env.path());
 
-        let env_renamed = dir.path().join("serafina.mdb");
+        let env_renamed = moved_parent.path().join("serafina.mdb");
         std::fs::rename(&env_name, &env_renamed).unwrap();
 
-        let _env = EnvOpenOptions::new()
+        let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&env_renamed)
             .unwrap();
+        assert_eq!(env_name, env.path());
     }
 
     #[test]
@@ -909,16 +919,22 @@ mod tests {
 
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
-        let _env = envbuilder
+        let env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&env_name)
             .unwrap();
+        assert_eq!(env_name, env.path());
+        assert_ne!(symlink_name, env.path());
 
         std::os::unix::fs::symlink(&dir.path(), &symlink_name).unwrap();
         let _env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&symlink_name)
             .unwrap();
+
+        // Checkout that we get the path of the first openning.
+        assert_eq!(env_name, env.path());
+        assert_ne!(symlink_name, env.path());
 
         let _env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
@@ -964,12 +980,12 @@ mod tests {
         fs::create_dir_all(&env_name).unwrap();
 
         std::os::windows::fs::symlink_dir(&env_name, &symlink_name).unwrap();
-        let _env = EnvOpenOptions::new()
+        let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&symlink_name)
             .unwrap();
 
-        let _env = EnvOpenOptions::new()
+        let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&env_name)
             .unwrap();
