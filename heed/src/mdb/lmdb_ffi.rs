@@ -7,7 +7,7 @@ pub use ffi::{
     mdb_env_set_maxdbs, mdb_env_set_maxreaders, mdb_env_stat, mdb_env_sync, mdb_filehandle_t,
     mdb_get, mdb_put, mdb_reader_check, mdb_stat, mdb_txn_abort, mdb_txn_begin, mdb_txn_commit,
     MDB_cursor, MDB_dbi, MDB_env, MDB_envinfo, MDB_stat, MDB_txn, MDB_val, MDB_APPEND,
-    MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_RDONLY, MDB_RESERVE,
+    MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_DUPSORT, MDB_RDONLY, MDB_RESERVE,
 };
 use lmdb_master_sys as ffi;
 

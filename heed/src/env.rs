@@ -21,6 +21,7 @@ use std::{fmt, io, mem, ptr, sync};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::db::PolyMultiDatabase;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::{
@@ -510,6 +511,29 @@ impl Env {
         }
     }
 
+    /// Opens an untyped database with DUPSORT enabled that already exists in this environment.
+    ///
+    /// If the database was previously opened as a typed one, an error will be returned.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
+    pub fn open_poly_multi_database(
+        &self,
+        rtxn: &RoTxn,
+        name: Option<&str>,
+    ) -> Result<Option<PolyMultiDatabase>> {
+        assert_eq_env_txn!(self, rtxn);
+
+        match self.raw_init_database(rtxn.txn, name, None, ffi::MDB_DUPSORT) {
+            Ok(dbi) => Ok(Some(PolyMultiDatabase::new(self.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Creates a typed database that can already exist in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
@@ -555,6 +579,28 @@ impl Env {
 
         match self.raw_init_database(wtxn.txn.txn, name, None, ffi::MDB_CREATE) {
             Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Creates a typed database with DUPSORT enabled that can already exist in this environment.
+    ///
+    /// If the database was previously opened as a typed one, an error will be returned.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
+    pub fn create_poly_multi_database(
+        &self,
+        wtxn: &mut RwTxn,
+        name: Option<&str>,
+    ) -> Result<PolyMultiDatabase> {
+        assert_eq_env_txn!(self, wtxn);
+
+        match self.raw_init_database(wtxn.txn.txn, name, None, ffi::MDB_CREATE | ffi::MDB_DUPSORT) {
+            Ok(dbi) => Ok(PolyMultiDatabase::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
