@@ -860,13 +860,13 @@ mod tests {
         assert_eq!(env_name, env.path());
     }
 
+    // Unix only since managing to support *moving* directory on windows was too
+    // much pain. By moving we mean not copy-recreating, just changing name.
+    // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexa
     #[test]
+    #[cfg(unix)]
     fn open_env_with_named_path_rename() {
         let dir = tempfile::tempdir().unwrap();
-        // We make a tmp dir where to move the env to avoid directly writing to /tmp.
-        // Windows CI had issue if not done.
-        let moved_parent = tempfile::tempdir().unwrap();
-
         let env_name = dir.path().join("babar.mdb");
         fs::create_dir_all(&env_name).unwrap();
 
@@ -876,7 +876,7 @@ mod tests {
             .unwrap();
         assert_eq!(env_name, env.path());
 
-        let env_renamed = moved_parent.path().join("serafina.mdb");
+        let env_renamed = dir.path().join("serafina.mdb");
         std::fs::rename(&env_name, &env_renamed).unwrap();
 
         let env = EnvOpenOptions::new()
