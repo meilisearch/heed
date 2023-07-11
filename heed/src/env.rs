@@ -912,34 +912,37 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn open_env_with_named_path_symlink_and_no_subdir() {
-        let dir = tempfile::tempdir().unwrap();
-        let dir_symlink = tempfile::tempdir().unwrap();
-        let env_name = dir.path().join("babar.mdb");
-        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        let env_dir = tempfile::Builder::new().suffix("heed_test_no_subdir_env").tempdir().unwrap();
+        let symlink_parent = tempfile::tempdir().unwrap();
+        let env_path = env_dir.path();
+        let db_file = env_dir.path().join("data.mdb");
+
+        let symlink_path = symlink_parent.path().join("env.link");
 
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
         let env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&env_name)
+            .open(&db_file)
             .unwrap();
-        assert_eq!(env_name, env.path());
-        assert_ne!(symlink_name, env.path());
+        assert_eq!(db_file, env.path());
 
-        std::os::unix::fs::symlink(&dir.path(), &symlink_name).unwrap();
+        std::os::unix::fs::symlink(&env_path, &symlink_path).unwrap();
         let _env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&symlink_name)
+            .open(&symlink_path)
             .unwrap();
 
         // Checkout that we get the path of the first openning.
-        assert_eq!(env_name, env.path());
-        assert_ne!(symlink_name, env.path());
+        assert_eq!(db_file, env.path());
+        assert_ne!(symlink_path, env.path());
 
         let _env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&env_name)
+            .open(&env_path)
             .unwrap();
+        assert_eq!(db_file, env.path());
+        assert_ne!(symlink_path, env.path());
     }
 
     #[test]
