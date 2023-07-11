@@ -10,6 +10,9 @@ use lmdb_master_sys as ffi;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {
     /// key/data pair already exists.
+    ///
+    /// May be also returned by append functions, data are passed
+    /// doesn't respect the database ordering.
     KeyExist,
     /// key/data pair not found (EOF).
     NotFound,

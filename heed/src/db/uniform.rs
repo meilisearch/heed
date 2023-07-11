@@ -1304,7 +1304,7 @@ impl<KC, DC> Database<KC, DC> {
     /// Append the given key/data pair to the end of the database.
     ///
     /// This option allows fast bulk loading when keys are already known to be in the correct order.
-    /// Loading unsorted keys will cause a MDB_KEYEXIST error.
+    /// Loading unsorted keys will cause a `KeyExist`/`MDB_KEYEXIST` error.
     ///
     /// ```
     /// # use std::fs;
@@ -1326,13 +1326,16 @@ impl<KC, DC> Database<KC, DC> {
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// db.append(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.append(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.append(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.append(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.get(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    ///
+    /// // Be wary if you insert at the end unsorted you get the KEYEXIST error.
+    /// assert!(db.append(&mut wtxn, &1, "Oh No").is_err());
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
