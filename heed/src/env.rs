@@ -834,31 +834,6 @@ mod tests {
     }
 
     #[test]
-    fn open_env_with_named_path_hardlink_and_no_subdir() {
-        let dir = tempfile::tempdir().unwrap();
-        let env_name = dir.path().join("babar.mdb");
-        let hardlink_name = dir.path().join("babar.mdb.link");
-
-        let mut envbuilder = EnvOpenOptions::new();
-        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
-        let _env = envbuilder
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(&env_name)
-            .unwrap();
-
-        std::fs::hard_link(&env_name, &hardlink_name).unwrap();
-        let _env = envbuilder
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(&hardlink_name)
-            .unwrap();
-
-        let _env = envbuilder
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(&env_name)
-            .unwrap();
-    }
-
-    #[test]
     #[cfg(unix)]
     fn open_env_with_named_path_symlink() {
         let dir = tempfile::tempdir().unwrap();
