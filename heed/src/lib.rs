@@ -51,7 +51,7 @@
 mod cursor;
 mod db;
 mod env;
-mod iter;
+mod iterator;
 mod lazy_decode;
 mod mdb;
 mod reserved_space;
@@ -67,7 +67,7 @@ pub use self::db::{Database, PolyDatabase};
 pub use self::env::{
     env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions,
 };
-pub use self::iter::{
+pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,
 };
