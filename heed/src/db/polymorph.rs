@@ -1577,7 +1577,7 @@ impl PolyDatabase {
     /// Append the given key/data pair to the end of the database.
     ///
     /// This option allows fast bulk loading when keys are already known to be in the correct order.
-    /// Loading unsorted keys will cause a MDB_KEYEXIST error.
+    /// Loading unsorted keys will cause a `KeyExist`/`MDB_KEYEXIST` error.
     ///
     /// ```
     /// # use std::fs;
@@ -1599,13 +1599,16 @@ impl PolyDatabase {
     /// let db = env.create_poly_database(&mut wtxn, Some("append-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    ///
+    /// // Be wary if you insert at the end unsorted you get the KEYEXIST error.
+    /// assert!(db.append::<BEI32, Str>(&mut wtxn, &1, "Oh No").is_err());
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
