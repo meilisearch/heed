@@ -64,7 +64,9 @@ pub use {bytemuck, byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::db::{Database, PolyDatabase};
-pub use self::env::{env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvOpenOptions};
+pub use self::env::{
+    env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions,
+};
 pub use self::iter::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,
