@@ -950,8 +950,12 @@ mod tests {
     fn open_env_with_named_path_symlinkfile_and_no_subdir() {
         let dir = tempfile::tempdir().unwrap();
         let dir_symlink = tempfile::tempdir().unwrap();
+        // We do a temp dir because CI returned
+        // Os { code: 5, kind: PermissionDenied, message: "Access is denied." }
+        let parent_symlink = tempfile::tempdir().unwrap();
+
         let env_name = dir.path().join("babar.mdb");
-        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        let symlink_name = parent_symlink.path().join("babar.mdb.link");
 
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
@@ -960,7 +964,7 @@ mod tests {
             .open(&env_name)
             .unwrap();
 
-        std::os::windows::fs::symlink_file(&dir.path(), &symlink_name).unwrap();
+        std::os::windows::fs::symlink_dir(&dir.path(), &symlink_name).unwrap();
         let _env = envbuilder
             .map_size(10 * 1024 * 1024) // 10MB
             .open(&symlink_name)
