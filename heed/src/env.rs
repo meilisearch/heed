@@ -480,7 +480,7 @@ impl Env {
         assert_eq_env_txn!(self, rtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+        match self.raw_init_database(rtxn.txn, name, Some(types), 0) {
             Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -503,7 +503,7 @@ impl Env {
     ) -> Result<Option<PolyDatabase>> {
         assert_eq_env_txn!(self, rtxn);
 
-        match self.raw_init_database(rtxn.txn, name, None, false) {
+        match self.raw_init_database(rtxn.txn, name, None, 0) {
             Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -531,7 +531,7 @@ impl Env {
         assert_eq_env_txn!(self, wtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
+        match self.raw_init_database(wtxn.txn.txn, name, Some(types), ffi::MDB_CREATE) {
             Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
@@ -553,7 +553,7 @@ impl Env {
     ) -> Result<PolyDatabase> {
         assert_eq_env_txn!(self, wtxn);
 
-        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
+        match self.raw_init_database(wtxn.txn.txn, name, None, ffi::MDB_CREATE) {
             Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
@@ -584,11 +584,11 @@ impl Env {
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         types: Option<(TypeId, TypeId)>,
-        create: bool,
+        flags: u32,
     ) -> Result<u32> {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
 
-        let flags = if create { ffi::MDB_CREATE } else { 0 };
+        //let flags = if create { ffi::MDB_CREATE } else { 0 };
         match self.raw_open_dbi(raw_txn, name, flags) {
             Ok(dbi) => {
                 let old_types = lock.entry(dbi).or_insert(types);
