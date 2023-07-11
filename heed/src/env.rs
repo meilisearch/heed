@@ -179,7 +179,8 @@ impl EnvOpenOptions {
     /// ```
     ///
     /// # Safety
-    /// It is unsafe to use unsafe LMDB flags such as Mdb_NoSync, Mdb_NoMetaSync, Mdb_NoLock
+    ///
+    /// It is unsafe to use unsafe LMDB flags such as `NoSync`, `NoMetaSync`, or `NoLock`.
     pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
         self.flags |= flag as u32;
         self
