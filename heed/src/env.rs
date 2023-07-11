@@ -660,6 +660,10 @@ impl Env {
     ///
     /// This function may be used to make a backup of an existing environment.
     /// No lockfile is created, since it gets recreated at need.
+    ///
+    /// # Safety
+    ///
+    /// The [`ffi::mdb_filehandle_t`] must have already been opened for Write access.
     pub unsafe fn copy_to_fd(
         &self,
         fd: ffi::mdb_filehandle_t,
