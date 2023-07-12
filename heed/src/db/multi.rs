@@ -578,7 +578,8 @@ impl PolyMultiDatabase {
         }
     }
 
-    /// Returns the number of elements in this database.
+    /// Returns the number of key value pairs in this database,
+    /// meaning that duplicate keys are counted multiple times.
     ///
     /// ```
     /// # use std::fs;
@@ -601,23 +602,25 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two_twice")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven_again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
-    /// assert_eq!(ret, 4);
+    /// assert_eq!(ret, 6);
     ///
     /// db.delete::<BEI32>(&mut wtxn, &27)?;
     ///
     /// let ret = db.len(&wtxn)?;
-    /// assert_eq!(ret, 3);
+    /// assert_eq!(ret, 4);
     ///
     /// wtxn.commit()?;
     ///
     /// # Ok(()) }
     /// ```
-    pub fn len<'txn>(&self, txn: &'txn RoTxn) -> Result<u64> {
+    pub fn len(&self, txn: &RoTxn) -> Result<u64> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
