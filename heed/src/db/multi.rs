@@ -37,6 +37,7 @@ use crate::*;
 /// # db.clear(&mut wtxn)?;
 /// db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
 /// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five")?;
+/// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five again")?;
 /// db.put::<BEI64, Str>(&mut wtxn, &42, "forty two")?;
 /// db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
 ///
@@ -44,6 +45,7 @@ use crate::*;
 /// let range = 35..=42;
 /// let mut range = db.range::<BEI64, Str, _>(&wtxn, &range)?;
 /// assert_eq!(range.next().transpose()?, Some((35, "thirty five")));
+/// assert_eq!(range.next().transpose()?, Some((35, "thirty five again")));
 /// assert_eq!(range.next().transpose()?, Some((42, "forty two")));
 /// assert_eq!(range.next().transpose()?, None);
 ///
@@ -80,13 +82,14 @@ use crate::*;
 /// # db.clear(&mut wtxn)?;
 /// db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
 /// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five")?;
+/// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five again")?;
 /// db.put::<BEI64, Str>(&mut wtxn, &42, "forty two")?;
 /// db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
 ///
 /// // even delete a range of keys
 /// let range = 35..=42;
 /// let deleted = db.delete_range::<BEI64, _>(&mut wtxn, &range)?;
-/// assert_eq!(deleted, 2);
+/// assert_eq!(deleted, 3);
 ///
 /// let rets: Result<_, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
 /// let rets: Vec<(i64, _)> = rets?;
@@ -96,7 +99,6 @@ use crate::*;
 ///     (68, ()),
 /// ];
 ///
-/// assert_eq!(deleted, 2);
 /// assert_eq!(rets, expected);
 ///
 /// wtxn.commit()?;
@@ -138,12 +140,12 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two", &42)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;    
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am", &42)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am", &27)?;
     ///
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am-forty-two")?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&("i-am-forty-two", 42)));   
+    /// assert_eq!(ret.iter().next(), Some(&("i-am-forty-two", 42)));
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am")?.collect::<Result<Vec<_>, _>>()?;
     /// let mut ret = ret.iter();
     /// assert_eq!(ret.next(), Some(&("i-am", 27)));
@@ -222,17 +224,18 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &1)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &5)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &42, &2)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &43, &3)?;
     ///
-    /// let ret = db.get_lower_than::<BEU32, Unit>(&wtxn, &4404)?;
-    /// assert_eq!(ret, Some((43, ())));
+    /// let ret = db.get_lower_than::<BEU32, BEU32>(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, 3)));
     ///
-    /// let ret = db.get_lower_than::<BEU32, Unit>(&wtxn, &43)?;
-    /// assert_eq!(ret, Some((42, ())));
+    /// let ret = db.get_lower_than::<BEU32, BEU32>(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((42, 2)));
     ///
-    /// let ret = db.get_lower_than::<BEU32, Unit>(&wtxn, &27)?;
+    /// let ret = db.get_lower_than::<BEU32, BEU32>(&wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -290,17 +293,21 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("get-lte-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &1)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &2)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &42, &3)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &43, &4)?;
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<BEU32, Unit>(&wtxn, &4404)?;
-    /// assert_eq!(ret, Some((43, ())));
+    /// let ret = db.get_lower_than_or_equal_to::<BEU32, BEU32>(&wtxn, &4404)?;
+    /// assert_eq!(ret, Some((43, 4)));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<BEU32, Unit>(&wtxn, &43)?;
-    /// assert_eq!(ret, Some((43, ())));
+    /// let ret = db.get_lower_than_or_equal_to::<BEU32, BEU32>(&wtxn, &43)?;
+    /// assert_eq!(ret, Some((43, 4)));
     ///
-    /// let ret = db.get_lower_than_or_equal_to::<BEU32, Unit>(&wtxn, &26)?;
+    /// let ret = db.get_lower_than_or_equal_to::<BEU32, BEU32>(&wtxn, &27)?;
+    /// assert_eq!(ret, Some((27, 1)));
+    ///
+    /// let ret = db.get_lower_than_or_equal_to::<BEU32, BEU32>(&wtxn, &26)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -362,17 +369,18 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &1)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &2)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &42, &3)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &43, &4)?;
     ///
-    /// let ret = db.get_greater_than::<BEU32, Unit>(&wtxn, &0)?;
-    /// assert_eq!(ret, Some((27, ())));
+    /// let ret = db.get_greater_than::<BEU32, BEU32>(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, 1)));
     ///
-    /// let ret = db.get_greater_than::<BEU32, Unit>(&wtxn, &42)?;
-    /// assert_eq!(ret, Some((43, ())));
+    /// let ret = db.get_greater_than::<BEU32, BEU32>(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((43, 4)));
     ///
-    /// let ret = db.get_greater_than::<BEU32, Unit>(&wtxn, &43)?;
+    /// let ret = db.get_greater_than::<BEU32, BEU32>(&wtxn, &43)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -433,17 +441,18 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &1)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &27, &2)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &42, &3)?;
+    /// db.put::<BEU32, BEU32>(&mut wtxn, &43, &4)?;
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<BEU32, Unit>(&wtxn, &0)?;
-    /// assert_eq!(ret, Some((27, ())));
+    /// let ret = db.get_greater_than_or_equal_to::<BEU32, BEU32>(&wtxn, &0)?;
+    /// assert_eq!(ret, Some((27, 1)));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<BEU32, Unit>(&wtxn, &42)?;
-    /// assert_eq!(ret, Some((42, ())));
+    /// let ret = db.get_greater_than_or_equal_to::<BEU32, BEU32>(&wtxn, &42)?;
+    /// assert_eq!(ret, Some((42, 3)));
     ///
-    /// let ret = db.get_greater_than_or_equal_to::<BEU32, Unit>(&wtxn, &44)?;
+    /// let ret = db.get_greater_than_or_equal_to::<BEU32, BEU32>(&wtxn, &44)?;
     /// assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
@@ -500,6 +509,7 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     ///
     /// let ret = db.first::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((27, "i-am-twenty-seven")));
@@ -552,10 +562,11 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.last::<BEI32, Str>(&wtxn)?;
-    /// assert_eq!(ret, Some((42, "i-am-forty-two")));
+    /// assert_eq!(ret, Some((42, "i-am-forty-two-again")));
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -602,9 +613,9 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two_twice")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two-twice")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven_again")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
@@ -659,6 +670,7 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
@@ -673,7 +685,7 @@ impl PolyMultiDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<'txn>(&self, txn: &'txn RoTxn) -> Result<bool> {
+    pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
@@ -707,11 +719,13 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven-again")));
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
@@ -726,7 +740,7 @@ impl PolyMultiDatabase {
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
-    ///
+    /// When updating a duplicate key, the new value must be the same size as the old.
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -748,7 +762,9 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter_mut::<BEI32, Str>(&mut wtxn)?;
@@ -757,9 +773,11 @@ impl PolyMultiDatabase {
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven-again")));
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
-    /// let ret = unsafe { iter.put_current(&42, "i-am-the-new-forty-two")? };
+    /// let ret = unsafe { iter.put_current(&42, "i-am-same-size")? };
     /// assert!(ret);
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two-again")));
     ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
@@ -769,7 +787,10 @@ impl PolyMultiDatabase {
     /// assert_eq!(ret.iter().next(), None);
     ///
     /// let ret = db.get::<BEI32, Str>(&wtxn, &42)?.collect::<Result<Vec<_>, _>>()?;;
-    /// assert_eq!(ret.iter().next(), Some(&(42, "i-am-the-new-forty-two")));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(42, "i-am-same-size")));
+    /// assert_eq!(ret.next(), Some(&(42, "i-am-forty-two-again")));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -803,11 +824,13 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven-again")));
     /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// assert_eq!(iter.next().transpose()?, None);
@@ -825,6 +848,7 @@ impl PolyMultiDatabase {
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
     /// in this database.
     ///
+    /// When updating a duplicate key, the new value must be the same size as the old.
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -847,18 +871,21 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen-again")?;
     ///
     /// let mut iter = db.rev_iter_mut::<BEI32, Str>(&mut wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
+    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven-again")));
     /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen-again")));
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
-    /// let ret = unsafe { iter.put_current(&13, "i-am-the-new-thirteen")? };
+    /// let ret = unsafe { iter.put_current(&13, "i-am-same-siz")? }; // no e to keep the same size
     /// assert!(ret);
-    ///
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -867,7 +894,10 @@ impl PolyMultiDatabase {
     /// assert_eq!(ret.iter().next(), None);
     ///
     /// let ret = db.get::<BEI32, Str>(&wtxn, &13)?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&(13, "i-am-the-new-thirteen")));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(13, "i-am-same-siz")));
+    /// assert_eq!(ret.next(), Some(&(13, "i-am-thirteen-again")));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -906,6 +936,7 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
@@ -914,6 +945,7 @@ impl PolyMultiDatabase {
     /// let mut iter = db.range::<BEI32, Str, _>(&wtxn, &range)?;
     /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two-again")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -984,7 +1016,9 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &28, "i-am-twenty-eight")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
@@ -993,17 +1027,24 @@ impl PolyMultiDatabase {
     /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
-    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
-    /// let ret = unsafe { range.put_current(&42, "i-am-the-new-forty-two")? };
+    /// assert_eq!(range.next().transpose()?, Some((28, "i-am-twenty-eight")));
+    /// let ret = unsafe { range.put_current(&28, "i-am-the-new-twenty-eight")? };
     /// assert!(ret);
-    ///
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// // The data in put current must be the same size as the old one
+    /// // if the given key is duplicated
+    /// let ret = unsafe { range.put_current(&42, "i-am-same-size")? };
+    /// assert!(ret);
+    /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two-again")));
     /// assert_eq!(range.next().transpose()?, None);
     /// drop(range);
     ///
     ///
     /// let mut iter = db.iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
-    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-the-new-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((28, "i-am-the-new-twenty-eight")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-same-size")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two-again")));
     /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
@@ -1131,7 +1172,7 @@ impl PolyMultiDatabase {
     /// key-value pairs in this database.
     ///
     /// Comparisons are made by using the bytes representation of the key.
-    ///
+    /// When updating a duplicate key, the new value must be the same size as the old.
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1245,6 +1286,7 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &277)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
@@ -1253,6 +1295,7 @@ impl PolyMultiDatabase {
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 277)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1278,7 +1321,7 @@ impl PolyMultiDatabase {
     /// in this database that starts with the given prefix.
     ///
     /// Comparisons are made by using the bytes representation of the key.
-    ///
+    /// When updating a duplicate key, the new value must be the same size as the old.
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1300,7 +1343,9 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &288)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &277)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
@@ -1310,20 +1355,25 @@ impl PolyMultiDatabase {
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 288)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// let ret = unsafe { iter.put_current("i-am-twenty-seven", &27000)? };
     /// assert!(ret);
-    ///
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 277)));
+
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
     ///
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am-twenty-eight")?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), None);
+    /// assert_eq!(ret.iter().next(), Some(&("i-am-twenty-eight", 288)));
     ///
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am-twenty-seven")?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&("i-am-twenty-seven", 27000)));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&("i-am-twenty-seven", 27000)));
+    /// assert_eq!(ret.next(), Some(&("i-am-twenty-seven", 277)));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1370,11 +1420,13 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &277)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
     ///
     /// let mut iter = db.rev_prefix_iter::<Str, BEI32>(&mut wtxn, "i-am-twenty")?;
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 277)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
@@ -1403,7 +1455,7 @@ impl PolyMultiDatabase {
     /// in this database that starts with the given prefix.
     ///
     /// Comparisons are made by using the bytes representation of the key.
-    ///
+    /// When updating a duplicate key, the new value must be the same size as the old.
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1425,6 +1477,7 @@ impl PolyMultiDatabase {
     ///
     /// # db.clear(&mut wtxn)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &288)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
     /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
@@ -1436,10 +1489,10 @@ impl PolyMultiDatabase {
     /// assert!(ret);
     ///
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
-    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 288)));
     /// let ret = unsafe { iter.put_current("i-am-twenty-eight", &28000)? };
     /// assert!(ret);
-    ///
+    /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
     /// drop(iter);
@@ -1448,7 +1501,10 @@ impl PolyMultiDatabase {
     /// assert_eq!(ret.iter().next(), None);
     ///
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am-twenty-eight")?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&("i-am-twenty-eight",28000)));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&("i-am-twenty-eight",28)));
+    /// assert_eq!(ret.next(), Some(&("i-am-twenty-eight",28000)));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1492,11 +1548,15 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&(27, "i-am-twenty-seven")));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(27, "i-am-twenty-seven")));
+    /// assert_eq!(ret.next(), Some(&(27, "i-am-twenty-seven-again")));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1529,7 +1589,8 @@ impl PolyMultiDatabase {
 
     /// Insert a key-value pair where the value can directly be written to disk.
     ///
-    /// ```
+    /// Unimplemented as the database was opened with DUPSORT
+    /// ```ignore
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
@@ -1550,17 +1611,27 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// let value = "I am a long long long value";
-    /// db.put_reserved::<BEI32, _>(&mut wtxn, &42, value.len(), |reserved| {
-    ///     reserved.write_all(value.as_bytes())
+    /// let value1 = "I am a long long long value";
+    /// db.put_reserved::<BEI32, _>(&mut wtxn, &42, value1.len(), |reserved| {
+    ///     reserved.write_all(value1.as_bytes())
     /// })?;
+    /// // let value2 = "I am the longest value in this database";
+    /// // db.put_reserved::<BEI32, _>(&mut wtxn, &42, value2.len(), |reserved| {
+    /// //     reserved.write_all(value2.as_bytes())
+    /// // })?;
     ///
     /// let ret = db.get::<BEI32, Str>(&mut wtxn, &42)?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&(42, value)));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(42, value1)));
+    /// //assert_eq!(ret.next(), Some(&(42, value2)));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
+    #[allow(unused_variables)]
+    #[allow(unused_mut)]
+    #[allow(unreachable_code)]
     pub fn put_reserved<'a, KC, F>(
         &self,
         txn: &mut RwTxn,
@@ -1572,6 +1643,10 @@ impl PolyMultiDatabase {
         KC: BytesEncode<'a>,
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
+        unimplemented!(
+            "MDB_RESERVE flag must not be
+        *		specified if the database was opened with #MDB_DUPSORT"
+        );
         assert_eq_env_db_txn!(self, txn);
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
@@ -1617,13 +1692,32 @@ impl PolyMultiDatabase {
     /// let db = env.create_poly_multi_database(&mut wtxn, Some("append-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?.collect::<Result<Vec<_>, _>>()?;
-    /// assert_eq!(ret.iter().next(), Some(&(27, "i-am-twenty-seven")));
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(27, "i-am-twenty-seven")));
+    /// assert_eq!(ret.next(), Some(&(27, "i-am-twenty-seven-again")));
+    /// assert_eq!(ret.next(), None);
+    ///
+    /// // Be wary if you insert at the end unsorted you get the KEYEXIST error.
+    /// assert!(db.append::<BEI32, Str>(&mut wtxn, &27, "aaaa").is_err());
+    ///
+    /// // But as opposed to the behavior without DUPSORT,
+    /// // you will still be able to insert everywhere
+    /// // as long as you keep the order inside a key
+    /// db.append::<BEI32, Str>(&mut wtxn, &1, "i-am-the-one")?;
+    /// db.append::<BEI32, Str>(&mut wtxn, &1, "i-am-the-other-one")?;
+    ///
+    /// let ret = db.get::<BEI32, Str>(&mut wtxn, &1)?.collect::<Result<Vec<_>, _>>()?;
+    /// let mut ret = ret.iter();
+    /// assert_eq!(ret.next(), Some(&(1, "i-am-the-one")));
+    /// assert_eq!(ret.next(), Some(&(1, "i-am-the-other-one")));
+    /// assert_eq!(ret.next(), None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1645,7 +1739,7 @@ impl PolyMultiDatabase {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = ffi::MDB_APPEND;
+        let flags = ffi::MDB_APPENDDUP;
 
         unsafe {
             mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
@@ -1654,7 +1748,7 @@ impl PolyMultiDatabase {
         Ok(())
     }
 
-    /// Deletes a key-value pairs in this database.
+    /// Deletes all data items associated with the given key in this database.
     ///
     /// If the key does not exist, then `false` is returned.
     ///
@@ -1680,6 +1774,7 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
@@ -1701,7 +1796,7 @@ impl PolyMultiDatabase {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(&key).map_err(Error::Encoding)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
 
         let result = unsafe {
@@ -1718,6 +1813,8 @@ impl PolyMultiDatabase {
     /// Deletes a range of key-value pairs in this database.
     ///
     /// Prefer using [`clear`] instead of a call to this method with a full range ([`..`]).
+    ///
+    /// Returns number of deleted data items.
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
@@ -1746,15 +1843,18 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=42;
     /// let ret = db.delete_range::<BEI32, _>(&mut wtxn, &range)?;
-    /// assert_eq!(ret, 2);
+    /// assert_eq!(ret, 3);
     ///
     /// let mut iter = db.iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen-again")));
     /// assert_eq!(iter.next().transpose()?, Some((521, "i-am-five-hundred-and-twenty-one")));
     /// assert_eq!(iter.next().transpose()?, None);
     ///
@@ -1812,6 +1912,7 @@ impl PolyMultiDatabase {
     /// # db.clear(&mut wtxn)?;
     /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
@@ -1839,7 +1940,7 @@ impl PolyMultiDatabase {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
@@ -1863,13 +1964,16 @@ impl PolyMultiDatabase {
     /// let db = db.as_uniform::<BEI32, Str>();
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven-again")?;
     /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
+    #[allow(unreachable_code)]
     pub fn as_uniform<KC, DC>(&self) -> Database<KC, DC> {
+        todo!();
         Database::new(self.env_ident, self.dbi)
     }
 }
