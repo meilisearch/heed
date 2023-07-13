@@ -42,7 +42,7 @@ sync-read-txn = []
 
 # Enable the serde en/decoders for bincode or serde_json
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]
-serde-json = ["heed-types/serde", "heed-types/serde_json"]
+serde-json = ["heed-types/serde", "heed-types/serde-json"]
 
 # serde_json features
 preserve_order = ["heed-types/preserve_order"]
