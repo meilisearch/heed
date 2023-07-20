@@ -19,6 +19,7 @@ use std::{
 use std::{fmt, io, mem, ptr, sync};
 
 use once_cell::sync::Lazy;
+use same_file::Handle;
 use synchronoise::event::SignalEvent;
 
 use crate::mdb::error::mdb_result;
@@ -29,32 +30,23 @@ use crate::{
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
-/// noone tries to open the same environment between these two phases.
+/// none tries to open the same environment between these two phases.
 ///
-/// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
+/// Trying to open a `None` marked environment returns an error to the user trying to open it.
+///
+/// [same_file::Handle] abstract the platform details of checking if the given paths points to
+///  the same file on the filesystem.
+///
+/// ## Safety
+///
+/// Mind that Handle currently open the file, so avoid writing through the fd held by [same_file::Handle],
+/// since the file will also be opened by LMDB.
+static OPENED_ENV: Lazy<RwLock<HashMap<Handle, EnvEntry>>> = Lazy::new(RwLock::default);
 
 struct EnvEntry {
     env: Option<Env>,
     signal_event: Arc<SignalEvent>,
     options: EnvOpenOptions,
-}
-
-// Thanks to the mozilla/rkv project
-// Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
-// Otherwise, `Env::from_env()` will panic with error_no(123).
-#[cfg(not(windows))]
-fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
-    path.canonicalize()
-}
-
-#[cfg(windows)]
-fn canonicalize_path(path: &Path) -> io::Result<PathBuf> {
-    let canonical = path.canonicalize()?;
-    let url = url::Url::from_file_path(&canonical)
-        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "URL passing error"))?;
-    url.to_file_path()
-        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "path canonicalization error"))
 }
 
 #[cfg(windows)]
@@ -190,22 +182,26 @@ impl EnvOpenOptions {
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        let path = match canonicalize_path(path.as_ref()) {
+        let (path, handle) = match Handle::from_path(&path) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
-                        Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
+                        Some((dir, file_name)) => {
+                            let handle = Handle::from_path(&dir)?;
+                            let path = dir.join(file_name);
+                            (path, handle)
+                        }
                         None => return Err(err.into()),
                     }
                 } else {
                     return Err(err.into());
                 }
             }
-            Ok(path) => path,
+            Ok(handle) => (path.as_ref().to_path_buf(), handle),
         };
 
-        match lock.entry(path) {
+        match lock.entry(handle) {
             Entry::Occupied(entry) => {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
@@ -216,7 +212,6 @@ impl EnvOpenOptions {
                 }
             }
             Entry::Vacant(entry) => {
-                let path = entry.key();
                 let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
 
                 unsafe {
@@ -265,6 +260,7 @@ impl EnvOpenOptions {
                                 env,
                                 dbi_open_mutex: sync::Mutex::default(),
                                 path: path.clone(),
+                                handle: Handle::from_path(path)?,
                             };
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
@@ -287,9 +283,11 @@ impl EnvOpenOptions {
 }
 
 /// Returns a struct that allows to wait for the effective closing of an environment.
-pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
+pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Result<Option<EnvClosingEvent>> {
     let lock = OPENED_ENV.read().unwrap();
-    lock.get(path.as_ref()).map(|e| EnvClosingEvent(e.signal_event.clone()))
+    let handle = Handle::from_path(path)?;
+
+    Ok(lock.get(&handle).map(|e| EnvClosingEvent(e.signal_event.clone())))
 }
 
 /// An environment handle constructed by using [`EnvOpenOptions`].
@@ -298,7 +296,8 @@ pub struct Env(Arc<EnvInner>);
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvInner { env: _, dbi_open_mutex: _, path } = self.0.as_ref();
+        // We don't include the header since it's containing platform specifics details
+        let EnvInner { env: _, dbi_open_mutex: _, path, handle: _ } = self.0.as_ref();
         f.debug_struct("Env").field("path", &path.display()).finish_non_exhaustive()
     }
 }
@@ -307,6 +306,7 @@ struct EnvInner {
     env: *mut ffi::MDB_env,
     dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
     path: PathBuf,
+    handle: Handle,
 }
 
 unsafe impl Send for EnvInner {}
@@ -317,7 +317,7 @@ impl Drop for EnvInner {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        match lock.remove(&self.path) {
+        match lock.remove(&self.handle) {
             None => panic!("It seems another env closed this env before"),
             Some(EnvEntry { signal_event, .. }) => {
                 unsafe {
@@ -690,7 +690,10 @@ impl Env {
         Ok(())
     }
 
-    /// Returns the canonicalized path where this env lives.
+    /// Returns the `Path` where this [Env] lives.
+    ///
+    /// The `Path` returned will be the one from the first opening. Like if you `EnvOpenOptions::open` through
+    /// a symlink or a moved the directory containing it will be the case.
     pub fn path(&self) -> &Path {
         &self.0.path
     }
@@ -702,7 +705,7 @@ impl Env {
     /// when all references are dropped, the last one will eventually close the environment.
     pub fn prepare_for_closing(self) -> EnvClosingEvent {
         let mut lock = OPENED_ENV.write().unwrap();
-        match lock.get_mut(self.path()) {
+        match lock.get_mut(&self.0.handle) {
             None => panic!("cannot find the env that we are trying to close"),
             Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
@@ -847,7 +850,7 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&dir.path()).is_none());
+        assert!(env_closing_event(&dir.path()).unwrap().is_none());
     }
 
     #[test]
@@ -881,6 +884,59 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn open_env_with_named_path_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        fs::create_dir_all(&env_name).unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+        assert_eq!(env_name, env.path());
+
+        std::os::unix::fs::symlink(&env_name, &symlink_name).unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        // The path is recycle from the first opening of the env.
+        assert_eq!(env_name, env.path());
+    }
+
+    // Unix only since managing to support *moving* directory on windows was too
+    // much pain. By moving we mean not copy-recreating, just changing name.
+    // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexa
+    #[test]
+    #[cfg(unix)]
+    fn open_env_with_named_path_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        let env_name = dir.path().join("babar.mdb");
+        fs::create_dir_all(&env_name).unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+        assert_eq!(env_name, env.path());
+
+        let env_renamed = dir.path().join("serafina.mdb");
+        std::fs::rename(&env_name, &env_renamed).unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_renamed)
+            .unwrap();
+        assert_eq!(env_name, env.path());
+    }
+
+    #[test]
     #[cfg(not(windows))]
     fn open_database_with_writemap_flag() {
         let dir = tempfile::tempdir().unwrap();
@@ -901,6 +957,95 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
         let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn open_env_with_named_path_symlink_and_no_subdir() {
+        let env_dir = tempfile::Builder::new().suffix("heed_test_no_subdir_env").tempdir().unwrap();
+        let symlink_parent = tempfile::tempdir().unwrap();
+        let env_path = env_dir.path();
+        let db_file = env_dir.path().join("data.mdb");
+
+        let symlink_path = symlink_parent.path().join("env.link");
+
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        let env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&db_file)
+            .unwrap();
+        assert_eq!(db_file, env.path());
+
+        std::os::unix::fs::symlink(&env_path, &symlink_path).unwrap();
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_path)
+            .unwrap();
+
+        // Checkout that we get the path of the first openning.
+        assert_eq!(db_file, env.path());
+        assert_ne!(symlink_path, env.path());
+
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_path)
+            .unwrap();
+        assert_eq!(db_file, env.path());
+        assert_ne!(symlink_path, env.path());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn open_env_with_named_path_symlinkfile_and_no_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+        // We do a temp dir because CI returned
+        // Os { code: 5, kind: PermissionDenied, message: "Access is denied." }
+        let parent_symlink = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = parent_symlink.path().join("babar.mdb.link");
+
+        let mut envbuilder = EnvOpenOptions::new();
+        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+
+        std::os::windows::fs::symlink_dir(&dir.path(), &symlink_name).unwrap();
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let _env = envbuilder
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn open_env_with_named_path_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_symlink = tempfile::tempdir().unwrap();
+
+        let env_name = dir.path().join("babar.mdb");
+        let symlink_name = dir_symlink.path().join("babar.mdb.link");
+        fs::create_dir_all(&env_name).unwrap();
+
+        std::os::windows::fs::symlink_dir(&env_name, &symlink_name).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&symlink_name)
+            .unwrap();
+
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .open(&env_name)
+            .unwrap();
     }
 
     #[test]
