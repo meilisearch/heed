@@ -756,7 +756,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, KC, DC>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, KC, DC>(&self, txn: &'txn RwTxn) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -854,10 +854,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, KC, DC>(
-        &self,
-        txn: &'txn mut RwTxn,
-    ) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn, KC, DC>(&self, txn: &'txn RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
@@ -995,7 +992,7 @@ impl PolyDatabase {
     /// ```
     pub fn range_mut<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn RwTxn,
         range: &'a R,
     ) -> Result<RwRange<'txn, KC, DC>>
     where
@@ -1164,7 +1161,7 @@ impl PolyDatabase {
     /// ```
     pub fn rev_range_mut<'a, 'txn, KC, DC, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn RwTxn,
         range: &'a R,
     ) -> Result<RwRevRange<'txn, KC, DC>>
     where
@@ -1312,7 +1309,7 @@ impl PolyDatabase {
     /// ```
     pub fn prefix_iter_mut<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwPrefix<'txn, KC, DC>>
     where
@@ -1437,7 +1434,7 @@ impl PolyDatabase {
     /// ```
     pub fn rev_prefix_iter_mut<'a, 'txn, KC, DC>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn RwTxn,
         prefix: &'a KC::EItem,
     ) -> Result<RwRevPrefix<'txn, KC, DC>>
     where
@@ -1485,7 +1482,7 @@ impl PolyDatabase {
     /// ```
     pub fn put<'a, KC, DC>(
         &self,
-        txn: &mut RwTxn,
+        txn: &RwTxn,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
     ) -> Result<()>
@@ -1545,7 +1542,7 @@ impl PolyDatabase {
     /// ```
     pub fn put_reserved<'a, KC, F>(
         &self,
-        txn: &mut RwTxn,
+        txn: &RwTxn,
         key: &'a KC::EItem,
         data_size: usize,
         mut write_func: F,
@@ -1615,7 +1612,7 @@ impl PolyDatabase {
     /// ```
     pub fn append<'a, KC, DC>(
         &self,
-        txn: &mut RwTxn,
+        txn: &RwTxn,
         key: &'a KC::EItem,
         data: &'a DC::EItem,
     ) -> Result<()>
@@ -1680,7 +1677,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete<'a, KC>(&self, txn: &mut RwTxn, key: &'a KC::EItem) -> Result<bool>
+    pub fn delete<'a, KC>(&self, txn: &RwTxn, key: &'a KC::EItem) -> Result<bool>
     where
         KC: BytesEncode<'a>,
     {
@@ -1747,7 +1744,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn delete_range<'a, 'txn, KC, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
+    pub fn delete_range<'a, 'txn, KC, R>(&self, txn: &'txn RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
@@ -1808,7 +1805,7 @@ impl PolyDatabase {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
+    pub fn clear(&self, txn: &RwTxn) -> Result<()> {
         assert_eq_env_db_txn!(self, txn);
 
         unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
