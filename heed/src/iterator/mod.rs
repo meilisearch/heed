@@ -203,6 +203,7 @@ mod tests {
         let iter = db.range(&wtxn, &range).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), None);
 
+        #[allow(clippy::reversed_empty_ranges)]
         let range = 2..=1;
         let iter = db.range(&wtxn, &range).unwrap();
         assert_eq!(iter.last().transpose().unwrap(), None);

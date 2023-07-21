@@ -813,7 +813,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // Force a thread to keep the env for 1 second.
@@ -847,7 +847,7 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&dir.path()).is_none());
+        assert!(env_closing_event(dir.path()).is_none());
     }
 
     #[test]
@@ -855,12 +855,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let _env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let result = EnvOpenOptions::new()
             .map_size(12 * 1024 * 1024) // 12MB
-            .open(&dir.path());
+            .open(dir.path());
 
         assert!(matches!(result, Err(Error::BadOpenOptions { .. })));
     }
@@ -888,7 +888,7 @@ mod tests {
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
         unsafe { envbuilder.flag(crate::Flag::WriteMap) };
-        let env = envbuilder.open(&dir.path()).unwrap();
+        let env = envbuilder.open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -900,7 +900,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
-        let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+        let _env = envbuilder.open(dir.path().join("data.mdb")).unwrap();
     }
 
     #[test]
@@ -909,7 +909,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
@@ -927,7 +927,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // we first create a database
@@ -940,7 +940,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let rtxn = env.read_txn().unwrap();
@@ -951,7 +951,7 @@ mod tests {
     #[test]
     fn resize_database() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(&dir.path()).unwrap();
+        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
