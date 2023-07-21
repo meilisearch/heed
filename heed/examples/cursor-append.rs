@@ -23,11 +23,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let second: Database<Str, Str> = env.create_database(&mut wtxn, Some("second"))?;
 
     // We fill the first database with entries.
-    first.put(&mut wtxn, "I am here", "to test things")?;
-    first.put(&mut wtxn, "I am here too", "for the same purpose")?;
+    first.put(&wtxn, "I am here", "to test things")?;
+    first.put(&wtxn, "I am here too", "for the same purpose")?;
 
     // We try to append ordered entries in the second database.
-    let mut iter = second.iter_mut(&mut wtxn)?;
+    let mut iter = second.iter_mut(&wtxn)?;
 
     unsafe { iter.append("aaaa", "lol")? };
     unsafe { iter.append("abcd", "lol")? };

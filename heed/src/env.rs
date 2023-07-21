@@ -828,9 +828,9 @@ mod tests {
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, "hello", "hello").unwrap();
-        db.put(&mut wtxn, "world", "world").unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, "hello", "hello").unwrap();
+        db.put(&wtxn, "world", "world").unwrap();
 
         let mut iter = db.iter(&wtxn).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some(("hello", "hello")));
@@ -1004,8 +1004,8 @@ mod tests {
             let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
 
             wtxn.commit().unwrap();
-            let mut wtxn = env.write_txn().unwrap();
-            database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
+            let wtxn = env.write_txn().unwrap();
+            database0.put(&wtxn, "shared0", expected_data0).unwrap();
             wtxn.commit().unwrap();
             // We also really need that no other env reside in memory in other thread doing tests.
             env.prepare_for_closing().wait();

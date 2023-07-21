@@ -28,18 +28,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         env2.create_database(&mut wtxn2, Some("hello"))?;
 
     // clear db
-    db1.clear(&mut wtxn1)?;
+    db1.clear(&wtxn1)?;
     wtxn1.commit()?;
 
     // clear db
-    db2.clear(&mut wtxn2)?;
+    db2.clear(&wtxn2)?;
     wtxn2.commit()?;
 
     // -----
 
-    let mut wtxn1 = env1.write_txn()?;
+    let wtxn1 = env1.write_txn()?;
 
-    db1.put(&mut wtxn1, "what", &[4, 5][..])?;
+    db1.put(&wtxn1, "what", &[4, 5][..])?;
     db1.get(&wtxn1, "what")?;
     wtxn1.commit()?;
 

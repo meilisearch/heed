@@ -42,11 +42,11 @@ mod tests {
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
-        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
 
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
@@ -84,11 +84,11 @@ mod tests {
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1, &()).unwrap();
-        db.put(&mut wtxn, &2, &()).unwrap();
-        db.put(&mut wtxn, &3, &()).unwrap();
-        db.put(&mut wtxn, &4, &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &1, &()).unwrap();
+        db.put(&wtxn, &2, &()).unwrap();
+        db.put(&wtxn, &3, &()).unwrap();
+        db.put(&wtxn, &4, &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
@@ -118,8 +118,8 @@ mod tests {
         wtxn.abort();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1, &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &1, &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.iter(&wtxn).unwrap();
@@ -152,11 +152,11 @@ mod tests {
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1, &()).unwrap();
-        db.put(&mut wtxn, &2, &()).unwrap();
-        db.put(&mut wtxn, &3, &()).unwrap();
-        db.put(&mut wtxn, &4, &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &1, &()).unwrap();
+        db.put(&wtxn, &2, &()).unwrap();
+        db.put(&wtxn, &3, &()).unwrap();
+        db.put(&wtxn, &4, &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.range(&wtxn, &(..)).unwrap();
@@ -211,8 +211,8 @@ mod tests {
         wtxn.abort();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1, &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &1, &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.range(&wtxn, &(..)).unwrap();
@@ -242,11 +242,11 @@ mod tests {
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
@@ -317,11 +317,11 @@ mod tests {
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
-        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0]).unwrap();
@@ -395,11 +395,11 @@ mod tests {
         type BEI32 = I32<BigEndian>;
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, &1, &()).unwrap();
-        db.put(&mut wtxn, &2, &()).unwrap();
-        db.put(&mut wtxn, &3, &()).unwrap();
-        db.put(&mut wtxn, &4, &()).unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, &1, &()).unwrap();
+        db.put(&wtxn, &2, &()).unwrap();
+        db.put(&wtxn, &3, &()).unwrap();
+        db.put(&wtxn, &4, &()).unwrap();
 
         // Lets check that we properly get the last entry.
         let iter = db.rev_range(&wtxn, &(1..=3)).unwrap();

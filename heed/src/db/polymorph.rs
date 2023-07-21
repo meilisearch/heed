@@ -34,11 +34,11 @@ use crate::*;
 /// let mut wtxn = env.write_txn()?;
 /// let db: PolyDatabase = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
-/// # db.clear(&mut wtxn)?;
-/// db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
-/// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five")?;
-/// db.put::<BEI64, Str>(&mut wtxn, &42, "forty two")?;
-/// db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
+/// # db.clear(&wtxn)?;
+/// db.put::<BEI64, Unit>(&wtxn, &0, &())?;
+/// db.put::<BEI64, Str>(&wtxn, &35, "thirty five")?;
+/// db.put::<BEI64, Str>(&wtxn, &42, "forty two")?;
+/// db.put::<BEI64, Unit>(&wtxn, &68, &())?;
 ///
 /// // you can iterate over database entries in order
 /// let range = 35..=42;
@@ -77,15 +77,15 @@ use crate::*;
 /// let mut wtxn = env.write_txn()?;
 /// let db: PolyDatabase = env.create_poly_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
-/// # db.clear(&mut wtxn)?;
-/// db.put::<BEI64, Unit>(&mut wtxn, &0, &())?;
-/// db.put::<BEI64, Str>(&mut wtxn, &35, "thirty five")?;
-/// db.put::<BEI64, Str>(&mut wtxn, &42, "forty two")?;
-/// db.put::<BEI64, Unit>(&mut wtxn, &68, &())?;
+/// # db.clear(&wtxn)?;
+/// db.put::<BEI64, Unit>(&wtxn, &0, &())?;
+/// db.put::<BEI64, Str>(&wtxn, &35, "thirty five")?;
+/// db.put::<BEI64, Str>(&wtxn, &42, "forty two")?;
+/// db.put::<BEI64, Unit>(&wtxn, &68, &())?;
 ///
 /// // even delete a range of keys
 /// let range = 35..=42;
-/// let deleted = db.delete_range::<BEI64, _>(&mut wtxn, &range)?;
+/// let deleted = db.delete_range::<BEI64, _>(&wtxn, &range)?;
 /// assert_eq!(deleted, 2);
 ///
 /// let rets: Result<_, _> = db.iter::<BEI64, Unit>(&wtxn)?.collect();
@@ -136,9 +136,9 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("get-poly-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two", &42)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-two", &42)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-seven", &27)?;
     ///
     /// let ret = db.get::<Str, BEI32>(&wtxn, "i-am-forty-two")?;
     /// assert_eq!(ret, Some(42));
@@ -206,10 +206,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEU32, Unit>(&wtxn, &27, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &42, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &43, &())?;
     ///
     /// let ret = db.get_lower_than::<BEU32, Unit>(&wtxn, &4404)?;
     /// assert_eq!(ret, Some((43, ())));
@@ -274,10 +274,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("get-lte-u32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEU32, Unit>(&wtxn, &27, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &42, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &43, &())?;
     ///
     /// let ret = db.get_lower_than_or_equal_to::<BEU32, Unit>(&wtxn, &4404)?;
     /// assert_eq!(ret, Some((43, ())));
@@ -346,10 +346,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEU32, Unit>(&wtxn, &27, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &42, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &43, &())?;
     ///
     /// let ret = db.get_greater_than::<BEU32, Unit>(&wtxn, &0)?;
     /// assert_eq!(ret, Some((27, ())));
@@ -417,10 +417,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("get-lt-u32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &27, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &42, &())?;
-    /// db.put::<BEU32, Unit>(&mut wtxn, &43, &())?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEU32, Unit>(&wtxn, &27, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &42, &())?;
+    /// db.put::<BEU32, Unit>(&wtxn, &43, &())?;
     ///
     /// let ret = db.get_greater_than_or_equal_to::<BEU32, Unit>(&wtxn, &0)?;
     /// assert_eq!(ret, Some((27, ())));
@@ -482,9 +482,9 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("first-poly-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.first::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((27, "i-am-twenty-seven")));
@@ -535,9 +535,9 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("last-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
     ///
     /// let ret = db.last::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(ret, Some((42, "i-am-forty-two")));
@@ -584,16 +584,16 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 4);
     ///
-    /// db.delete::<BEI32>(&mut wtxn, &27)?;
+    /// db.delete::<BEI32>(&wtxn, &27)?;
     ///
     /// let ret = db.len(&wtxn)?;
     /// assert_eq!(ret, 3);
@@ -638,16 +638,16 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, false);
     ///
-    /// db.clear(&mut wtxn)?;
+    /// db.clear(&wtxn)?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert_eq!(ret, true);
@@ -686,10 +686,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
@@ -728,12 +728,12 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
     ///
-    /// let mut iter = db.iter_mut::<BEI32, Str>(&mut wtxn)?;
+    /// let mut iter = db.iter_mut::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -783,10 +783,10 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.rev_iter::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
@@ -826,12 +826,12 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
     ///
-    /// let mut iter = db.rev_iter_mut::<BEI32, Str>(&mut wtxn)?;
+    /// let mut iter = db.rev_iter_mut::<BEI32, Str>(&wtxn)?;
     /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -883,11 +883,11 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=42;
     /// let mut iter = db.range::<BEI32, Str, _>(&wtxn, &range)?;
@@ -961,14 +961,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=42;
-    /// let mut range = db.range_mut::<BEI32, Str, _>(&mut wtxn, &range)?;
+    /// let mut range = db.range_mut::<BEI32, Str, _>(&wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((27, "i-am-twenty-seven")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -1052,11 +1052,11 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=43;
     /// let mut iter = db.rev_range::<BEI32, Str, _>(&wtxn, &range)?;
@@ -1130,14 +1130,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=42;
-    /// let mut range = db.rev_range_mut::<BEI32, Str, _>(&mut wtxn, &range)?;
+    /// let mut range = db.rev_range_mut::<BEI32, Str, _>(&wtxn, &range)?;
     /// assert_eq!(range.next().transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { range.del_current()? };
     /// assert!(ret);
@@ -1221,14 +1221,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-one",    &41)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-two",    &42)?;
     ///
-    /// let mut iter = db.prefix_iter::<Str, BEI32>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter::<Str, BEI32>(&wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
@@ -1277,14 +1277,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-one",    &41)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-two",    &42)?;
     ///
-    /// let mut iter = db.prefix_iter_mut::<Str, BEI32>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.prefix_iter_mut::<Str, BEI32>(&wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1346,14 +1346,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-one",    &41)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-two",    &42)?;
     ///
-    /// let mut iter = db.rev_prefix_iter::<Str, BEI32>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter::<Str, BEI32>(&wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-nine", 29)));
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-eight", 28)));
@@ -1402,14 +1402,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-eight", &28)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-seven", &27)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-twenty-nine",  &29)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-one",    &41)?;
-    /// db.put::<Str, BEI32>(&mut wtxn, "i-am-forty-two",    &42)?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-eight", &28)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-seven", &27)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-twenty-nine",  &29)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-one",    &41)?;
+    /// db.put::<Str, BEI32>(&wtxn, "i-am-forty-two",    &42)?;
     ///
-    /// let mut iter = db.rev_prefix_iter_mut::<Str, BEI32>(&mut wtxn, "i-am-twenty")?;
+    /// let mut iter = db.rev_prefix_iter_mut::<Str, BEI32>(&wtxn, "i-am-twenty")?;
     /// assert_eq!(iter.next().transpose()?, Some(("i-am-twenty-seven", 27)));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
@@ -1468,13 +1468,13 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?;
+    /// let ret = db.get::<BEI32, Str>(&wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// wtxn.commit()?;
@@ -1528,13 +1528,13 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
+    /// # db.clear(&wtxn)?;
     /// let value = "I am a long long long value";
-    /// db.put_reserved::<BEI32, _>(&mut wtxn, &42, value.len(), |reserved| {
+    /// db.put_reserved::<BEI32, _>(&wtxn, &42, value.len(), |reserved| {
     ///     reserved.write_all(value.as_bytes())
     /// })?;
     ///
-    /// let ret = db.get::<BEI32, Str>(&mut wtxn, &42)?;
+    /// let ret = db.get::<BEI32, Str>(&wtxn, &42)?;
     /// assert_eq!(ret, Some(value));
     ///
     /// wtxn.commit()?;
@@ -1595,17 +1595,17 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("append-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.append::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.append::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.append::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.append::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.append::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.append::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.append::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.append::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?;
+    /// let ret = db.get::<BEI32, Str>(&wtxn, &27)?;
     /// assert_eq!(ret, Some("i-am-twenty-seven"));
     ///
     /// // Be wary if you insert at the end unsorted you get the KEYEXIST error.
-    /// assert!(db.append::<BEI32, Str>(&mut wtxn, &1, "Oh No").is_err());
+    /// assert!(db.append::<BEI32, Str>(&wtxn, &1, "Oh No").is_err());
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -1659,19 +1659,19 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// let ret = db.delete::<BEI32>(&mut wtxn, &27)?;
+    /// let ret = db.delete::<BEI32>(&wtxn, &27)?;
     /// assert_eq!(ret, true);
     ///
-    /// let ret = db.get::<BEI32, Str>(&mut wtxn, &27)?;
+    /// let ret = db.get::<BEI32, Str>(&wtxn, &27)?;
     /// assert_eq!(ret, None);
     ///
-    /// let ret = db.delete::<BEI32>(&mut wtxn, &467)?;
+    /// let ret = db.delete::<BEI32>(&wtxn, &467)?;
     /// assert_eq!(ret, false);
     ///
     /// wtxn.commit()?;
@@ -1725,14 +1725,14 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// let range = 27..=42;
-    /// let ret = db.delete_range::<BEI32, _>(&mut wtxn, &range)?;
+    /// let ret = db.delete_range::<BEI32, _>(&wtxn, &range)?;
     /// assert_eq!(ret, 2);
     ///
     /// let mut iter = db.iter::<BEI32, Str>(&wtxn)?;
@@ -1791,13 +1791,13 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put::<BEI32, Str>(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// # db.clear(&wtxn)?;
+    /// db.put::<BEI32, Str>(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put::<BEI32, Str>(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put::<BEI32, Str>(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put::<BEI32, Str>(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
-    /// db.clear(&mut wtxn)?;
+    /// db.clear(&wtxn)?;
     ///
     /// let ret = db.is_empty(&wtxn)?;
     /// assert!(ret);
@@ -1840,13 +1840,13 @@ impl PolyDatabase {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_poly_database(&mut wtxn, Some("iter-i32"))?;
     ///
-    /// # db.clear(&mut wtxn)?;
+    /// # db.clear(&wtxn)?;
     /// // We remap the types for ease of use.
     /// let db = db.as_uniform::<BEI32, Str>();
-    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }

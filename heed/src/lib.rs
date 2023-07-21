@@ -29,10 +29,10 @@
 //! let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
-//! db.put(&mut wtxn, "seven", &7)?;
-//! db.put(&mut wtxn, "zero", &0)?;
-//! db.put(&mut wtxn, "five", &5)?;
-//! db.put(&mut wtxn, "three", &3)?;
+//! db.put(&wtxn, "seven", &7)?;
+//! db.put(&wtxn, "zero", &0)?;
+//! db.put(&wtxn, "five", &5)?;
+//! db.put(&wtxn, "three", &3)?;
 //! wtxn.commit()?;
 //!
 //! // opening a read transaction
