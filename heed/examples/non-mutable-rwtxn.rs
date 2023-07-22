@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
     let one: Database<Str, ByteSlice> = env.create_database(&mut wtxn, Some("one"))?;
     let two: Database<Str, ByteSlice> = env.create_database(&mut wtxn, Some("two"))?;
+    let numbers: Database<U8, Unit> = env.create_database(&mut wtxn, Some("numbers"))?;
 
     // clear db
     one.clear(&wtxn)?;
@@ -91,6 +92,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     assert!(one.is_empty(&wtxn)?);
+    wtxn.commit()?;
+
+    // -----
+
+    // We can also insert values along the way, while we are iterating
+    let wtxn = env.write_txn()?;
+    numbers.put(&wtxn, &0, &())?;
+    for (result, expected) in numbers.iter(&wtxn)?.zip(0..=u8::MAX) {
+        let (i, ()) = result?;
+        assert_eq!(i, expected);
+        if let Some(next) = i.checked_add(1) {
+            numbers.put(&wtxn, &next, &())?;
+        }
+    }
+
     wtxn.commit()?;
 
     Ok(())
