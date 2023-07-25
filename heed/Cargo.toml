@@ -36,7 +36,7 @@ url = "2.3.1"
 default = ["serde", "serde-bincode", "serde-json"]
 
 # The NO_TLS flag is automatically set on Env opening and
-# RoTxn implements the Sync trait. This allow the user to reference
+# RoTxn implements the Sync and Send traits. This allow the user to reference
 # a read-only transaction from multiple threads at the same time.
 sync-read-txn = []
 
