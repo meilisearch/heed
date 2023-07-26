@@ -48,8 +48,8 @@ impl<T> Drop for RoTxn<'_, T> {
     }
 }
 
-#[cfg(feature = "sync-read-txn")]
-unsafe impl<T> Sync for RoTxn<'_, T> {}
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<T> Send for RoTxn<'_, T> {}
 
 #[cfg(all(feature = "lmdb", not(feature = "mdbx")))]
 fn abort_txn(txn: *mut ffi::MDB_txn) -> Result<()> {

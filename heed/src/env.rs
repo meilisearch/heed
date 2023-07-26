@@ -193,10 +193,10 @@ impl EnvOpenOptions {
                         mdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                     }
 
-                    // When the `sync-read-txn` feature is enabled, we must force LMDB
+                    // When the `read-txn-no-tls` feature is enabled, we must force LMDB
                     // to avoid using the thread local storage, this way we allow users
                     // to use references of RoTxn between threads safely.
-                    let flags = if cfg!(feature = "sync-read-txn") {
+                    let flags = if cfg!(feature = "read-txn-no-tls") {
                         self.flags | Flags::MdbNoTls as u32
                     } else {
                         self.flags
