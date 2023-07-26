@@ -36,9 +36,9 @@ url = "2.3.1"
 default = ["serde", "serde-bincode", "serde-json"]
 
 # The NO_TLS flag is automatically set on Env opening and
-# RoTxn implements the Sync trait. This allow the user to reference
-# a read-only transaction from multiple threads at the same time.
-sync-read-txn = []
+# RoTxn implements the Send trait. This allows the user to move
+# a RoTxn between threads.
+send-read-txn = []
 
 # Enable the serde en/decoders for bincode or serde_json
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]
