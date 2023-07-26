@@ -35,10 +35,20 @@ url = "2.3.1"
 # like the `EnvOpenOptions` struct.
 default = ["serde", "serde-bincode", "serde-json"]
 
-# The NO_TLS flag is automatically set on Env opening and
+# The #MDB_NOTLS flag is automatically set on Env opening and
 # RoTxn implements the Send trait. This allows the user to move
-# a RoTxn between threads.
-send-read-txn = []
+# a RoTxn between threads as read transactions will no more use
+# thread local storage and will tie reader locktable slots to
+# #MDB_txn objects instead of to threads.
+#
+# According to the LMDB documentation, when this feature is not enabled:
+# A thread can only use one transaction at a time, plus any child
+# transactions. Each transaction belongs to one thread. [...]
+# The #MDB_NOTLS flag changes this for read-only transactions.
+#
+# And a #MDB_BAD_RSLOT error will be thrown when multiple read
+# transactions exists on the same thread
+read-txn-no-tls = []
 
 # Enable the serde en/decoders for bincode or serde_json
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]

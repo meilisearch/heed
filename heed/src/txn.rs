@@ -73,7 +73,7 @@ impl Drop for RoTxn<'_> {
     }
 }
 
-#[cfg(feature = "send-read-txn")]
+#[cfg(feature = "read-txn-no-tls")]
 unsafe impl Send for RoTxn<'_> {}
 
 fn abort_txn(txn: *mut ffi::MDB_txn) {
