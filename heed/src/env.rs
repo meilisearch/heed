@@ -813,7 +813,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // Force a thread to keep the env for 1 second.
@@ -828,9 +828,9 @@ mod tests {
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
-        let mut wtxn = env.write_txn().unwrap();
-        db.put(&mut wtxn, "hello", "hello").unwrap();
-        db.put(&mut wtxn, "world", "world").unwrap();
+        let wtxn = env.write_txn().unwrap();
+        db.put(&wtxn, "hello", "hello").unwrap();
+        db.put(&wtxn, "world", "world").unwrap();
 
         let mut iter = db.iter(&wtxn).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some(("hello", "hello")));
@@ -847,7 +847,7 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&dir.path()).is_none());
+        assert!(env_closing_event(dir.path()).is_none());
     }
 
     #[test]
@@ -855,12 +855,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let _env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let result = EnvOpenOptions::new()
             .map_size(12 * 1024 * 1024) // 12MB
-            .open(&dir.path());
+            .open(dir.path());
 
         assert!(matches!(result, Err(Error::BadOpenOptions { .. })));
     }
@@ -888,7 +888,7 @@ mod tests {
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
         unsafe { envbuilder.flag(crate::Flag::WriteMap) };
-        let env = envbuilder.open(&dir.path()).unwrap();
+        let env = envbuilder.open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -900,7 +900,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
-        let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+        let _env = envbuilder.open(dir.path().join("data.mdb")).unwrap();
     }
 
     #[test]
@@ -909,7 +909,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
@@ -927,7 +927,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // we first create a database
@@ -940,7 +940,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let rtxn = env.read_txn().unwrap();
@@ -951,34 +951,36 @@ mod tests {
     #[test]
     fn resize_database() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(&dir.path()).unwrap();
+        let page_size = page_size::get();
+        let env =
+            EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
         wtxn.commit().unwrap();
 
-        let mut wtxn = env.write_txn().unwrap();
+        let wtxn = env.write_txn().unwrap();
         for i in 0..64 {
-            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+            db.put(&wtxn, &i.to_string(), "world").unwrap();
         }
         wtxn.commit().unwrap();
 
-        let mut wtxn = env.write_txn().unwrap();
+        let wtxn = env.write_txn().unwrap();
         for i in 64..128 {
-            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+            db.put(&wtxn, &i.to_string(), "world").unwrap();
         }
         wtxn.commit().expect_err("cannot commit a transaction that would reach the map size limit");
 
         unsafe {
-            env.resize(10 * 4096).unwrap();
+            env.resize(10 * page_size).unwrap();
         }
-        let mut wtxn = env.write_txn().unwrap();
+        let wtxn = env.write_txn().unwrap();
         for i in 64..128 {
-            db.put(&mut wtxn, &i.to_string(), "world").unwrap();
+            db.put(&wtxn, &i.to_string(), "world").unwrap();
         }
         wtxn.commit().expect("transaction should commit after resizing the map size");
 
-        assert_eq!(10 * 4096, env.info().map_size);
+        assert_eq!(10 * page_size, env.info().map_size);
     }
 
     /// Non-regression test for
@@ -1002,8 +1004,8 @@ mod tests {
             let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
 
             wtxn.commit().unwrap();
-            let mut wtxn = env.write_txn().unwrap();
-            database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
+            let wtxn = env.write_txn().unwrap();
+            database0.put(&wtxn, "shared0", expected_data0).unwrap();
             wtxn.commit().unwrap();
             // We also really need that no other env reside in memory in other thread doing tests.
             env.prepare_for_closing().wait();

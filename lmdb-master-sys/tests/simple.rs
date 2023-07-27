@@ -1,9 +1,9 @@
-use cstr::cstr;
-use lmdb_master_sys::*;
-
 use std::ffi::{c_void, CString};
 use std::fs::{self, File};
 use std::ptr;
+
+use cstr::cstr;
+use lmdb_master_sys::*;
 
 // https://github.com/victorporof/lmdb/blob/mdb.master/libraries/liblmdb/moz-test.c
 
@@ -62,7 +62,7 @@ fn test_simple(env_path: &str) {
         E!(mdb_env_create(&mut env));
         E!(mdb_env_set_maxdbs(env, 2));
         let env_path = CString::new(env_path).unwrap();
-        E!(mdb_env_open(env, env_path.as_ptr(), 0, 0664));
+        E!(mdb_env_open(env, env_path.as_ptr(), 0, 0o664));
 
         E!(mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn));
         E!(mdb_dbi_open(

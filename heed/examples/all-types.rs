@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
     let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(&mut wtxn, Some("kikou"))?;
 
-    db.put(&mut wtxn, &[2, 3], "what's up?")?;
+    db.put(&wtxn, &[2, 3], "what's up?")?;
     let ret: Option<&str> = db.get(&wtxn, &[2, 3])?;
 
     println!("{:?}", ret);
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
     let db: Database<Str, ByteSlice> = env.create_database(&mut wtxn, Some("kiki"))?;
 
-    db.put(&mut wtxn, "hello", &[2, 3][..])?;
+    db.put(&wtxn, "hello", &[2, 3][..])?;
     let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         env.create_database(&mut wtxn, Some("serde-bincode"))?;
 
     let hello = Hello { string: "hi" };
-    db.put(&mut wtxn, "hello", &hello)?;
+    db.put(&wtxn, "hello", &hello)?;
 
     let ret: Option<Hello> = db.get(&wtxn, "hello")?;
     println!("serde-bincode:\t{:?}", ret);
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, SerdeJson<Hello>> = env.create_database(&mut wtxn, Some("serde-json"))?;
 
     let hello = Hello { string: "hi" };
-    db.put(&mut wtxn, "hello", &hello)?;
+    db.put(&wtxn, "hello", &hello)?;
 
     let ret: Option<Hello> = db.get(&wtxn, "hello")?;
     println!("serde-json:\t{:?}", ret);
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         env.create_database(&mut wtxn, Some("simple-struct"))?;
 
     let zerobytes = ZeroBytes { bytes: [24; 12] };
-    db.put(&mut wtxn, "zero", &zerobytes)?;
+    db.put(&wtxn, "zero", &zerobytes)?;
 
     let ret = db.get(&wtxn, "zero")?;
 
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
     let db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
 
-    db.put(&mut wtxn, "hello", &())?;
+    db.put(&wtxn, "hello", &())?;
     let ret: Option<()> = db.get(&wtxn, "hello")?;
 
     println!("{:?}", ret);
@@ -123,10 +123,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 
-    db.put(&mut wtxn, &0, &())?;
-    db.put(&mut wtxn, &68, &())?;
-    db.put(&mut wtxn, &35, &())?;
-    db.put(&mut wtxn, &42, &())?;
+    db.put(&wtxn, &0, &())?;
+    db.put(&wtxn, &68, &())?;
+    db.put(&wtxn, &35, &())?;
+    db.put(&wtxn, &42, &())?;
 
     let rets: Result<Vec<(i64, _)>, _> = db.iter(&wtxn)?.collect();
 
@@ -140,7 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // delete a range of key
     let range = 35..=42;
-    let deleted: usize = db.delete_range(&mut wtxn, &range)?;
+    let deleted: usize = db.delete_range(&wtxn, &range)?;
 
     let rets: Result<Vec<(i64, _)>, _> = db.iter(&wtxn)?.collect();
 

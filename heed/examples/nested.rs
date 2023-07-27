@@ -20,15 +20,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, ByteSlice> = env.create_database(&mut wtxn, None)?;
 
     // clear db
-    db.clear(&mut wtxn)?;
+    db.clear(&wtxn)?;
     wtxn.commit()?;
 
     // -----
 
     let mut wtxn = env.write_txn()?;
-    let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
+    let nwtxn = env.nested_write_txn(&mut wtxn)?;
 
-    db.put(&mut nwtxn, "what", &[4, 5][..])?;
+    db.put(&nwtxn, "what", &[4, 5][..])?;
     let ret = db.get(&nwtxn, "what")?;
     println!("nested(1) \"what\": {:?}", ret);
 
@@ -43,9 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // also try with multiple levels of nesting
     let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
-    let mut nnwtxn = env.nested_write_txn(&mut nwtxn)?;
+    let nnwtxn = env.nested_write_txn(&mut nwtxn)?;
 
-    db.put(&mut nnwtxn, "humm...", &[6, 7][..])?;
+    db.put(&nnwtxn, "humm...", &[6, 7][..])?;
     let ret = db.get(&nnwtxn, "humm...")?;
     println!("nested(2) \"humm...\": {:?}", ret);
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ret = db.get(&wtxn, "humm...")?;
     println!("parent \"humm...\": {:?}", ret);
 
-    db.put(&mut wtxn, "hello", &[2, 3][..])?;
+    db.put(&wtxn, "hello", &[2, 3][..])?;
 
     let ret = db.get(&wtxn, "hello")?;
     println!("parent \"hello\": {:?}", ret);
