@@ -667,13 +667,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # Ok(()) }
     /// ```
     pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
-        assert_eq_env_db_txn!(self, txn);
-
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
-        match cursor.move_on_first()? {
-            Some(_) => Ok(false),
-            None => Ok(true),
-        }
+        self.len(txn).map(|l| l == 0)
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
