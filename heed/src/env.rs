@@ -21,9 +21,10 @@ use std::{fmt, io, mem, ptr, sync};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::database::DatabaseOpenOptions;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{assert_eq_env_txn, Database, Error, Flag, Result, RoCursor, RoTxn, RwTxn};
+use crate::{Database, Error, Flag, Result, RoCursor, RoTxn, RwTxn, Unspecified};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -448,6 +449,10 @@ impl Env {
         Ok(size)
     }
 
+    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
+        DatabaseOpenOptions::new(self)
+    }
+
     /// Opens a typed database that already exists in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
@@ -475,14 +480,11 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
-        assert_eq_env_txn!(self, rtxn);
-
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(rtxn.txn, name, types, false) {
-            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
         }
+        options.open(rtxn)
     }
 
     /// Creates a typed database that can already exist in this environment.
@@ -503,13 +505,11 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
-        assert_eq_env_txn!(self, wtxn);
-
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(wtxn.txn.txn, name, types, true) {
-            Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
         }
+        options.create(wtxn)
     }
 
     fn raw_open_dbi(
@@ -532,7 +532,7 @@ impl Env {
         Ok(dbi)
     }
 
-    fn raw_init_database(
+    pub(crate) fn raw_init_database(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,

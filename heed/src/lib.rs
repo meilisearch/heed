@@ -185,6 +185,14 @@ impl From<io::Error> for Error {
 /// Either a success or an [`Error`].
 pub type Result<T> = result::Result<T, Error>;
 
+/// An unspecified type.
+///
+/// It is used as placeholders when creating a database,
+/// do not implement the [`BytesEncode`] and [`BytesDecode`] traits
+/// and therefore can't be used as codecs. You must use the [`Database::remap_types`]
+/// to properly define them.
+pub struct Unspecified;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,7 +216,7 @@ macro_rules! assert_eq_env_db_txn {
 }
 
 macro_rules! assert_eq_env_txn {
-    ($env:ident, $txn:ident) => {
+    ($env:expr, $txn:ident) => {
         assert!(
             $env.env_mut_ptr() == $txn.env_mut_ptr(),
             "The environment doesn't match the transaction's environment"

@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
@@ -7,6 +8,85 @@ use types::{DecodeIgnore, LazyDecode};
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
+
+pub struct DatabaseOpenOptions<'e, KC, DC> {
+    env: &'e Env,
+    types: marker::PhantomData<(KC, DC)>,
+    name: Option<String>,
+}
+
+impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified> {
+    pub fn new(env: &'e Env) -> Self {
+        DatabaseOpenOptions { env, types: Default::default(), name: None }
+    }
+}
+
+impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC> {
+        DatabaseOpenOptions { env: self.env, types: Default::default(), name: self.name }
+    }
+
+    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
+    ///
+    /// ## Lmdb read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote you might need to call manually `RoTxn::commit` to get metadata
+    /// and the databases handles opened and shared with the global [Env] handle.
+    ///
+    /// If not done you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<Database<KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        assert_eq_env_txn!(self.env, rtxn);
+
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        match self.env.raw_init_database(rtxn.txn, self.name.as_deref(), types, false) {
+            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
+            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB have an important restriction on the unnamed database when named ones are opened,
+    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// these keys can only be read and not written.
+    pub fn create(&self, wtxn: &mut RwTxn) -> Result<Database<KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        assert_eq_env_txn!(self.env, wtxn);
+
+        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
+        match self.env.raw_init_database(wtxn.txn.txn, self.name.as_deref(), types, true) {
+            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
+            Err(e) => Err(e),
+        }
+    }
+}
 
 /// A typed database that accepts only the types it was created with.
 ///
