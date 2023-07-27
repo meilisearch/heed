@@ -303,7 +303,7 @@ impl fmt::Debug for Env {
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
     path: PathBuf,
 }
 
@@ -478,7 +478,7 @@ impl Env {
         assert_eq_env_txn!(self, rtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
+        match self.raw_init_database(rtxn.txn, name, types, false) {
             Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -506,7 +506,7 @@ impl Env {
         assert_eq_env_txn!(self, wtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
+        match self.raw_init_database(wtxn.txn.txn, name, types, true) {
             Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
@@ -536,7 +536,7 @@ impl Env {
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
+        types: (TypeId, TypeId),
         create: bool,
     ) -> Result<u32> {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
