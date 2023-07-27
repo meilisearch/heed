@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::marker;
 
+use types::LazyDecode;
+
 use crate::*;
 
 /// A read-only iterator structure.

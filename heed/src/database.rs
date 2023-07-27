@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
 
-use types::DecodeIgnore;
+use types::{DecodeIgnore, LazyDecode};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;

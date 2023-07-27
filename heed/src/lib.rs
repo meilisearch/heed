@@ -52,7 +52,6 @@ mod cursor;
 mod database;
 mod env;
 mod iterator;
-mod lazy_decode;
 mod mdb;
 mod reserved_space;
 mod txn;
@@ -72,7 +71,6 @@ pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,
 };
-pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::Flag;

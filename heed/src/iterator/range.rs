@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::marker;
 use std::ops::Bound;
 
+use types::LazyDecode;
+
 use super::{advance_key, retreat_key};
 use crate::*;
 
