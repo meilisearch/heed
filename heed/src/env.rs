@@ -904,7 +904,9 @@ mod tests {
     #[test]
     fn resize_database() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(dir.path()).unwrap();
+        let page_size = page_size::get();
+        let env =
+            EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -923,7 +925,7 @@ mod tests {
         wtxn.commit().expect_err("cannot commit a transaction that would reach the map size limit");
 
         unsafe {
-            env.resize(10 * 4096).unwrap();
+            env.resize(10 * page_size).unwrap();
         }
         let mut wtxn = env.write_txn().unwrap();
         for i in 64..128 {
@@ -931,7 +933,7 @@ mod tests {
         }
         wtxn.commit().expect("transaction should commit after resizing the map size");
 
-        assert_eq!(10 * 4096, env.info().map_size);
+        assert_eq!(10 * page_size, env.info().map_size);
     }
 
     /// Non-regression test for
