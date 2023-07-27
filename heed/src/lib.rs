@@ -49,7 +49,7 @@
 #![warn(missing_docs)]
 
 mod cursor;
-mod db;
+mod database;
 mod env;
 mod iterator;
 mod lazy_decode;
@@ -64,7 +64,7 @@ use heed_traits as traits;
 pub use {bytemuck, byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::db::{Database, PolyDatabase};
+pub use self::database::Database;
 pub use self::env::{
     env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions,
 };

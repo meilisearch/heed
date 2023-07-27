@@ -23,9 +23,7 @@ use synchronoise::event::SignalEvent;
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{
-    assert_eq_env_txn, Database, Error, Flag, PolyDatabase, Result, RoCursor, RoTxn, RwTxn,
-};
+use crate::{assert_eq_env_txn, Database, Error, Flag, Result, RoCursor, RoTxn, RwTxn};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -487,29 +485,6 @@ impl Env {
         }
     }
 
-    /// Opens an untyped database that already exists in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn open_poly_database(
-        &self,
-        rtxn: &RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<PolyDatabase>> {
-        assert_eq_env_txn!(self, rtxn);
-
-        match self.raw_init_database(rtxn.txn, name, None, false) {
-            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Creates a typed database that can already exist in this environment.
     ///
     /// If the database was previously opened in this program run, types will be checked.
@@ -533,28 +508,6 @@ impl Env {
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
             Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn create_poly_database(
-        &self,
-        wtxn: &mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<PolyDatabase> {
-        assert_eq_env_txn!(self, wtxn);
-
-        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
-            Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
