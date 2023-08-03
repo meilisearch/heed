@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![allow(rustdoc::broken_intra_doc_links)]
+#![allow(rustdoc::invalid_html_tags)]
 #![allow(non_camel_case_types)]
 #![allow(clippy::all)]
 #![doc(html_root_url = "https://docs.rs/lmdb-master-sys/0.1.0")]
