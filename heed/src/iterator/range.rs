@@ -71,7 +71,7 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -304,7 +304,7 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -428,7 +428,7 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -663,7 +663,7 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 

@@ -193,19 +193,6 @@ pub type Result<T> = result::Result<T, Error>;
 /// to properly define them.
 pub struct Unspecified;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_is_send_sync() {
-        fn give_me_send_sync<T: Send + Sync>(_: T) {}
-
-        let error = Error::Encoding(Box::from("There is an issue, you know?"));
-        give_me_send_sync(error);
-    }
-}
-
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
@@ -225,3 +212,16 @@ macro_rules! assert_eq_env_txn {
 }
 
 pub(crate) use {assert_eq_env_db_txn, assert_eq_env_txn};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_is_send_sync() {
+        fn give_me_send_sync<T: Send + Sync>(_: T) {}
+
+        let error = Error::Encoding(Box::from("There is an issue, you know?"));
+        give_me_send_sync(error);
+    }
+}

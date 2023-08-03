@@ -22,7 +22,7 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
         RoIter {
             cursor: self.cursor,
             move_on_first: self.move_on_first,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -217,7 +217,7 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         RwIter {
             cursor: self.cursor,
             move_on_first: self.move_on_first,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -303,7 +303,7 @@ impl<'txn, KC, DC> RoRevIter<'txn, KC, DC> {
         RoRevIter {
             cursor: self.cursor,
             move_on_last: self.move_on_last,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -498,7 +498,7 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         RwRevIter {
             cursor: self.cursor,
             move_on_last: self.move_on_last,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 

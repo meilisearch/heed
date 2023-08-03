@@ -36,7 +36,7 @@ impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
             cursor: self.cursor,
             prefix: self.prefix,
             move_on_first: self.move_on_first,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -245,7 +245,7 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
             cursor: self.cursor,
             prefix: self.prefix,
             move_on_first: self.move_on_first,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -345,7 +345,7 @@ impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
             cursor: self.cursor,
             prefix: self.prefix,
             move_on_last: self.move_on_last,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
@@ -556,7 +556,7 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
             cursor: self.cursor,
             prefix: self.prefix,
             move_on_last: self.move_on_last,
-            _phantom: marker::PhantomData::default(),
+            _phantom: marker::PhantomData,
         }
     }
 
