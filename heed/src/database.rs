@@ -9,6 +9,46 @@ use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
+/// Options and flags which can be used to configure how a [`Database`] is opened.
+///
+/// # Examples
+///
+/// Opening a file to read:
+///
+/// ```
+/// # use std::fs;
+/// # use std::path::Path;
+/// # use heed::EnvOpenOptions;
+/// use heed::types::*;
+/// use heed::byteorder::BigEndian;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # let dir = tempfile::tempdir()?;
+/// # let env = EnvOpenOptions::new()
+/// #     .map_size(10 * 1024 * 1024) // 10MB
+/// #     .max_dbs(3000)
+/// #     .open(dir.path())?;
+/// type BEI64 = I64<BigEndian>;
+///
+/// // Imagine you have an optional name
+/// let conditional_name = Some("big-endian-iter");
+///
+/// let mut wtxn = env.write_txn()?;
+/// let mut options = env.database_options().types::<BEI64, Unit>();
+/// if let Some(name) = conditional_name {
+///    options.name(name);
+/// }
+/// let db = options.create(&mut wtxn)?;
+///
+/// # db.clear(&mut wtxn)?;
+/// db.put(&mut wtxn, &68, &())?;
+/// db.put(&mut wtxn, &35, &())?;
+/// db.put(&mut wtxn, &0, &())?;
+/// db.put(&mut wtxn, &42, &())?;
+///
+/// wtxn.commit()?;
+/// # Ok(()) }
+/// ```
 pub struct DatabaseOpenOptions<'e, KC, DC> {
     env: &'e Env,
     types: marker::PhantomData<(KC, DC)>,
@@ -16,16 +56,24 @@ pub struct DatabaseOpenOptions<'e, KC, DC> {
 }
 
 impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified> {
+    /// Create an options struct to open/create a database with specific flags.
     pub fn new(env: &'e Env) -> Self {
         DatabaseOpenOptions { env, types: Default::default(), name: None }
     }
 }
 
 impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
+    /// Change the type of the database.
+    ///
+    /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
+    /// to use the [`Database`].
     pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC> {
         DatabaseOpenOptions { env: self.env, types: Default::default(), name: self.name }
     }
 
+    /// Change the name of the database.
+    ///
+    /// By default the database is unnamed and there only is a single unnamed database.
     pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
         self.name = Some(name.into());
         self

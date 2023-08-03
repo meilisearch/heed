@@ -449,6 +449,7 @@ impl Env {
         Ok(size)
     }
 
+    /// Options and flags which can be used to configure how a [`Database`] is opened.
     pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
         DatabaseOpenOptions::new(self)
     }
@@ -512,26 +513,6 @@ impl Env {
         options.create(wtxn)
     }
 
-    fn raw_open_dbi(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        flags: u32,
-    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
-        let mut dbi = 0;
-        let name = name.map(|n| CString::new(n).unwrap());
-        let name_ptr = match name {
-            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
-            None => ptr::null(),
-        };
-
-        // safety: The name cstring is cloned by LMDB, we can drop it after.
-        //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
-        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
-
-        Ok(dbi)
-    }
-
     pub(crate) fn raw_init_database(
         &self,
         raw_txn: *mut ffi::MDB_txn,
@@ -553,6 +534,26 @@ impl Env {
             }
             Err(e) => Err(e.into()),
         }
+    }
+
+    fn raw_open_dbi(
+        &self,
+        raw_txn: *mut ffi::MDB_txn,
+        name: Option<&str>,
+        flags: u32,
+    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
+        let mut dbi = 0;
+        let name = name.map(|n| CString::new(n).unwrap());
+        let name_ptr = match name {
+            Some(ref name) => name.as_bytes_with_nul().as_ptr() as *const _,
+            None => ptr::null(),
+        };
+
+        // safety: The name cstring is cloned by LMDB, we can drop it after.
+        //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
+        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
+
+        Ok(dbi)
     }
 
     /// Create a transaction with read and write access for use with the environment.
@@ -593,10 +594,10 @@ impl Env {
     ///
     /// ## Errors
     ///
-    /// * [heed::mdb::lmdb_error::Error::Panic]: A fatal error occurred earlier, and the environment must be shut down
-    /// * [heed::mdb::lmdb_error::Error::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
+    /// * [crate::MdbError::Panic]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [crate::MdbError::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
     /// map must be resized
-    /// * [heed::mdb::lmdb_error::Error::ReadersFull]: a read-only transaction was requested, and the reader lock table is
+    /// * [crate::MdbError::ReadersFull]: a read-only transaction was requested, and the reader lock table is
     /// full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
