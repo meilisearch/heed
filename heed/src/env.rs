@@ -24,7 +24,8 @@ use synchronoise::event::SignalEvent;
 use crate::database::DatabaseOpenOptions;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Database, Error, Flag, Result, RoCursor, RoTxn, RwTxn, Unspecified};
+use crate::mdb::lmdb_flags::DatabaseFlags;
+use crate::{Database, EnvFlags, Error, Result, RoCursor, RoTxn, RwTxn, Unspecified};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -101,7 +102,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
-    flags: u32, // LMDB flags
+    flags: EnvFlags,
 }
 
 impl Default for EnvOpenOptions {
@@ -113,7 +114,12 @@ impl Default for EnvOpenOptions {
 impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
-        EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None, flags: 0 }
+        EnvOpenOptions {
+            map_size: None,
+            max_readers: None,
+            max_dbs: None,
+            flags: EnvFlags::empty(),
+        }
     }
 
     /// Set the size of the memory map to use for this environment.
@@ -138,16 +144,13 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, Flag};
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
-    /// unsafe {
-    ///     env_builder.flag(Flag::NoTls);
-    ///     env_builder.flag(Flag::NoMetaSync);
-    /// }
+    /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = env_builder.open(dir.path())?;
     ///
@@ -179,9 +182,9 @@ impl EnvOpenOptions {
     ///
     /// # Safety
     ///
-    /// It is unsafe to use unsafe LMDB flags such as `NoSync`, `NoMetaSync`, or `NoLock`.
-    pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
-        self.flags |= flag as u32;
+    /// It is unsafe to use unsafe LMDB flags such as `NO_SYNC`, `NO_META_SYNC`, or `NO_LOCK`.
+    pub unsafe fn flags(&mut self, flags: EnvFlags) -> &mut Self {
+        self.flags |= flags;
         self
     }
 
@@ -191,7 +194,7 @@ impl EnvOpenOptions {
 
         let path = match canonicalize_path(path.as_ref()) {
             Err(err) => {
-                if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
+                if err.kind() == NotFound && self.flags.contains(EnvFlags::NO_SUB_DIR) {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
                         Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
@@ -249,13 +252,13 @@ impl EnvOpenOptions {
                     // to avoid using the thread local storage, this way we allow users
                     // to use references of RoTxn between threads safely.
                     let flags = if cfg!(feature = "read-txn-no-tls") {
-                        self.flags | Flag::NoTls as u32
+                        self.flags | EnvFlags::NO_TLS
                     } else {
                         self.flags
                     };
 
                     let result =
-                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), flags, 0o600));
+                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600));
 
                     match result {
                         Ok(()) => {
@@ -364,26 +367,25 @@ impl Env {
     /// # Ok(()) }
     /// ```
     pub fn real_disk_size(&self) -> Result<u64> {
-        let mut fd = std::mem::MaybeUninit::uninit();
+        let mut fd = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr(), fd.as_mut_ptr()))? };
         let fd = unsafe { fd.assume_init() };
         let metadata = unsafe { metadata_from_fd(fd)? };
         Ok(metadata.len())
     }
 
-    /// Check if a flag was specified when opening this environment.
-    pub fn contains_flag(&self, flag: Flag) -> Result<bool> {
-        let flags = self.raw_flags()?;
-        let set = flags & (flag as u32);
-        Ok(set != 0)
+    /// Return the raw flags the environment was opened with.
+    ///
+    /// Returns `None` if the environment flags are different from the [`EnvFlags`] set.
+    pub fn flags(&self) -> Result<Option<EnvFlags>> {
+        self.raw_flags().map(EnvFlags::from_bits)
     }
 
     /// Return the raw flags the environment was opened with.
     pub fn raw_flags(&self) -> Result<u32> {
-        let mut flags = std::mem::MaybeUninit::uninit();
+        let mut flags = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
         let flags = unsafe { flags.assume_init() };
-
         Ok(flags)
     }
 
@@ -412,7 +414,7 @@ impl Env {
 
         let mut size = 0;
 
-        let mut stat = std::mem::MaybeUninit::uninit();
+        let mut stat = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr(), stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
         size += compute_size(stat);
@@ -434,7 +436,7 @@ impl Env {
 
             let key = String::from_utf8(key.to_vec()).unwrap();
             if let Ok(dbi) = self.raw_open_dbi(rtxn.txn, Some(&key), 0) {
-                let mut stat = std::mem::MaybeUninit::uninit();
+                let mut stat = mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
@@ -518,12 +520,10 @@ impl Env {
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         types: (TypeId, TypeId),
-        create: bool,
+        flags: DatabaseFlags,
     ) -> Result<u32> {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        let flags = if create { ffi::MDB_CREATE } else { 0 };
-        match self.raw_open_dbi(raw_txn, name, flags) {
+        match self.raw_open_dbi(raw_txn, name, flags.bits()) {
             Ok(dbi) => {
                 let old_types = lock.entry(dbi).or_insert(types);
                 if *old_types == types {
@@ -841,7 +841,7 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
-        unsafe { envbuilder.flag(crate::Flag::WriteMap) };
+        unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
         let env = envbuilder.open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
@@ -853,7 +853,7 @@ mod tests {
     fn open_database_with_nosubdir() {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
-        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
+        unsafe { envbuilder.flags(crate::EnvFlags::NO_SUB_DIR) };
         let _env = envbuilder.open(dir.path().join("data.mdb")).unwrap();
     }
 

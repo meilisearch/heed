@@ -7,6 +7,7 @@ use types::{DecodeIgnore, LazyDecode};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
+use crate::mdb::lmdb_flags::DatabaseFlags;
 use crate::*;
 
 /// Options and flags which can be used to configure how a [`Database`] is opened.
@@ -53,12 +54,18 @@ pub struct DatabaseOpenOptions<'e, KC, DC> {
     env: &'e Env,
     types: marker::PhantomData<(KC, DC)>,
     name: Option<String>,
+    flags: DatabaseFlags,
 }
 
 impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
     pub fn new(env: &'e Env) -> Self {
-        DatabaseOpenOptions { env, types: Default::default(), name: None }
+        DatabaseOpenOptions {
+            env,
+            types: Default::default(),
+            name: None,
+            flags: DatabaseFlags::empty(),
+        }
     }
 }
 
@@ -68,7 +75,12 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
     pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC> {
-        DatabaseOpenOptions { env: self.env, types: Default::default(), name: self.name }
+        DatabaseOpenOptions {
+            env: self.env,
+            types: Default::default(),
+            name: self.name,
+            flags: self.flags,
+        }
     }
 
     /// Change the name of the database.
@@ -105,7 +117,8 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
         assert_eq_env_txn!(self.env, rtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.env.raw_init_database(rtxn.txn, self.name.as_deref(), types, false) {
+        let name = self.name.as_deref();
+        match self.env.raw_init_database(rtxn.txn, name, types, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -129,7 +142,9 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
         assert_eq_env_txn!(self.env, wtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.env.raw_init_database(wtxn.txn.txn, self.name.as_deref(), types, true) {
+        let name = self.name.as_deref();
+        let flags = self.flags | DatabaseFlags::CREATE;
+        match self.env.raw_init_database(wtxn.txn.txn, name, types, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
