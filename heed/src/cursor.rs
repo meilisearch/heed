@@ -5,6 +5,18 @@ use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
+/// The way the `Iterator::next/prev` method behaves towards DUP data.
+#[derive(Debug, Clone, Copy)]
+pub enum MoveOperation {
+    /// Move on the next/prev entry, wether it's the same key or not.
+    Any,
+    /// Move on the next/prev data of the current key.
+    Dup,
+    /// Move on the next/prev entry which is the next/prev key.
+    /// Skip the multiple values of the current key.
+    NoDup,
+}
+
 pub struct RoCursor<'txn> {
     cursor: *mut ffi::MDB_cursor,
     _marker: marker::PhantomData<&'txn ()>,
@@ -13,9 +25,7 @@ pub struct RoCursor<'txn> {
 impl<'txn> RoCursor<'txn> {
     pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
-
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
-
         Ok(RoCursor { cursor, _marker: marker::PhantomData })
     }
 
@@ -122,9 +132,15 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_prev(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_prev(&mut self, op: MoveOperation) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
+
+        let flag = match op {
+            MoveOperation::Any => ffi::cursor_op::MDB_PREV,
+            MoveOperation::Dup => ffi::cursor_op::MDB_PREV_DUP,
+            MoveOperation::NoDup => ffi::cursor_op::MDB_PREV_NODUP,
+        };
 
         // Move the cursor to the previous non-dup key
         let result = unsafe {
@@ -132,7 +148,7 @@ impl<'txn> RoCursor<'txn> {
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::cursor_op::MDB_PREV,
+                flag,
             ))
         };
 
@@ -147,9 +163,15 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_next(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_next(&mut self, op: MoveOperation) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
+
+        let flag = match op {
+            MoveOperation::Any => ffi::cursor_op::MDB_NEXT,
+            MoveOperation::Dup => ffi::cursor_op::MDB_NEXT_DUP,
+            MoveOperation::NoDup => ffi::cursor_op::MDB_NEXT_NODUP,
+        };
 
         // Move the cursor to the next non-dup key
         let result = unsafe {
@@ -157,7 +179,7 @@ impl<'txn> RoCursor<'txn> {
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::cursor_op::MDB_NEXT,
+                flag,
             ))
         };
 

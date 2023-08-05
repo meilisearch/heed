@@ -4,6 +4,7 @@ use std::marker;
 use types::LazyDecode;
 
 use super::{advance_key, retreat_key};
+use crate::cursor::MoveOperation;
 use crate::*;
 
 fn move_on_prefix_end<'txn>(
@@ -11,8 +12,9 @@ fn move_on_prefix_end<'txn>(
     prefix: &mut Vec<u8>,
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     advance_key(prefix);
-    let result =
-        cursor.move_on_key_greater_than_or_equal_to(prefix).and_then(|_| cursor.move_on_prev());
+    let result = cursor
+        .move_on_key_greater_than_or_equal_to(prefix)
+        .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup));
     retreat_key(prefix);
     result
 }
@@ -21,13 +23,24 @@ fn move_on_prefix_end<'txn>(
 pub struct RoPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
+    move_operation: MoveOperation,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoPrefix<'txn, KC, DC> {
-        RoPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RoCursor<'txn>,
+        prefix: Vec<u8>,
+        move_operation: MoveOperation,
+    ) -> RoPrefix<'txn, KC, DC> {
+        RoPrefix {
+            cursor,
+            prefix,
+            move_operation,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -35,6 +48,7 @@ impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
+            move_operation: self.move_operation,
             move_on_first: self.move_on_first,
             _phantom: marker::PhantomData,
         }
@@ -68,7 +82,7 @@ where
             self.move_on_first = false;
             self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -121,13 +135,24 @@ where
 pub struct RwPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
+    move_operation: MoveOperation,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwPrefix<'txn, KC, DC> {
-        RwPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RwCursor<'txn>,
+        prefix: Vec<u8>,
+        move_operation: MoveOperation,
+    ) -> RwPrefix<'txn, KC, DC> {
+        RwPrefix {
+            cursor,
+            prefix,
+            move_operation,
+            move_on_first: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -244,6 +269,7 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
+            move_operation: self.move_operation,
             move_on_first: self.move_on_first,
             _phantom: marker::PhantomData,
         }
@@ -277,7 +303,7 @@ where
             self.move_on_first = false;
             self.cursor.move_on_key_greater_than_or_equal_to(&self.prefix)
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -330,13 +356,24 @@ where
 pub struct RoRevPrefix<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
+    move_operation: MoveOperation,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoRevPrefix<'txn, KC, DC> {
-        RoRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RoCursor<'txn>,
+        prefix: Vec<u8>,
+        move_operation: MoveOperation,
+    ) -> RoRevPrefix<'txn, KC, DC> {
+        RoRevPrefix {
+            cursor,
+            prefix,
+            move_operation,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -344,6 +381,7 @@ impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
+            move_operation: self.move_operation,
             move_on_last: self.move_on_last,
             _phantom: marker::PhantomData,
         }
@@ -377,7 +415,7 @@ where
             self.move_on_last = false;
             move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {
@@ -432,13 +470,24 @@ where
 pub struct RwRevPrefix<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
+    move_operation: MoveOperation,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwRevPrefix<'txn, KC, DC> {
-        RwRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RwCursor<'txn>,
+        prefix: Vec<u8>,
+        move_operation: MoveOperation,
+    ) -> RwRevPrefix<'txn, KC, DC> {
+        RwRevPrefix {
+            cursor,
+            prefix,
+            move_operation,
+            move_on_last: true,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -555,6 +604,7 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
+            move_operation: self.move_operation,
             move_on_last: self.move_on_last,
             _phantom: marker::PhantomData,
         }
@@ -588,7 +638,7 @@ where
             self.move_on_last = false;
             move_on_prefix_end(&mut self.cursor, &mut self.prefix)
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {

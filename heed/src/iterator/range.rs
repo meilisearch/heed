@@ -5,6 +5,7 @@ use std::ops::Bound;
 use types::LazyDecode;
 
 use super::{advance_key, retreat_key};
+use crate::cursor::MoveOperation;
 use crate::*;
 
 fn move_on_range_end<'txn>(
@@ -14,12 +15,12 @@ fn move_on_range_end<'txn>(
     match end_bound {
         Bound::Included(end) => match cursor.move_on_key_greater_than_or_equal_to(end) {
             Ok(Some((key, data))) if key == &end[..] => Ok(Some((key, data))),
-            Ok(_) => cursor.move_on_prev(),
+            Ok(_) => cursor.move_on_prev(MoveOperation::NoDup),
             Err(e) => Err(e),
         },
-        Bound::Excluded(end) => {
-            cursor.move_on_key_greater_than_or_equal_to(end).and_then(|_| cursor.move_on_prev())
-        }
+        Bound::Excluded(end) => cursor
+            .move_on_key_greater_than_or_equal_to(end)
+            .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup)),
         Bound::Unbounded => cursor.move_on_last(),
     }
 }
@@ -43,6 +44,7 @@ fn move_on_range_start<'txn>(
 /// A read-only range iterator structure.
 pub struct RoRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
@@ -54,9 +56,11 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
+        move_operation: MoveOperation,
     ) -> RoRange<'txn, KC, DC> {
         RoRange {
             cursor,
+            move_operation,
             move_on_start: true,
             start_bound,
             end_bound,
@@ -68,6 +72,7 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
         RoRange {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -103,7 +108,7 @@ where
             self.move_on_start = false;
             move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -167,6 +172,7 @@ where
 /// A read-write range iterator structure.
 pub struct RwRange<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
@@ -178,9 +184,11 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
+        move_operation: MoveOperation,
     ) -> RwRange<'txn, KC, DC> {
         RwRange {
             cursor,
+            move_operation,
             move_on_start: true,
             start_bound,
             end_bound,
@@ -301,6 +309,7 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2> {
         RwRange {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -336,7 +345,7 @@ where
             self.move_on_start = false;
             move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -400,6 +409,7 @@ where
 /// A reverse read-only range iterator structure.
 pub struct RoRevRange<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
@@ -411,9 +421,11 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
+        move_operation: MoveOperation,
     ) -> RoRevRange<'txn, KC, DC> {
         RoRevRange {
             cursor,
+            move_operation,
             move_on_end: true,
             start_bound,
             end_bound,
@@ -425,6 +437,7 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RoRevRange<'txn, KC2, DC2> {
         RoRevRange {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -460,7 +473,7 @@ where
             self.move_on_end = false;
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {
@@ -526,6 +539,7 @@ where
 /// A reverse read-write range iterator structure.
 pub struct RwRevRange<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
@@ -537,9 +551,11 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
+        move_operation: MoveOperation,
     ) -> RwRevRange<'txn, KC, DC> {
         RwRevRange {
             cursor,
+            move_operation,
             move_on_end: true,
             start_bound,
             end_bound,
@@ -660,6 +676,7 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RwRevRange<'txn, KC2, DC2> {
         RwRevRange {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -695,7 +712,7 @@ where
             self.move_on_end = false;
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {

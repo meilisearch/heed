@@ -21,6 +21,7 @@ use std::{fmt, io, mem, ptr, sync};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::cursor::MoveOperation;
 use crate::database::DatabaseOpenOptions;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -429,7 +430,7 @@ impl Env {
         // We’re going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
 
-        while let Some((key, _value)) = cursor.move_on_next()? {
+        while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
             if key.contains(&0) {
                 continue;
             }

@@ -18,7 +18,11 @@ pub mod cursor_op {
     pub const MDB_LAST: MDB_cursor_op = ffi::MDB_LAST;
     pub const MDB_SET_RANGE: MDB_cursor_op = ffi::MDB_SET_RANGE;
     pub const MDB_PREV: MDB_cursor_op = ffi::MDB_PREV;
+    pub const MDB_PREV_NODUP: MDB_cursor_op = ffi::MDB_PREV_NODUP;
+    pub const MDB_PREV_DUP: MDB_cursor_op = ffi::MDB_PREV_DUP;
     pub const MDB_NEXT: MDB_cursor_op = ffi::MDB_NEXT;
+    pub const MDB_NEXT_NODUP: MDB_cursor_op = ffi::MDB_NEXT_NODUP;
+    pub const MDB_NEXT_DUP: MDB_cursor_op = ffi::MDB_NEXT_DUP;
     pub const MDB_GET_CURRENT: MDB_cursor_op = ffi::MDB_GET_CURRENT;
 }
 

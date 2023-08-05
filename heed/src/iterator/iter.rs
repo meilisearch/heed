@@ -3,24 +3,30 @@ use std::marker;
 
 use types::LazyDecode;
 
+use crate::cursor::MoveOperation;
 use crate::*;
 
 /// A read-only iterator structure.
 pub struct RoIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RoCursor<'txn>) -> RoIter<'txn, KC, DC> {
-        RoIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RoCursor<'txn>,
+        move_operation: MoveOperation,
+    ) -> RoIter<'txn, KC, DC> {
+        RoIter { cursor, move_operation, move_on_first: true, _phantom: marker::PhantomData }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RoIter<'txn, KC2, DC2> {
         RoIter {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_first: self.move_on_first,
             _phantom: marker::PhantomData,
         }
@@ -54,7 +60,7 @@ where
             self.move_on_first = false;
             self.cursor.move_on_first()
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -94,13 +100,17 @@ where
 /// A read-write iterator structure.
 pub struct RwIter<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RwCursor<'txn>) -> RwIter<'txn, KC, DC> {
-        RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RwCursor<'txn>,
+        move_operation: MoveOperation,
+    ) -> RwIter<'txn, KC, DC> {
+        RwIter { cursor, move_operation, move_on_first: true, _phantom: marker::PhantomData }
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -216,6 +226,7 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RwIter<'txn, KC2, DC2> {
         RwIter {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_first: self.move_on_first,
             _phantom: marker::PhantomData,
         }
@@ -249,7 +260,7 @@ where
             self.move_on_first = false;
             self.cursor.move_on_first()
         } else {
-            self.cursor.move_on_next()
+            self.cursor.move_on_next(self.move_operation)
         };
 
         match result {
@@ -289,19 +300,24 @@ where
 /// A reverse read-only iterator structure.
 pub struct RoRevIter<'txn, KC, DC> {
     cursor: RoCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RoRevIter<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RoCursor<'txn>) -> RoRevIter<'txn, KC, DC> {
-        RoRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RoCursor<'txn>,
+        move_operation: MoveOperation,
+    ) -> RoRevIter<'txn, KC, DC> {
+        RoRevIter { cursor, move_operation, move_on_last: true, _phantom: marker::PhantomData }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RoRevIter<'txn, KC2, DC2> {
         RoRevIter {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_last: self.move_on_last,
             _phantom: marker::PhantomData,
         }
@@ -335,7 +351,7 @@ where
             self.move_on_last = false;
             self.cursor.move_on_last()
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {
@@ -375,13 +391,17 @@ where
 /// A reverse read-write iterator structure.
 pub struct RwRevIter<'txn, KC, DC> {
     cursor: RwCursor<'txn>,
+    move_operation: MoveOperation,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC)>,
 }
 
 impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
-    pub(crate) fn new(cursor: RwCursor<'txn>) -> RwRevIter<'txn, KC, DC> {
-        RwRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
+    pub(crate) fn new(
+        cursor: RwCursor<'txn>,
+        move_operation: MoveOperation,
+    ) -> RwRevIter<'txn, KC, DC> {
+        RwRevIter { cursor, move_operation, move_on_last: true, _phantom: marker::PhantomData }
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -497,6 +517,7 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
     pub fn remap_types<KC2, DC2>(self) -> RwRevIter<'txn, KC2, DC2> {
         RwRevIter {
             cursor: self.cursor,
+            move_operation: self.move_operation,
             move_on_last: self.move_on_last,
             _phantom: marker::PhantomData,
         }
@@ -530,7 +551,7 @@ where
             self.move_on_last = false;
             self.cursor.move_on_last()
         } else {
-            self.cursor.move_on_prev()
+            self.cursor.move_on_prev(self.move_operation)
         };
 
         match result {
