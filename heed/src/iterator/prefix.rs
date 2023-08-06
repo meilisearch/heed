@@ -43,6 +43,20 @@ impl<'txn, KC, DC> RoPrefix<'txn, KC, DC> {
         }
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, KC2, DC2> {
         RoPrefix {
@@ -275,6 +289,20 @@ impl<'txn, KC, DC> RwPrefix<'txn, KC, DC> {
         }
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the key codec type of this iterator, specifying the new codec.
     pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, KC2, DC> {
         self.remap_types::<KC2, DC>()
@@ -374,6 +402,20 @@ impl<'txn, KC, DC> RoRevPrefix<'txn, KC, DC> {
             move_on_last: true,
             _phantom: marker::PhantomData,
         }
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -608,6 +650,20 @@ impl<'txn, KC, DC> RwRevPrefix<'txn, KC, DC> {
             move_on_last: self.move_on_last,
             _phantom: marker::PhantomData,
         }
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.

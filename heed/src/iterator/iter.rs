@@ -22,6 +22,107 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
         RoIter { cursor, move_operation, move_on_first: true, _phantom: marker::PhantomData }
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI64 = I64<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.database_options()
+    ///     .types::<BEI64, BEI64>()
+    ///     .dup_sort(true)
+    ///     .name("dup-sort")
+    ///     .create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &68, &120)?;
+    /// db.put(&mut wtxn, &68, &121)?;
+    /// db.put(&mut wtxn, &68, &122)?;
+    /// db.put(&mut wtxn, &68, &123)?;
+    /// db.put(&mut wtxn, &35, &120)?;
+    /// db.put(&mut wtxn, &0, &120)?;
+    /// db.put(&mut wtxn, &42, &120)?;
+    ///
+    /// let mut iter = db.iter(&wtxn)?;
+    /// iter.move_between_keys();
+    /// assert_eq!(iter.next().transpose()?, Some((0, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((35, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((42, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI64 = I64<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.database_options()
+    ///     .types::<BEI64, BEI64>()
+    ///     .dup_sort(true)
+    ///     .name("dup-sort")
+    ///     .create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &68, &120)?;
+    /// db.put(&mut wtxn, &68, &121)?;
+    /// db.put(&mut wtxn, &68, &122)?;
+    /// db.put(&mut wtxn, &68, &123)?;
+    /// db.put(&mut wtxn, &35, &120)?;
+    /// db.put(&mut wtxn, &0, &120)?;
+    /// db.put(&mut wtxn, &42, &120)?;
+    ///
+    /// let mut iter = db.iter(&wtxn)?;
+    /// iter.move_through_duplicate_values();
+    /// assert_eq!(iter.next().transpose()?, Some((0, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((35, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((42, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RoIter<'txn, KC2, DC2> {
         RoIter {
@@ -222,6 +323,20 @@ impl<'txn, KC, DC> RwIter<'txn, KC, DC> {
         self.cursor.append(&key_bytes, &data_bytes)
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RwIter<'txn, KC2, DC2> {
         RwIter {
@@ -311,6 +426,20 @@ impl<'txn, KC, DC> RoRevIter<'txn, KC, DC> {
         move_operation: MoveOperation,
     ) -> RoRevIter<'txn, KC, DC> {
         RoRevIter { cursor, move_operation, move_on_last: true, _phantom: marker::PhantomData }
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -511,6 +640,20 @@ impl<'txn, KC, DC> RwRevIter<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the codec types of this iterator, specifying the codecs.

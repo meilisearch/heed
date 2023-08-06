@@ -68,6 +68,20 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
         }
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the codec types of this iterator, specifying the codecs.
     pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
         RoRange {
@@ -317,6 +331,20 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         }
     }
 
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
+    }
+
     /// Change the key codec type of this iterator, specifying the new codec.
     pub fn remap_key_type<KC2>(self) -> RwRange<'txn, KC2, DC> {
         self.remap_types::<KC2, DC>()
@@ -431,6 +459,20 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
             end_bound,
             _phantom: marker::PhantomData,
         }
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -670,6 +712,20 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.append(&key_bytes, &data_bytes)
+    }
+
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(&mut self) {
+        self.move_operation = MoveOperation::NoDup;
+    }
+
+    /// Move through key/values entries and output duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_through_duplicate_values`].
+    pub fn move_through_duplicate_values(&mut self) {
+        self.move_operation = MoveOperation::Any;
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
