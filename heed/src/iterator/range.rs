@@ -291,10 +291,9 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
-    /// Append the given key/value pair to the end of the database.
+    /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
-    /// If a key is inserted that is less than any previous key a `KeyExist` error
-    /// is returned and the key is not inserted into the database.
+    /// For more info, see [`RoIter::put_current_with_flags`].
     ///
     /// # Safety
     ///
@@ -309,14 +308,19 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub unsafe fn put_current_with_flags<'a>(
+        &mut self,
+        flags: PutFlags,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
-        self.cursor.append(&key_bytes, &data_bytes)
+        self.cursor.put_current_with_flags(flags, &key_bytes, &data_bytes)
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
@@ -686,10 +690,9 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
         self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
     }
 
-    /// Append the given key/value pair to the end of the database.
+    /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
-    /// If a key is inserted that is less than any previous key a `KeyExist` error
-    /// is returned and the key is not inserted into the database.
+    /// For more info, see [`RoIter::put_current_with_flags`].
     ///
     /// # Safety
     ///
@@ -704,14 +707,19 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append<'a>(&mut self, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub unsafe fn put_current_with_flags<'a>(
+        &mut self,
+        flags: PutFlags,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
-        self.cursor.append(&key_bytes, &data_bytes)
+        self.cursor.put_current_with_flags(flags, &key_bytes, &data_bytes)
     }
 
     /// Move on the first value of keys, ignoring duplicate values.

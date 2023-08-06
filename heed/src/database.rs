@@ -1618,7 +1618,7 @@ impl<KC, DC> Database<KC, DC> {
             .map(|cursor| RwRevPrefix::new(cursor, prefix_bytes, MoveOperation::Any))
     }
 
-    /// Insert a key-value pairs in this database.
+    /// Insert a key-value pair in this database. The entry is written with no specific flag.
     ///
     /// ```
     /// # use std::fs;
@@ -1737,16 +1737,13 @@ impl<KC, DC> Database<KC, DC> {
         }
     }
 
-    /// Append the given key/data pair to the end of the database.
-    ///
-    /// This option allows fast bulk loading when keys are already known to be in the correct order.
-    /// Loading unsorted keys will cause a `KeyExist`/`MDB_KEYEXIST` error.
+    /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{Database, PutFlags, Error, MdbError};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1759,24 +1756,51 @@ impl<KC, DC> Database<KC, DC> {
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let db = env.database_options()
+    ///     .types::<BEI32, Str>()
+    ///     .name("dup-i32")
+    ///     .dup_sort(true)
+    ///     .create(&mut wtxn)?;
     ///
     /// # db.clear(&mut wtxn)?;
-    /// db.append(&mut wtxn, &13, "i-am-thirteen")?;
-    /// db.append(&mut wtxn, &27, "i-am-twenty-seven")?;
-    /// db.append(&mut wtxn, &42, "i-am-forty-two")?;
-    /// db.append(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &42, "i-am-so-cool")?;
+    /// db.put(&mut wtxn, &42, "i-am-the-king")?;
+    /// db.put(&mut wtxn, &42, "i-am-fun")?;
+    /// db.put_with_flags(&mut wtxn, PutFlags::APPEND, &54, "i-am-older-than-you")?;
+    /// db.put_with_flags(&mut wtxn, PutFlags::APPEND_DUP, &54, "ok-but-i-am-better-than-you")?;
+    /// // You can compose flags by OR'ing them
+    /// db.put_with_flags(&mut wtxn, PutFlags::APPEND_DUP | PutFlags::NO_OVERWRITE, &55, "welcome")?;
     ///
-    /// let ret = db.get(&mut wtxn, &27)?;
-    /// assert_eq!(ret, Some("i-am-twenty-seven"));
+    /// // The NO_DUP_DATA flag will return KeyExist if we try to insert the exact same key/value pair.
+    /// let ret = db.put_with_flags(&mut wtxn, PutFlags::NO_DUP_DATA, &54, "ok-but-i-am-better-than-you");
+    /// assert!(matches!(ret, Err(Error::Mdb(MdbError::KeyExist))));
     ///
-    /// // Be wary if you insert at the end unsorted you get the KEYEXIST error.
-    /// assert!(db.append(&mut wtxn, &1, "Oh No").is_err());
+    /// // The NO_OVERWRITE flag will return KeyExist if we try to insert something with an already existing key.
+    /// let ret = db.put_with_flags(&mut wtxn, PutFlags::NO_OVERWRITE, &54, "there-can-be-only-one-data");
+    /// assert!(matches!(ret, Err(Error::Mdb(MdbError::KeyExist))));
     ///
+    /// let mut iter = db.iter(&wtxn)?;
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-fun")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-so-cool")));
+    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-the-king")));
+    /// assert_eq!(iter.next().transpose()?, Some((54, "i-am-older-than-you")));
+    /// assert_eq!(iter.next().transpose()?, Some((54, "ok-but-i-am-better-than-you")));
+    /// assert_eq!(iter.next().transpose()?, Some((55, "welcome")));
+    /// assert_eq!(iter.next().transpose()?, None);
+    ///
+    /// drop(iter);
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn append<'a>(&self, txn: &mut RwTxn, key: &'a KC::EItem, data: &'a DC::EItem) -> Result<()>
+    pub fn put_with_flags<'a>(
+        &self,
+        txn: &mut RwTxn,
+        flags: PutFlags,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<()>
     where
         KC: BytesEncode<'a>,
         DC: BytesEncode<'a>,
@@ -1788,7 +1812,7 @@ impl<KC, DC> Database<KC, DC> {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = ffi::MDB_APPEND;
+        let flags = flags.bits();
 
         unsafe {
             mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
@@ -1797,7 +1821,7 @@ impl<KC, DC> Database<KC, DC> {
         Ok(())
     }
 
-    /// Deletes a key-value pairs in this database.
+    /// Deletes a key-value pair in this database.
     ///
     /// If the key does not exist, then `false` is returned.
     ///

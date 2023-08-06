@@ -339,7 +339,12 @@ impl<'txn> RwCursor<'txn> {
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn append(&mut self, key: &[u8], data: &[u8]) -> Result<()> {
+    pub unsafe fn put_current_with_flags(
+        &mut self,
+        flags: PutFlags,
+        key: &[u8],
+        data: &[u8],
+    ) -> Result<()> {
         let mut key_val = crate::into_val(key);
         let mut data_val = crate::into_val(data);
 
@@ -348,7 +353,7 @@ impl<'txn> RwCursor<'txn> {
             self.cursor.cursor,
             &mut key_val,
             &mut data_val,
-            ffi::MDB_APPEND,
+            flags.bits(),
         ));
 
         result.map_err(Into::into)

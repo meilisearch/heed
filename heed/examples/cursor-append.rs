@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use heed::types::*;
-use heed::{Database, EnvOpenOptions};
+use heed::{Database, EnvOpenOptions, PutFlags};
 
 // In this test we are checking that we can append ordered entries in one
 // database even if there is multiple databases which already contain entries.
@@ -29,9 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We try to append ordered entries in the second database.
     let mut iter = second.iter_mut(&mut wtxn)?;
 
-    unsafe { iter.append("aaaa", "lol")? };
-    unsafe { iter.append("abcd", "lol")? };
-    unsafe { iter.append("bcde", "lol")? };
+    unsafe { iter.put_current_with_flags(PutFlags::APPEND, "aaaa", "lol")? };
+    unsafe { iter.put_current_with_flags(PutFlags::APPEND, "abcd", "lol")? };
+    unsafe { iter.put_current_with_flags(PutFlags::APPEND, "bcde", "lol")? };
 
     drop(iter);
 
