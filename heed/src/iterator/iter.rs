@@ -161,7 +161,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
             self.move_on_first = false;
-            self.cursor.move_on_first()
+            self.cursor.move_on_first(IM::MOVE_OPERATION)
         } else {
             self.cursor.move_on_next(IM::MOVE_OPERATION)
         };
@@ -178,9 +178,9 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            self.cursor.move_on_last()
+            self.cursor.move_on_last(IM::MOVE_OPERATION)
         } else {
-            match (self.cursor.current(), self.cursor.move_on_last()) {
+            match (self.cursor.current(), self.cursor.move_on_last(IM::MOVE_OPERATION)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -383,7 +383,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
             self.move_on_first = false;
-            self.cursor.move_on_first()
+            self.cursor.move_on_first(IM::MOVE_OPERATION)
         } else {
             self.cursor.move_on_next(IM::MOVE_OPERATION)
         };
@@ -400,9 +400,9 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            self.cursor.move_on_last()
+            self.cursor.move_on_last(IM::MOVE_OPERATION)
         } else {
-            match (self.cursor.current(), self.cursor.move_on_last()) {
+            match (self.cursor.current(), self.cursor.move_on_last(IM::MOVE_OPERATION)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -494,7 +494,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            self.cursor.move_on_last()
+            self.cursor.move_on_last(IM::MOVE_OPERATION)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
@@ -511,9 +511,9 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
-            self.cursor.move_on_first()
+            self.cursor.move_on_first(IM::MOVE_OPERATION)
         } else {
-            match (self.cursor.current(), self.cursor.move_on_first()) {
+            match (self.cursor.current(), self.cursor.move_on_first(IM::MOVE_OPERATION)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -718,7 +718,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            self.cursor.move_on_last()
+            self.cursor.move_on_last(IM::MOVE_OPERATION)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
@@ -735,9 +735,9 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
-            self.cursor.move_on_first()
+            self.cursor.move_on_first(IM::MOVE_OPERATION)
         } else {
-            match (self.cursor.current(), self.cursor.move_on_first()) {
+            match (self.cursor.current(), self.cursor.move_on_first(IM::MOVE_OPERATION)) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }

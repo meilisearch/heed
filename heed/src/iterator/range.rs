@@ -22,7 +22,7 @@ fn move_on_range_end<'txn>(
         Bound::Excluded(end) => cursor
             .move_on_key_greater_than_or_equal_to(end)
             .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup)),
-        Bound::Unbounded => cursor.move_on_last(),
+        Bound::Unbounded => cursor.move_on_last(MoveOperation::NoDup),
     }
 }
 
@@ -38,7 +38,7 @@ fn move_on_range_start<'txn>(
             retreat_key(start);
             result
         }
-        Bound::Unbounded => cursor.move_on_first(),
+        Bound::Unbounded => cursor.move_on_first(MoveOperation::NoDup),
     }
 }
 

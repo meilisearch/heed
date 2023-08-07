@@ -6,6 +6,7 @@ use std::{any, fmt, marker, mem, ptr};
 use types::{DecodeIgnore, LazyDecode};
 
 use crate::cursor::MoveOperation;
+use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::mdb::lmdb_flags::{AllDatabaseFlags, DatabaseFlags};
@@ -92,7 +93,7 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
         self
     }
 
-    /// Specify the set of flags to use to open the database.
+    /// Specify the set of flags used to open the database.
     pub fn flags(&mut self, flags: DatabaseFlags) -> &mut Self {
         self.flags = AllDatabaseFlags::from_bits(flags.bits()).unwrap();
         self
@@ -339,6 +340,73 @@ impl<KC, DC> Database<KC, DC> {
             }
             Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Returns an iterator over all of the values of a single key.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI64 = I64<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.database_options()
+    ///     .types::<BEI64, BEI64>()
+    ///     .flags(DatabaseFlags::DUP_SORT)
+    ///     .name("dup-sort")
+    ///     .create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &68, &120)?;
+    /// db.put(&mut wtxn, &68, &121)?;
+    /// db.put(&mut wtxn, &68, &122)?;
+    /// db.put(&mut wtxn, &68, &123)?;
+    /// db.put(&mut wtxn, &92, &32)?;
+    /// db.put(&mut wtxn, &35, &120)?;
+    /// db.put(&mut wtxn, &0, &120)?;
+    /// db.put(&mut wtxn, &42, &120)?;
+    ///
+    /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+    /// assert_eq!(iter.next().transpose()?, None);
+    /// drop(iter);
+    ///
+    /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.last().transpose()?, Some((68, 123)));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn get_duplicates<'a, 'txn>(
+        &self,
+        txn: &'txn RoTxn,
+        key: &'a KC::EItem,
+    ) -> Result<Option<RoIter<'txn, KC, DC, MoveOnCurrentKeyDuplicates>>>
+    where
+        KC: BytesEncode<'a>,
+    {
+        assert_eq_env_db_txn!(self, txn);
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        if cursor.move_on_key(&key_bytes)? {
+            Ok(Some(RoIter::new(cursor)))
+        } else {
+            Ok(None)
         }
     }
 
@@ -662,7 +730,7 @@ impl<KC, DC> Database<KC, DC> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        match cursor.move_on_first() {
+        match cursor.move_on_first(MoveOperation::Any) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
                 (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
@@ -715,7 +783,7 @@ impl<KC, DC> Database<KC, DC> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        match cursor.move_on_last() {
+        match cursor.move_on_last(MoveOperation::Any) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
                 (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),

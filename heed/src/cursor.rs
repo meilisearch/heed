@@ -42,9 +42,25 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_first(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_first(&mut self, op: MoveOperation) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
+
+        let flag = match dbg!(op) {
+            MoveOperation::Any => ffi::cursor_op::MDB_FIRST,
+            MoveOperation::Dup => {
+                unsafe {
+                    mdb_result(ffi::mdb_cursor_get(
+                        self.cursor,
+                        ptr::null_mut(),
+                        &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
+                        ffi::cursor_op::MDB_FIRST_DUP,
+                    ))?
+                };
+                ffi::cursor_op::MDB_GET_CURRENT
+            }
+            MoveOperation::NoDup => ffi::cursor_op::MDB_FIRST,
+        };
 
         // Move the cursor on the first database key
         let result = unsafe {
@@ -52,7 +68,7 @@ impl<'txn> RoCursor<'txn> {
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::cursor_op::MDB_FIRST,
+                flag,
             ))
         };
 
@@ -67,9 +83,25 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_last(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
+    pub fn move_on_last(&mut self, op: MoveOperation) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
+
+        let flag = match op {
+            MoveOperation::Any => ffi::cursor_op::MDB_LAST,
+            MoveOperation::Dup => {
+                unsafe {
+                    mdb_result(ffi::mdb_cursor_get(
+                        self.cursor,
+                        ptr::null_mut(),
+                        &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
+                        ffi::cursor_op::MDB_LAST_DUP,
+                    ))?
+                };
+                ffi::cursor_op::MDB_GET_CURRENT
+            }
+            MoveOperation::NoDup => ffi::cursor_op::MDB_LAST,
+        };
 
         // Move the cursor on the first database key
         let result = unsafe {
@@ -77,7 +109,7 @@ impl<'txn> RoCursor<'txn> {
                 self.cursor,
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
-                ffi::cursor_op::MDB_LAST,
+                flag,
             ))
         };
 
@@ -88,6 +120,26 @@ impl<'txn> RoCursor<'txn> {
                 Ok(Some((key, data)))
             }
             Err(e) if e.not_found() => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn move_on_key(&mut self, key: &[u8]) -> Result<bool> {
+        let mut key_val = unsafe { crate::into_val(key) };
+
+        // Move the cursor to the specified key
+        let result = unsafe {
+            mdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                &mut key_val,
+                &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
+                ffi::cursor_op::MDB_SET,
+            ))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
             Err(e) => Err(e.into()),
         }
     }
@@ -155,7 +207,7 @@ impl<'txn> RoCursor<'txn> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
-        let flag = match op {
+        let flag = match dbg!(op) {
             MoveOperation::Any => ffi::cursor_op::MDB_NEXT,
             MoveOperation::Dup => ffi::cursor_op::MDB_NEXT_DUP,
             MoveOperation::NoDup => ffi::cursor_op::MDB_NEXT_NODUP,
