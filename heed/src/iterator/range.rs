@@ -6,6 +6,7 @@ use types::LazyDecode;
 
 use super::{advance_key, retreat_key};
 use crate::cursor::MoveOperation;
+use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
 
 fn move_on_range_end<'txn>(
@@ -42,25 +43,22 @@ fn move_on_range_start<'txn>(
 }
 
 /// A read-only range iterator structure.
-pub struct RoRange<'txn, KC, DC> {
+pub struct RoRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
-    move_operation: MoveOperation,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
+    _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
+impl<'txn, KC, DC, IM> RoRange<'txn, KC, DC, IM> {
     pub(crate) fn new(
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-        move_operation: MoveOperation,
-    ) -> RoRange<'txn, KC, DC> {
+    ) -> RoRange<'txn, KC, DC, IM> {
         RoRange {
             cursor,
-            move_operation,
             move_on_start: true,
             start_bound,
             end_bound,
@@ -71,22 +69,35 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(&mut self) {
-        self.move_operation = MoveOperation::NoDup;
+    pub fn move_between_keys(self) -> RoRange<'txn, KC, DC, MoveBetweenKeys> {
+        RoRange {
+            cursor: self.cursor,
+            move_on_start: self.move_on_start,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Move through key/values entries and output duplicate values.
     ///
     /// For more info, see [`RoIter::move_through_duplicate_values`].
-    pub fn move_through_duplicate_values(&mut self) {
-        self.move_operation = MoveOperation::Any;
+    pub fn move_through_duplicate_values(
+        self,
+    ) -> RoRange<'txn, KC, DC, MoveThroughDuplicateValues> {
+        RoRange {
+            cursor: self.cursor,
+            move_on_start: self.move_on_start,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2> {
+    pub fn remap_types<KC2, DC2>(self) -> RoRange<'txn, KC2, DC2, IM> {
         RoRange {
             cursor: self.cursor,
-            move_operation: self.move_operation,
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -95,25 +106,26 @@ impl<'txn, KC, DC> RoRange<'txn, KC, DC> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRange<'txn, KC2, DC> {
+    pub fn remap_key_type<KC2>(self) -> RoRange<'txn, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRange<'txn, KC, DC2> {
+    pub fn remap_data_type<DC2>(self) -> RoRange<'txn, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRange<'txn, KC, LazyDecode<DC>> {
+    pub fn lazily_decode_data(self) -> RoRange<'txn, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RoRange<'txn, KC, DC>
+impl<'txn, KC, DC, IM> Iterator for RoRange<'txn, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -122,7 +134,7 @@ where
             self.move_on_start = false;
             move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
-            self.cursor.move_on_next(self.move_operation)
+            self.cursor.move_on_next(IM::MOVE_OPERATION)
         };
 
         match result {
@@ -184,25 +196,22 @@ where
 }
 
 /// A read-write range iterator structure.
-pub struct RwRange<'txn, KC, DC> {
+pub struct RwRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
-    move_operation: MoveOperation,
     move_on_start: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
+    _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
+impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
     pub(crate) fn new(
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-        move_operation: MoveOperation,
-    ) -> RwRange<'txn, KC, DC> {
+    ) -> RwRange<'txn, KC, DC, IM> {
         RwRange {
             cursor,
-            move_operation,
             move_on_start: true,
             start_bound,
             end_bound,
@@ -293,7 +302,7 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
-    /// For more info, see [`RoIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_flags`].
     ///
     /// # Safety
     ///
@@ -323,11 +332,12 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         self.cursor.put_current_with_flags(flags, &key_bytes, &data_bytes)
     }
 
-    /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2> {
+    /// Move on the first value of keys, ignoring duplicate values.
+    ///
+    /// For more info, see [`RoIter::move_between_keys`].
+    pub fn move_between_keys(self) -> RwRange<'txn, KC, DC, MoveBetweenKeys> {
         RwRange {
             cursor: self.cursor,
-            move_operation: self.move_operation,
             move_on_start: self.move_on_start,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -335,40 +345,53 @@ impl<'txn, KC, DC> RwRange<'txn, KC, DC> {
         }
     }
 
-    /// Move on the first value of keys, ignoring duplicate values.
-    ///
-    /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(&mut self) {
-        self.move_operation = MoveOperation::NoDup;
-    }
-
     /// Move through key/values entries and output duplicate values.
     ///
     /// For more info, see [`RoIter::move_through_duplicate_values`].
-    pub fn move_through_duplicate_values(&mut self) {
-        self.move_operation = MoveOperation::Any;
+    pub fn move_through_duplicate_values(
+        self,
+    ) -> RwRange<'txn, KC, DC, MoveThroughDuplicateValues> {
+        RwRange {
+            cursor: self.cursor,
+            move_on_start: self.move_on_start,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
+    }
+
+    /// Change the codec types of this iterator, specifying the codecs.
+    pub fn remap_types<KC2, DC2>(self) -> RwRange<'txn, KC2, DC2, IM> {
+        RwRange {
+            cursor: self.cursor,
+            move_on_start: self.move_on_start,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRange<'txn, KC2, DC> {
+    pub fn remap_key_type<KC2>(self) -> RwRange<'txn, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRange<'txn, KC, DC2> {
+    pub fn remap_data_type<DC2>(self) -> RwRange<'txn, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRange<'txn, KC, LazyDecode<DC>> {
+    pub fn lazily_decode_data(self) -> RwRange<'txn, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RwRange<'txn, KC, DC>
+impl<'txn, KC, DC, IM> Iterator for RwRange<'txn, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -377,7 +400,7 @@ where
             self.move_on_start = false;
             move_on_range_start(&mut self.cursor, &mut self.start_bound)
         } else {
-            self.cursor.move_on_next(self.move_operation)
+            self.cursor.move_on_next(IM::MOVE_OPERATION)
         };
 
         match result {
@@ -439,25 +462,22 @@ where
 }
 
 /// A reverse read-only range iterator structure.
-pub struct RoRevRange<'txn, KC, DC> {
+pub struct RoRevRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
-    move_operation: MoveOperation,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
+    _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
+impl<'txn, KC, DC, IM> RoRevRange<'txn, KC, DC, IM> {
     pub(crate) fn new(
         cursor: RoCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-        move_operation: MoveOperation,
-    ) -> RoRevRange<'txn, KC, DC> {
+    ) -> RoRevRange<'txn, KC, DC, IM> {
         RoRevRange {
             cursor,
-            move_operation,
             move_on_end: true,
             start_bound,
             end_bound,
@@ -468,22 +488,35 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(&mut self) {
-        self.move_operation = MoveOperation::NoDup;
+    pub fn move_between_keys(self) -> RoRevRange<'txn, KC, DC, MoveBetweenKeys> {
+        RoRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Move through key/values entries and output duplicate values.
     ///
     /// For more info, see [`RoIter::move_through_duplicate_values`].
-    pub fn move_through_duplicate_values(&mut self) {
-        self.move_operation = MoveOperation::Any;
+    pub fn move_through_duplicate_values(
+        self,
+    ) -> RoRevRange<'txn, KC, DC, MoveThroughDuplicateValues> {
+        RoRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRevRange<'txn, KC2, DC2> {
+    pub fn remap_types<KC2, DC2>(self) -> RoRevRange<'txn, KC2, DC2, IM> {
         RoRevRange {
             cursor: self.cursor,
-            move_operation: self.move_operation,
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -492,25 +525,26 @@ impl<'txn, KC, DC> RoRevRange<'txn, KC, DC> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRevRange<'txn, KC2, DC> {
+    pub fn remap_key_type<KC2>(self) -> RoRevRange<'txn, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRevRange<'txn, KC, DC2> {
+    pub fn remap_data_type<DC2>(self) -> RoRevRange<'txn, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRevRange<'txn, KC, LazyDecode<DC>> {
+    pub fn lazily_decode_data(self) -> RoRevRange<'txn, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RoRevRange<'txn, KC, DC>
+impl<'txn, KC, DC, IM> Iterator for RoRevRange<'txn, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -519,7 +553,7 @@ where
             self.move_on_end = false;
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            self.cursor.move_on_prev(self.move_operation)
+            self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
 
         match result {
@@ -583,25 +617,22 @@ where
 }
 
 /// A reverse read-write range iterator structure.
-pub struct RwRevRange<'txn, KC, DC> {
+pub struct RwRevRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
-    move_operation: MoveOperation,
     move_on_end: bool,
     start_bound: Bound<Vec<u8>>,
     end_bound: Bound<Vec<u8>>,
-    _phantom: marker::PhantomData<(KC, DC)>,
+    _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
+impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
     pub(crate) fn new(
         cursor: RwCursor<'txn>,
         start_bound: Bound<Vec<u8>>,
         end_bound: Bound<Vec<u8>>,
-        move_operation: MoveOperation,
-    ) -> RwRevRange<'txn, KC, DC> {
+    ) -> RwRevRange<'txn, KC, DC, IM> {
         RwRevRange {
             cursor,
-            move_operation,
             move_on_end: true,
             start_bound,
             end_bound,
@@ -692,7 +723,7 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
-    /// For more info, see [`RoIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_flags`].
     ///
     /// # Safety
     ///
@@ -725,22 +756,35 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(&mut self) {
-        self.move_operation = MoveOperation::NoDup;
+    pub fn move_between_keys(self) -> RwRevRange<'txn, KC, DC, MoveBetweenKeys> {
+        RwRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Move through key/values entries and output duplicate values.
     ///
     /// For more info, see [`RoIter::move_through_duplicate_values`].
-    pub fn move_through_duplicate_values(&mut self) {
-        self.move_operation = MoveOperation::Any;
+    pub fn move_through_duplicate_values(
+        self,
+    ) -> RwRevRange<'txn, KC, DC, MoveThroughDuplicateValues> {
+        RwRevRange {
+            cursor: self.cursor,
+            move_on_end: self.move_on_end,
+            start_bound: self.start_bound,
+            end_bound: self.end_bound,
+            _phantom: marker::PhantomData,
+        }
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRevRange<'txn, KC2, DC2> {
+    pub fn remap_types<KC2, DC2>(self) -> RwRevRange<'txn, KC2, DC2, IM> {
         RwRevRange {
             cursor: self.cursor,
-            move_operation: self.move_operation,
             move_on_end: self.move_on_end,
             start_bound: self.start_bound,
             end_bound: self.end_bound,
@@ -749,25 +793,26 @@ impl<'txn, KC, DC> RwRevRange<'txn, KC, DC> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRevRange<'txn, KC2, DC> {
+    pub fn remap_key_type<KC2>(self) -> RwRevRange<'txn, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRevRange<'txn, KC, DC2> {
+    pub fn remap_data_type<DC2>(self) -> RwRevRange<'txn, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRevRange<'txn, KC, LazyDecode<DC>> {
+    pub fn lazily_decode_data(self) -> RwRevRange<'txn, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC> Iterator for RwRevRange<'txn, KC, DC>
+impl<'txn, KC, DC, IM> Iterator for RwRevRange<'txn, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
 
@@ -776,7 +821,7 @@ where
             self.move_on_end = false;
             move_on_range_end(&mut self.cursor, &self.end_bound)
         } else {
-            self.cursor.move_on_prev(self.move_operation)
+            self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
 
         match result {

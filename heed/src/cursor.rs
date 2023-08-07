@@ -5,18 +5,6 @@ use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
-/// The way the `Iterator::next/prev` method behaves towards DUP data.
-#[derive(Debug, Clone, Copy)]
-pub enum MoveOperation {
-    /// Move on the next/prev entry, wether it's the same key or not.
-    Any,
-    /// Move on the next/prev data of the current key.
-    Dup,
-    /// Move on the next/prev entry which is the next/prev key.
-    /// Skip the multiple values of the current key.
-    NoDup,
-}
-
 pub struct RoCursor<'txn> {
     cursor: *mut ffi::MDB_cursor,
     _marker: marker::PhantomData<&'txn ()>,
@@ -372,4 +360,16 @@ impl DerefMut for RwCursor<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.cursor
     }
+}
+
+/// The way the `Iterator::next/prev` method behaves towards DUP data.
+#[derive(Debug, Clone, Copy)]
+pub enum MoveOperation {
+    /// Move on the next/prev entry, wether it's the same key or not.
+    Any,
+    /// Move on the next/prev data of the current key.
+    Dup,
+    /// Move on the next/prev entry which is the next/prev key.
+    /// Skip the multiple values of the current key.
+    NoDup,
 }

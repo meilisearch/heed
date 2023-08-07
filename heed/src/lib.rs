@@ -51,6 +51,7 @@
 mod cursor;
 mod database;
 mod env;
+pub mod iteration_method;
 mod iterator;
 mod mdb;
 mod reserved_space;

@@ -858,8 +858,7 @@ impl<KC, DC> Database<KC, DC> {
     /// ```
     pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
-
-        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
@@ -914,7 +913,7 @@ impl<KC, DC> Database<KC, DC> {
     pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
@@ -956,7 +955,7 @@ impl<KC, DC> Database<KC, DC> {
     pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value\
@@ -1012,7 +1011,7 @@ impl<KC, DC> Database<KC, DC> {
     pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
@@ -1089,8 +1088,7 @@ impl<KC, DC> Database<KC, DC> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RoCursor::new(txn, self.dbi)
-            .map(|cursor| RoRange::new(cursor, start_bound, end_bound, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable lexicographically ordered iterator of a range of
@@ -1181,8 +1179,7 @@ impl<KC, DC> Database<KC, DC> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RwCursor::new(txn, self.dbi)
-            .map(|cursor| RwRange::new(cursor, start_bound, end_bound, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a reversed lexicographically ordered iterator of a range of key-value
@@ -1260,8 +1257,7 @@ impl<KC, DC> Database<KC, DC> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RoCursor::new(txn, self.dbi)
-            .map(|cursor| RoRevRange::new(cursor, start_bound, end_bound, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of a range of
@@ -1352,8 +1348,7 @@ impl<KC, DC> Database<KC, DC> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RwCursor::new(txn, self.dbi)
-            .map(|cursor| RwRevRange::new(cursor, start_bound, end_bound, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1409,8 +1404,7 @@ impl<KC, DC> Database<KC, DC> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RoCursor::new(txn, self.dbi)
-            .map(|cursor| RoPrefix::new(cursor, prefix_bytes, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1479,8 +1473,7 @@ impl<KC, DC> Database<KC, DC> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RwCursor::new(txn, self.dbi)
-            .map(|cursor| RwPrefix::new(cursor, prefix_bytes, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1536,8 +1529,7 @@ impl<KC, DC> Database<KC, DC> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RoCursor::new(txn, self.dbi)
-            .map(|cursor| RoRevPrefix::new(cursor, prefix_bytes, MoveOperation::Any))
+        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
@@ -1606,8 +1598,7 @@ impl<KC, DC> Database<KC, DC> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RwCursor::new(txn, self.dbi)
-            .map(|cursor| RwRevPrefix::new(cursor, prefix_bytes, MoveOperation::Any))
+        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Insert a key-value pair in this database. The entry is written with no specific flag.
