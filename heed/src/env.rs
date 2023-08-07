@@ -25,7 +25,7 @@ use crate::cursor::MoveOperation;
 use crate::database::DatabaseOpenOptions;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::mdb::lmdb_flags::DatabaseFlags;
+use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::{Database, EnvFlags, Error, Result, RoCursor, RoTxn, RwTxn, Unspecified};
 
 /// The list of opened environments, the value is an optional environment, it is None
@@ -521,7 +521,7 @@ impl Env {
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         types: (TypeId, TypeId),
-        flags: DatabaseFlags,
+        flags: AllDatabaseFlags,
     ) -> Result<u32> {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
         match self.raw_open_dbi(raw_txn, name, flags.bits()) {

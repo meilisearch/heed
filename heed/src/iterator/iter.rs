@@ -27,7 +27,7 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::EnvOpenOptions;
+    /// # use heed::{DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -42,7 +42,7 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
-    ///     .dup_sort(true)
+    ///     .flags(DatabaseFlags::DUP_SORT)
     ///     .name("dup-sort")
     ///     .create(&mut wtxn)?;
     ///
@@ -76,7 +76,7 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::EnvOpenOptions;
+    /// # use heed::{DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -91,7 +91,7 @@ impl<'txn, KC, DC> RoIter<'txn, KC, DC> {
     /// let mut wtxn = env.write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
-    ///     .dup_sort(true)
+    ///     .flags(DatabaseFlags::DUP_SORT)
     ///     .name("dup-sort")
     ///     .create(&mut wtxn)?;
     ///

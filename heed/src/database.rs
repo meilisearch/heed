@@ -8,7 +8,7 @@ use types::{DecodeIgnore, LazyDecode};
 use crate::cursor::MoveOperation;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::mdb::lmdb_flags::DatabaseFlags;
+use crate::mdb::lmdb_flags::{AllDatabaseFlags, DatabaseFlags};
 use crate::*;
 
 /// Options and flags which can be used to configure how a [`Database`] is opened.
@@ -55,7 +55,7 @@ pub struct DatabaseOpenOptions<'e, KC, DC> {
     env: &'e Env,
     types: marker::PhantomData<(KC, DC)>,
     name: Option<String>,
-    flags: DatabaseFlags,
+    flags: AllDatabaseFlags,
 }
 
 impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified> {
@@ -65,7 +65,7 @@ impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified> {
             env,
             types: Default::default(),
             name: None,
-            flags: DatabaseFlags::empty(),
+            flags: AllDatabaseFlags::empty(),
         }
     }
 }
@@ -92,17 +92,9 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
         self
     }
 
-    /// Enable the `DUPSORT` support for this database which accepts sorted duplicates.
-    ///
-    /// Note that enabling this feature makes it possible to have multiple values associated
-    /// with the same key but reduces the maximum length of the values to the same as keys,
-    /// 511 bytes by default.
-    pub fn dup_sort(&mut self, enable: bool) -> &mut Self {
-        if enable {
-            self.flags.insert(DatabaseFlags::DUP_SORT);
-        } else {
-            self.flags.remove(DatabaseFlags::DUP_SORT);
-        }
+    /// Specify the set of flags to use to open the database.
+    pub fn flags(&mut self, flags: DatabaseFlags) -> &mut Self {
+        self.flags = AllDatabaseFlags::from_bits(flags.bits()).unwrap();
         self
     }
 
@@ -158,7 +150,7 @@ impl<'e, KC, DC> DatabaseOpenOptions<'e, KC, DC> {
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
         let name = self.name.as_deref();
-        let flags = self.flags | DatabaseFlags::CREATE;
+        let flags = self.flags | AllDatabaseFlags::CREATE;
         match self.env.raw_init_database(wtxn.txn.txn, name, types, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
@@ -1743,7 +1735,7 @@ impl<KC, DC> Database<KC, DC> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PutFlags, Error, MdbError};
+    /// use heed::{Database, PutFlags, DatabaseFlags, Error, MdbError};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1759,7 +1751,7 @@ impl<KC, DC> Database<KC, DC> {
     /// let db = env.database_options()
     ///     .types::<BEI32, Str>()
     ///     .name("dup-i32")
-    ///     .dup_sort(true)
+    ///     .flags(DatabaseFlags::DUP_SORT)
     ///     .create(&mut wtxn)?;
     ///
     /// # db.clear(&mut wtxn)?;

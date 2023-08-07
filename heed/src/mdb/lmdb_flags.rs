@@ -36,11 +36,45 @@ bitflags! {
     /// LMDB database flags (see <http://www.lmdb.tech/doc/group__mdb__dbi__open.html> for more details).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[repr(transparent)]
-    pub struct DatabaseFlags: u32 {
-        /// use sorted duplicates
+    pub struct AllDatabaseFlags: u32 {
+        /// Use reverse string keys.
+        const REVERSE_KEY = ffi::MDB_REVERSEKEY;
+        /// Use sorted duplicates.
         const DUP_SORT = ffi::MDB_DUPSORT;
-        /// create DB if not already existing
+        /// Numeric keys in native byte order: either `u32` or `usize`.
+        /// The keys must all be of the same size.
+        const INTEGER_KEY = ffi::MDB_INTEGERKEY;
+        /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
+        const DUP_FIXED = ffi::MDB_DUPFIXED;
+        /// With [`DatabaseKey::DUP_SORT`], dups are [`DatabaseKey::INTEGER_KEY`]-style integers.
+        const INTEGER_DUP = ffi::MDB_INTEGERDUP;
+        /// With [`DatabaseKey::DUP_SORT`], use reverse string dups.
+        const REVERSE_DUP = ffi::MDB_REVERSEDUP;
+        /// Create DB if not already existing.
         const CREATE = ffi::MDB_CREATE;
+    }
+}
+
+bitflags! {
+    /// LMDB database flags (see <http://www.lmdb.tech/doc/group__mdb__dbi__open.html> for more details).
+    // It is a subset of the whole list of possible flags LMDB exposes but
+    // we only want users to be able to specify these with the DUP flags.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    #[repr(transparent)]
+    pub struct DatabaseFlags: u32 {
+        /// Use reverse string keys.
+        const REVERSE_KEY = ffi::MDB_REVERSEKEY;
+        /// Use sorted duplicates.
+        const DUP_SORT = ffi::MDB_DUPSORT;
+        /// Numeric keys in native byte order: either `u32` or `usize`.
+        /// The keys must all be of the same size.
+        const INTEGER_KEY = ffi::MDB_INTEGERKEY;
+        /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
+        const DUP_FIXED = ffi::MDB_DUPFIXED;
+        /// With [`DatabaseKey::DUP_SORT`], dups are [`DatabaseKey::INTEGER_KEY`]-style integers.
+        const INTEGER_DUP = ffi::MDB_INTEGERDUP;
+        /// With [`DatabaseKey::DUP_SORT`], use reverse string dups.
+        const REVERSE_DUP = ffi::MDB_REVERSEDUP;
     }
 }
 
