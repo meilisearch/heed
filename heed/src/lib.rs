@@ -141,14 +141,13 @@ impl From<io::Error> for Error {
 }
 
 pub fn lmdb_version() -> (i32, i32, i32) {
-    let mut version = 0;
+    let mut major = mem::MaybeUninit::uninit();
+    let mut minor = mem::MaybeUninit::uninit();
+    let mut patch = mem::MaybeUninit::uninit();
     unsafe {
-        mdb::ffi::mdb_version(&mut version, std::ptr::null_mut(), std::ptr::null_mut());
+        mdb::ffi::mdb_version(major.as_mut_ptr(), minor.as_mut_ptr(), patch.as_mut_ptr());
+        (major.assume_init(), minor.assume_init(), patch.assume_init())
     }
-    let major = version >> 16;
-    let minor = (version >> 8) & 0xFF;
-    let patch = version & 0xFF;
-    (major as i32, minor as i32, patch as i32)
 }
 
 /// Either a success or an [`Error`].
