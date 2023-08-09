@@ -1872,9 +1872,10 @@ impl<KC, DC> Database<KC, DC> {
         Ok(())
     }
 
-    /// Deletes a key-value pair in this database.
+    /// Deletes an entry or every duplicate data items of a key
+    /// if the database supports duplicate data items.
     ///
-    /// If the key does not exist, then `false` is returned.
+    /// If the entry does not exist, then `false` is returned.
     ///
     /// ```
     /// # use std::fs;
@@ -1925,6 +1926,91 @@ impl<KC, DC> Database<KC, DC> {
         let result = unsafe {
             mdb_result(ffi::mdb_del(txn.txn.txn, self.dbi, &mut key_val, ptr::null_mut()))
         };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Deletes a single key-value pair in this database.
+    ///
+    /// If the database doesn't support duplicate data items the data is ignored.
+    /// If the key does not exist, then `false` is returned.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI64 = I64<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.database_options()
+    ///     .types::<BEI64, BEI64>()
+    ///     .flags(DatabaseFlags::DUP_SORT)
+    ///     .name("dup-sort")
+    ///     .create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &68, &120)?;
+    /// db.put(&mut wtxn, &68, &121)?;
+    /// db.put(&mut wtxn, &68, &122)?;
+    /// db.put(&mut wtxn, &68, &123)?;
+    /// db.put(&mut wtxn, &92, &32)?;
+    /// db.put(&mut wtxn, &35, &120)?;
+    /// db.put(&mut wtxn, &0, &120)?;
+    /// db.put(&mut wtxn, &42, &120)?;
+    ///
+    /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+    /// assert_eq!(iter.next().transpose()?, None);
+    /// drop(iter);
+    ///
+    /// assert!(db.delete_one_duplicate(&mut wtxn, &68, &121)?, "The entry must exist");
+    ///
+    /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// // No more (68, 121) returned here!
+    /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+    /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+    /// assert_eq!(iter.next().transpose()?, None);
+    /// drop(iter);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn delete_one_duplicate<'a>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a>,
+    {
+        assert_eq_env_db_txn!(self, txn);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+
+        let result =
+            unsafe { mdb_result(ffi::mdb_del(txn.txn.txn, self.dbi, &mut key_val, &mut data_val)) };
 
         match result {
             Ok(()) => Ok(true),
