@@ -4,7 +4,7 @@
 //! For specific types you can choose:
 //!   - [`Str`] to store [`str`](primitive@str)s
 //!   - [`Unit`] to store `()` types
-//!   - [`SerdeBincode`] or [`SerdeJson`] to store [`Serialize`]/[`Deserialize`] types
+//!   - [`SerdeBincode`],  [`SerdeJson`], or [`SerdeRmp`] to store [`Serialize`]/[`Deserialize`] types
 //!
 //! But if you want to store big types that can be efficiently deserialized then
 //! here is a little table to help you in your quest:
@@ -39,6 +39,9 @@ mod serde_bincode;
 
 #[cfg(feature = "serde-json")]
 mod serde_json;
+
+#[cfg(feature = "serde-rmp")]
+mod serde_rmp;
 
 use heed_traits::BoxedError;
 
@@ -77,3 +80,5 @@ impl heed_traits::BytesDecode<'_> for DecodeIgnore {
 pub use self::serde_bincode::SerdeBincode;
 #[cfg(feature = "serde-json")]
 pub use self::serde_json::SerdeJson;
+#[cfg(feature = "serde-rmp")]
+pub use self::serde_rmp::SerdeRmp;
