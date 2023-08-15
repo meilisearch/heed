@@ -75,7 +75,9 @@ jobs:
       - name: Run the examples
         run: |
           cargo clean
-          cargo run --example 2>&1 | grep -E '^ ' | xargs -n1 cargo run --example
+          # rmp-serde needs a feature activated, so we'll just run it separately.
+          cargo run --example 2>&1 | grep -E '^ ' | awk '!/rmp-serde/' | xargs -n1 cargo run --example
+          cargo run --example rmp-serde --features serde-rmp
 
   fmt:
     name: Ensure the heed project is formatted
