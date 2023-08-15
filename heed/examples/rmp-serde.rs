@@ -2,9 +2,7 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use heed::bytemuck::{Pod, Zeroable};
-use heed::byteorder::BE;
-use heed::types::*;
+use heed::types::{SerdeRmp, Str};
 use heed::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
