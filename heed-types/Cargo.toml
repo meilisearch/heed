@@ -24,7 +24,7 @@ rmp-serde = { version = "1.1.2", optional = true }
 rand = "0.8.5"
 
 [features]
-default = ["serde-bincode", "serde-json", "serde-rmp"]
+default = ["serde-bincode", "serde-json"]
 serde-bincode = ["serde", "bincode"]
 serde-json = ["serde", "serde_json"]
 serde-rmp = ["serde", "rmp-serde"]
