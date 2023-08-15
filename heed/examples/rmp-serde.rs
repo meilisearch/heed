@@ -6,7 +6,6 @@ use heed::types::{SerdeRmp, Str};
 use heed::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
-
 fn main() -> Result<(), Box<dyn Error>> {
     let path = Path::new("target").join("heed.mdb");
 
