@@ -200,6 +200,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RoIter<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoIter").finish()
+    }
+}
+
 /// A read-write iterator structure.
 pub struct RwIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -422,6 +428,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RwIter<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwIter").finish()
+    }
+}
+
 /// A reverse read-only iterator structure.
 pub struct RoRevIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
@@ -530,6 +542,12 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RoRevIter<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoRevIter").finish()
     }
 }
 
@@ -754,5 +772,11 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RwRevIter<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwRevIter").finish()
     }
 }

@@ -195,6 +195,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RoRange<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoRange").finish()
+    }
+}
+
 /// A read-write range iterator structure.
 pub struct RwRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -461,6 +467,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RwRange<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwRange").finish()
+    }
+}
+
 /// A reverse read-only range iterator structure.
 pub struct RoRevRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
@@ -613,6 +625,12 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RoRevRange<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoRevRange").finish()
     }
 }
 
@@ -881,5 +899,11 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RwRevRange<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwRevRange").finish()
     }
 }

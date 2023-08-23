@@ -147,6 +147,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RoPrefix<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoPrefix").finish()
+    }
+}
+
 /// A read-write prefix iterator structure.
 pub struct RwPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -387,6 +393,12 @@ where
     }
 }
 
+impl<KC, DC, IM> fmt::Debug for RwPrefix<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwPrefix").finish()
+    }
+}
+
 /// A reverse read-only prefix iterator structure.
 pub struct RoRevPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
@@ -513,6 +525,12 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RoRevPrefix").finish()
     }
 }
 
@@ -755,5 +773,11 @@ where
             Ok(None) => None,
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<KC, DC, IM> fmt::Debug for RwRevPrefix<'_, KC, DC, IM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RwRevPrefix").finish()
     }
 }
