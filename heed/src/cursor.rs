@@ -46,7 +46,7 @@ impl<'txn> RoCursor<'txn> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
-        let flag = match dbg!(op) {
+        let flag = match op {
             MoveOperation::Any => ffi::cursor_op::MDB_FIRST,
             MoveOperation::Dup => {
                 unsafe {
@@ -207,7 +207,7 @@ impl<'txn> RoCursor<'txn> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();
 
-        let flag = match dbg!(op) {
+        let flag = match op {
             MoveOperation::Any => ffi::cursor_op::MDB_NEXT,
             MoveOperation::Dup => ffi::cursor_op::MDB_NEXT_DUP,
             MoveOperation::NoDup => ffi::cursor_op::MDB_NEXT_NODUP,
