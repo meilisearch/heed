@@ -74,3 +74,4 @@ posix-sem = ["lmdb-master-sys/posix-sem"]
 [[example]]
 name = "rmp-serde"
 required-features = ["serde-rmp"]
+
