@@ -21,14 +21,15 @@ build = "build.rs"
 
 [lib]
 name = "lmdb_master_sys"
+doctest = false
 
 [dependencies]
 libc = "0.2.139"
 
 [build-dependencies]
-bindgen = { version = "0.63.0", default-features = false, optional = true, features = ["runtime"] }
+bindgen = { version = "0.66.1", default-features = false, optional = true, features = ["runtime"] }
 cc = "1.0.78"
-doxygen-rs = "0.2.2"
+doxygen-rs = "0.4.2"
 pkg-config = "0.3.26"
 
 [dev-dependencies]

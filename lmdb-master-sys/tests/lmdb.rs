@@ -14,7 +14,7 @@ fn test_lmdb() {
         .status()
         .expect("failed to execute process");
 
-    assert_eq!(make_cmd.success(), true);
+    assert!(make_cmd.success());
 
     let make_test_cmd = Command::new("make")
         .arg("test")
@@ -22,5 +22,5 @@ fn test_lmdb() {
         .status()
         .expect("failed to execute process");
 
-    assert_eq!(make_test_cmd.success(), true);
+    assert!(make_test_cmd.success());
 }

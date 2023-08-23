@@ -49,10 +49,10 @@
 #![warn(missing_docs)]
 
 mod cursor;
-mod db;
+mod database;
 mod env;
+pub mod iteration_method;
 mod iterator;
-mod lazy_decode;
 mod mdb;
 mod reserved_space;
 mod txn;
@@ -64,7 +64,7 @@ use heed_traits as traits;
 pub use {bytemuck, byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::db::{Database, PolyDatabase};
+pub use self::database::{Database, DatabaseOpenOptions};
 pub use self::env::{
     env_closing_event, CompactionOption, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions,
 };
@@ -72,10 +72,9 @@ pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,
 };
-pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::mdb::error::Error as MdbError;
 use self::mdb::ffi::{from_val, into_val};
-pub use self::mdb::flags::Flag;
+pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
@@ -187,6 +186,34 @@ impl From<io::Error> for Error {
 /// Either a success or an [`Error`].
 pub type Result<T> = result::Result<T, Error>;
 
+/// An unspecified type.
+///
+/// It is used as placeholders when creating a database,
+/// do not implement the [`BytesEncode`] and [`BytesDecode`] traits
+/// and therefore can't be used as codecs. You must use the [`Database::remap_types`]
+/// to properly define them.
+pub struct Unspecified;
+
+macro_rules! assert_eq_env_db_txn {
+    ($database:ident, $txn:ident) => {
+        assert!(
+            $database.env_ident == $txn.env_mut_ptr() as usize,
+            "The database environment doesn't match the transaction's environment"
+        );
+    };
+}
+
+macro_rules! assert_eq_env_txn {
+    ($env:expr, $txn:ident) => {
+        assert!(
+            $env.env_mut_ptr() == $txn.env_mut_ptr(),
+            "The environment doesn't match the transaction's environment"
+        );
+    };
+}
+
+pub(crate) use {assert_eq_env_db_txn, assert_eq_env_txn};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,23 +226,3 @@ mod tests {
         give_me_send_sync(error);
     }
 }
-
-macro_rules! assert_eq_env_db_txn {
-    ($database:ident, $txn:ident) => {
-        assert!(
-            $database.env_ident == $txn.env_mut_ptr() as usize,
-            "The database environment doesn't match the transaction's environment"
-        );
-    };
-}
-
-macro_rules! assert_eq_env_txn {
-    ($env:ident, $txn:ident) => {
-        assert!(
-            $env.env_mut_ptr() == $txn.env_mut_ptr(),
-            "The environment doesn't match the transaction's environment"
-        );
-    };
-}
-
-pub(crate) use {assert_eq_env_db_txn, assert_eq_env_txn};

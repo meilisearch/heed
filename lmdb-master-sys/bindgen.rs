@@ -1,7 +1,7 @@
-use bindgen::callbacks::IntKind;
-use bindgen::callbacks::ParseCallbacks;
 use std::env;
 use std::path::PathBuf;
+
+use bindgen::callbacks::{IntKind, ParseCallbacks};
 
 #[derive(Debug)]
 struct Callbacks;
@@ -67,7 +67,6 @@ pub fn generate() {
         .parse_callbacks(Box::new(Callbacks {}))
         .layout_tests(false)
         .prepend_enum_name(false)
-        .rustfmt_bindings(true)
         .generate()
         .expect("Unable to generate bindings");
 

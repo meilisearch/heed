@@ -21,11 +21,12 @@ use std::{fmt, io, mem, ptr, sync};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
+use crate::cursor::MoveOperation;
+use crate::database::DatabaseOpenOptions;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{
-    assert_eq_env_txn, Database, Error, Flag, PolyDatabase, Result, RoCursor, RoTxn, RwTxn,
-};
+use crate::mdb::lmdb_flags::AllDatabaseFlags;
+use crate::{Database, EnvFlags, Error, Result, RoCursor, RoTxn, RwTxn, Unspecified};
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
@@ -102,7 +103,7 @@ pub struct EnvOpenOptions {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
-    flags: u32, // LMDB flags
+    flags: EnvFlags,
 }
 
 impl Default for EnvOpenOptions {
@@ -114,7 +115,12 @@ impl Default for EnvOpenOptions {
 impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
-        EnvOpenOptions { map_size: None, max_readers: None, max_dbs: None, flags: 0 }
+        EnvOpenOptions {
+            map_size: None,
+            max_readers: None,
+            max_dbs: None,
+            flags: EnvFlags::empty(),
+        }
     }
 
     /// Set the size of the memory map to use for this environment.
@@ -139,16 +145,13 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, Flag};
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
-    /// unsafe {
-    ///     env_builder.flag(Flag::NoTls);
-    ///     env_builder.flag(Flag::NoMetaSync);
-    /// }
+    /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = env_builder.open(dir.path())?;
     ///
@@ -180,9 +183,9 @@ impl EnvOpenOptions {
     ///
     /// # Safety
     ///
-    /// It is unsafe to use unsafe LMDB flags such as `NoSync`, `NoMetaSync`, or `NoLock`.
-    pub unsafe fn flag(&mut self, flag: Flag) -> &mut Self {
-        self.flags |= flag as u32;
+    /// It is unsafe to use unsafe LMDB flags such as `NO_SYNC`, `NO_META_SYNC`, or `NO_LOCK`.
+    pub unsafe fn flags(&mut self, flags: EnvFlags) -> &mut Self {
+        self.flags |= flags;
         self
     }
 
@@ -192,7 +195,7 @@ impl EnvOpenOptions {
 
         let path = match canonicalize_path(path.as_ref()) {
             Err(err) => {
-                if err.kind() == NotFound && self.flags & (Flag::NoSubDir as u32) != 0 {
+                if err.kind() == NotFound && self.flags.contains(EnvFlags::NO_SUB_DIR) {
                     let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
                         Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
@@ -250,13 +253,13 @@ impl EnvOpenOptions {
                     // to avoid using the thread local storage, this way we allow users
                     // to use references of RoTxn between threads safely.
                     let flags = if cfg!(feature = "read-txn-no-tls") {
-                        self.flags | Flag::NoTls as u32
+                        self.flags | EnvFlags::NO_TLS
                     } else {
                         self.flags
                     };
 
                     let result =
-                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), flags, 0o600));
+                        mdb_result(ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600));
 
                     match result {
                         Ok(()) => {
@@ -305,7 +308,7 @@ impl fmt::Debug for Env {
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, Option<(TypeId, TypeId)>>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
     path: PathBuf,
 }
 
@@ -365,26 +368,25 @@ impl Env {
     /// # Ok(()) }
     /// ```
     pub fn real_disk_size(&self) -> Result<u64> {
-        let mut fd = std::mem::MaybeUninit::uninit();
+        let mut fd = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr(), fd.as_mut_ptr()))? };
         let fd = unsafe { fd.assume_init() };
         let metadata = unsafe { metadata_from_fd(fd)? };
         Ok(metadata.len())
     }
 
-    /// Check if a flag was specified when opening this environment.
-    pub fn contains_flag(&self, flag: Flag) -> Result<bool> {
-        let flags = self.raw_flags()?;
-        let set = flags & (flag as u32);
-        Ok(set != 0)
+    /// Return the raw flags the environment was opened with.
+    ///
+    /// Returns `None` if the environment flags are different from the [`EnvFlags`] set.
+    pub fn flags(&self) -> Result<Option<EnvFlags>> {
+        self.raw_flags().map(EnvFlags::from_bits)
     }
 
     /// Return the raw flags the environment was opened with.
     pub fn raw_flags(&self) -> Result<u32> {
-        let mut flags = std::mem::MaybeUninit::uninit();
+        let mut flags = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
         let flags = unsafe { flags.assume_init() };
-
         Ok(flags)
     }
 
@@ -413,7 +415,7 @@ impl Env {
 
         let mut size = 0;
 
-        let mut stat = std::mem::MaybeUninit::uninit();
+        let mut stat = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr(), stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
         size += compute_size(stat);
@@ -428,14 +430,14 @@ impl Env {
         // We’re going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
 
-        while let Some((key, _value)) = cursor.move_on_next()? {
+        while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
             if key.contains(&0) {
                 continue;
             }
 
             let key = String::from_utf8(key.to_vec()).unwrap();
             if let Ok(dbi) = self.raw_open_dbi(rtxn.txn, Some(&key), 0) {
-                let mut stat = std::mem::MaybeUninit::uninit();
+                let mut stat = mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
@@ -448,6 +450,11 @@ impl Env {
         }
 
         Ok(size)
+    }
+
+    /// Options and flags which can be used to configure how a [`Database`] is opened.
+    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
+        DatabaseOpenOptions::new(self)
     }
 
     /// Opens a typed database that already exists in this environment.
@@ -477,37 +484,11 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
-        assert_eq_env_txn!(self, rtxn);
-
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(rtxn.txn, name, Some(types), false) {
-            Ok(dbi) => Ok(Some(Database::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
         }
-    }
-
-    /// Opens an untyped database that already exists in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn open_poly_database(
-        &self,
-        rtxn: &RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<PolyDatabase>> {
-        assert_eq_env_txn!(self, rtxn);
-
-        match self.raw_init_database(rtxn.txn, name, None, false) {
-            Ok(dbi) => Ok(Some(PolyDatabase::new(self.env_mut_ptr() as _, dbi))),
-            Err(Error::Mdb(e)) if e.not_found() => Ok(None),
-            Err(e) => Err(e),
-        }
+        options.open(rtxn)
     }
 
     /// Creates a typed database that can already exist in this environment.
@@ -528,34 +509,31 @@ impl Env {
         KC: 'static,
         DC: 'static,
     {
-        assert_eq_env_txn!(self, wtxn);
-
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>());
-        match self.raw_init_database(wtxn.txn.txn, name, Some(types), true) {
-            Ok(dbi) => Ok(Database::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
         }
+        options.create(wtxn)
     }
 
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened as a typed one, an error will be returned.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
-    pub fn create_poly_database(
+    pub(crate) fn raw_init_database(
         &self,
-        wtxn: &mut RwTxn,
+        raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
-    ) -> Result<PolyDatabase> {
-        assert_eq_env_txn!(self, wtxn);
-
-        match self.raw_init_database(wtxn.txn.txn, name, None, true) {
-            Ok(dbi) => Ok(PolyDatabase::new(self.env_mut_ptr() as _, dbi)),
-            Err(e) => Err(e),
+        types: (TypeId, TypeId),
+        flags: AllDatabaseFlags,
+    ) -> Result<u32> {
+        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
+        match self.raw_open_dbi(raw_txn, name, flags.bits()) {
+            Ok(dbi) => {
+                let old_types = lock.entry(dbi).or_insert(types);
+                if *old_types == types {
+                    Ok(dbi)
+                } else {
+                    Err(Error::InvalidDatabaseTyping)
+                }
+            }
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -577,29 +555,6 @@ impl Env {
         unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
 
         Ok(dbi)
-    }
-
-    fn raw_init_database(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        types: Option<(TypeId, TypeId)>,
-        create: bool,
-    ) -> Result<u32> {
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-
-        let flags = if create { ffi::MDB_CREATE } else { 0 };
-        match self.raw_open_dbi(raw_txn, name, flags) {
-            Ok(dbi) => {
-                let old_types = lock.entry(dbi).or_insert(types);
-                if *old_types == types {
-                    Ok(dbi)
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
-            Err(e) => Err(e.into()),
-        }
     }
 
     /// Create a transaction with read and write access for use with the environment.
@@ -640,10 +595,10 @@ impl Env {
     ///
     /// ## Errors
     ///
-    /// * [heed::mdb::lmdb_error::Error::Panic]: A fatal error occurred earlier, and the environment must be shut down
-    /// * [heed::mdb::lmdb_error::Error::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
+    /// * [crate::MdbError::Panic]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [crate::MdbError::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
     /// map must be resized
-    /// * [heed::mdb::lmdb_error::Error::ReadersFull]: a read-only transaction was requested, and the reader lock table is
+    /// * [crate::MdbError::ReadersFull]: a read-only transaction was requested, and the reader lock table is
     /// full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
@@ -813,7 +768,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(30)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // Force a thread to keep the env for 1 second.
@@ -847,7 +802,7 @@ mod tests {
         eprintln!("env closed successfully");
 
         // Make sure we don't have a reference to the env
-        assert!(env_closing_event(&dir.path()).is_none());
+        assert!(env_closing_event(dir.path()).is_none());
     }
 
     #[test]
@@ -855,12 +810,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let _env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let result = EnvOpenOptions::new()
             .map_size(12 * 1024 * 1024) // 12MB
-            .open(&dir.path());
+            .open(dir.path());
 
         assert!(matches!(result, Err(Error::BadOpenOptions { .. })));
     }
@@ -887,8 +842,8 @@ mod tests {
         let mut envbuilder = EnvOpenOptions::new();
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
-        unsafe { envbuilder.flag(crate::Flag::WriteMap) };
-        let env = envbuilder.open(&dir.path()).unwrap();
+        unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
+        let env = envbuilder.open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -899,8 +854,8 @@ mod tests {
     fn open_database_with_nosubdir() {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
-        unsafe { envbuilder.flag(crate::Flag::NoSubDir) };
-        let _env = envbuilder.open(&dir.path().join("data.mdb")).unwrap();
+        unsafe { envbuilder.flags(crate::EnvFlags::NO_SUB_DIR) };
+        let _env = envbuilder.open(dir.path().join("data.mdb")).unwrap();
     }
 
     #[test]
@@ -909,7 +864,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
@@ -927,7 +882,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         // we first create a database
@@ -940,7 +895,7 @@ mod tests {
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(10)
-            .open(&dir.path())
+            .open(dir.path())
             .unwrap();
 
         let rtxn = env.read_txn().unwrap();
@@ -951,7 +906,9 @@ mod tests {
     #[test]
     fn resize_database() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new().map_size(9 * 4096).max_dbs(1).open(&dir.path()).unwrap();
+        let page_size = page_size::get();
+        let env =
+            EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -970,7 +927,7 @@ mod tests {
         wtxn.commit().expect_err("cannot commit a transaction that would reach the map size limit");
 
         unsafe {
-            env.resize(10 * 4096).unwrap();
+            env.resize(10 * page_size).unwrap();
         }
         let mut wtxn = env.write_txn().unwrap();
         for i in 64..128 {
@@ -978,7 +935,7 @@ mod tests {
         }
         wtxn.commit().expect("transaction should commit after resizing the map size");
 
-        assert_eq!(10 * 4096, env.info().map_size);
+        assert_eq!(10 * page_size, env.info().map_size);
     }
 
     /// Non-regression test for

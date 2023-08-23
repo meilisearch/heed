@@ -7,7 +7,8 @@ pub use ffi::{
     mdb_env_set_maxdbs, mdb_env_set_maxreaders, mdb_env_stat, mdb_env_sync, mdb_filehandle_t,
     mdb_get, mdb_put, mdb_reader_check, mdb_stat, mdb_txn_abort, mdb_txn_begin, mdb_txn_commit,
     mdb_version, MDB_cursor, MDB_dbi, MDB_env, MDB_envinfo, MDB_stat, MDB_txn, MDB_val, MDB_APPEND,
-    MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_RDONLY, MDB_RESERVE,
+    MDB_APPENDDUP, MDB_CP_COMPACT, MDB_CREATE, MDB_CURRENT, MDB_DUPSORT, MDB_NODUPDATA,
+    MDB_NOOVERWRITE, MDB_RDONLY, MDB_RESERVE,
 };
 use lmdb_master_sys as ffi;
 
@@ -15,10 +16,17 @@ pub mod cursor_op {
     use super::ffi::{self, MDB_cursor_op};
 
     pub const MDB_FIRST: MDB_cursor_op = ffi::MDB_FIRST;
+    pub const MDB_FIRST_DUP: MDB_cursor_op = ffi::MDB_FIRST_DUP;
     pub const MDB_LAST: MDB_cursor_op = ffi::MDB_LAST;
+    pub const MDB_LAST_DUP: MDB_cursor_op = ffi::MDB_LAST_DUP;
     pub const MDB_SET_RANGE: MDB_cursor_op = ffi::MDB_SET_RANGE;
+    pub const MDB_SET: MDB_cursor_op = ffi::MDB_SET;
     pub const MDB_PREV: MDB_cursor_op = ffi::MDB_PREV;
+    pub const MDB_PREV_NODUP: MDB_cursor_op = ffi::MDB_PREV_NODUP;
+    pub const MDB_PREV_DUP: MDB_cursor_op = ffi::MDB_PREV_DUP;
     pub const MDB_NEXT: MDB_cursor_op = ffi::MDB_NEXT;
+    pub const MDB_NEXT_NODUP: MDB_cursor_op = ffi::MDB_NEXT_NODUP;
+    pub const MDB_NEXT_DUP: MDB_cursor_op = ffi::MDB_NEXT_DUP;
     pub const MDB_GET_CURRENT: MDB_cursor_op = ffi::MDB_GET_CURRENT;
 }
 

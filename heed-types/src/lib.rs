@@ -26,6 +26,7 @@
 mod cow_slice;
 mod cow_type;
 mod integer;
+mod lazy_decode;
 mod owned_slice;
 mod owned_type;
 mod str;
@@ -44,6 +45,7 @@ use heed_traits::BoxedError;
 pub use self::cow_slice::CowSlice;
 pub use self::cow_type::CowType;
 pub use self::integer::*;
+pub use self::lazy_decode::{Lazy, LazyDecode};
 pub use self::owned_slice::OwnedSlice;
 pub use self::owned_type::OwnedType;
 pub use self::str::Str;
