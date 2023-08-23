@@ -18,6 +18,7 @@ byteorder = "1.4.3"
 heed-traits = { version = "0.20.0-alpha.4", path = "../heed-traits" }
 serde = { version = "1.0.151", optional = true }
 serde_json = { version = "1.0.91", optional = true }
+rmp-serde = { version = "1.1.2", optional = true }
 
 [dev-dependencies]
 rand = "0.8.5"
@@ -26,6 +27,7 @@ rand = "0.8.5"
 default = ["serde-bincode", "serde-json"]
 serde-bincode = ["serde", "bincode"]
 serde-json = ["serde", "serde_json"]
+serde-rmp = ["serde", "rmp-serde"]
 # serde_json features
 preserve_order = ["serde_json/preserve_order"]
 arbitrary_precision = ["serde_json/arbitrary_precision"]

@@ -51,9 +51,10 @@ default = ["serde", "serde-bincode", "serde-json"]
 # transactions exists on the same thread
 read-txn-no-tls = []
 
-# Enable the serde en/decoders for bincode or serde_json
+# Enable the serde en/decoders for bincode, serde_json, or rmp_serde
 serde-bincode = ["heed-types/serde", "heed-types/bincode"]
 serde-json = ["heed-types/serde", "heed-types/serde-json"]
+serde-rmp = ["heed-types/serde", "heed-types/serde-rmp"]
 
 # serde_json features
 preserve_order = ["heed-types/preserve_order"]
@@ -69,3 +70,8 @@ unbounded_depth = ["heed-types/unbounded_depth"]
 # should look into before enabling this feature. Also, see here:
 # <https://github.com/LMDB/lmdb/blob/3947014aed7ffe39a79991fa7fb5b234da47ad1a/libraries/liblmdb/lmdb.h#L46-L69>
 posix-sem = ["lmdb-master-sys/posix-sem"]
+
+[[example]]
+name = "rmp-serde"
+required-features = ["serde-rmp"]
+
