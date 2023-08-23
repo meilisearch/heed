@@ -57,7 +57,8 @@ mod mdb;
 mod reserved_space;
 mod txn;
 
-use std::{error, fmt, io, result};
+use std::ffi::CStr;
+use std::{error, fmt, io, mem, result};
 
 use heed_traits as traits;
 pub use {bytemuck, byteorder, heed_types as types};
@@ -78,6 +79,49 @@ pub use self::mdb::flags::Flag;
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};
 pub use self::txn::{RoTxn, RwTxn};
+
+/// The underlying LMDB library version information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LmdbVersion {
+    /// The library version as a string.
+    pub string: &'static str,
+    /// The library major version number.
+    pub major: i32,
+    /// The library minor version number.
+    pub minor: i32,
+    /// The library patch version number.
+    pub patch: i32,
+}
+
+/// Return the LMDB library version information.
+///
+/// ```
+/// use heed::{lmdb_version, LmdbVersion};
+///
+/// let expected = LmdbVersion {
+///     string: "LMDB 0.9.70: (December 19, 2015)",
+///     major: 0,
+///     minor: 9,
+///     patch: 70,
+/// };
+/// assert_eq!(lmdb_version(), expected);
+/// ```
+pub fn lmdb_version() -> LmdbVersion {
+    let mut major = mem::MaybeUninit::uninit();
+    let mut minor = mem::MaybeUninit::uninit();
+    let mut patch = mem::MaybeUninit::uninit();
+
+    unsafe {
+        let string_ptr =
+            mdb::ffi::mdb_version(major.as_mut_ptr(), minor.as_mut_ptr(), patch.as_mut_ptr());
+        LmdbVersion {
+            string: CStr::from_ptr(string_ptr).to_str().unwrap(),
+            major: major.assume_init(),
+            minor: minor.assume_init(),
+            patch: patch.assume_init(),
+        }
+    }
+}
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
