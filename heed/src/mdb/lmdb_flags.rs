@@ -63,17 +63,313 @@ bitflags! {
     #[repr(transparent)]
     pub struct DatabaseFlags: u32 {
         /// Use reverse string keys.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<Str, Unit>()
+        ///     .flags(DatabaseFlags::REVERSE_KEY)
+        ///     .name("reverse-key")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &"bonjour", &())?;
+        /// db.put(&mut wtxn, &"hello", &())?;
+        /// db.put(&mut wtxn, &"holla", &())?;
+        ///
+        /// let mut iter = db.iter(&wtxn)?;
+        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// let mut iter = db.rev_iter(&wtxn)?;
+        /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const REVERSE_KEY = ffi::MDB_REVERSEKEY;
         /// Use sorted duplicates.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        /// type BEI64 = I64<BigEndian>;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<BEI64, BEI64>()
+        ///     .flags(DatabaseFlags::DUP_SORT)
+        ///     .name("dup-sort")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &68, &120)?;
+        /// db.put(&mut wtxn, &68, &121)?;
+        /// db.put(&mut wtxn, &68, &122)?;
+        /// db.put(&mut wtxn, &68, &123)?;
+        /// db.put(&mut wtxn, &92, &32)?;
+        /// db.put(&mut wtxn, &35, &120)?;
+        /// db.put(&mut wtxn, &0, &120)?;
+        /// db.put(&mut wtxn, &42, &120)?;
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.last().transpose()?, Some((68, 123)));
+        ///
+        /// assert!(db.delete_one_duplicate(&mut wtxn, &68, &121)?, "The entry must exist");
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// // No more (68, 121) returned here!
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const DUP_SORT = ffi::MDB_DUPSORT;
         /// Numeric keys in native byte order: either `u32` or `usize`.
         /// The keys must all be of the same size.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        /// type BEI32 = I32<BigEndian>;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<BEI32, BEI32>()
+        ///     .flags(DatabaseFlags::INTEGER_KEY)
+        ///     .name("integer-key")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &68, &120)?;
+        /// db.put(&mut wtxn, &92, &32)?;
+        /// db.put(&mut wtxn, &35, &120)?;
+        /// db.put(&mut wtxn, &0, &120)?;
+        /// db.put(&mut wtxn, &42, &120)?;
+        ///
+        /// let mut iter = db.iter(&wtxn)?;
+        /// assert_eq!(iter.next().transpose()?, Some((0, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((35, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((42, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((92, 32)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const INTEGER_KEY = ffi::MDB_INTEGERKEY;
         /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        /// type BEI64 = I64<BigEndian>;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<BEI64, BEI64>()
+        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
+        ///     .name("dup-sort-fixed")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &68, &120)?;
+        /// db.put(&mut wtxn, &68, &121)?;
+        /// db.put(&mut wtxn, &68, &122)?;
+        /// db.put(&mut wtxn, &68, &123)?;
+        /// db.put(&mut wtxn, &92, &32)?;
+        /// db.put(&mut wtxn, &35, &120)?;
+        /// db.put(&mut wtxn, &0, &120)?;
+        /// db.put(&mut wtxn, &42, &120)?;
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.last().transpose()?, Some((68, 123)));
+        ///
+        /// assert!(db.delete_one_duplicate(&mut wtxn, &68, &121)?, "The entry must exist");
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// // No more (68, 121) returned here!
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const DUP_FIXED = ffi::MDB_DUPFIXED;
         /// With [`DatabaseKey::DUP_SORT`], dups are [`DatabaseKey::INTEGER_KEY`]-style integers.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        /// type BEI32 = I32<BigEndian>;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<BEI32, BEI32>()
+        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::INTEGER_DUP)
+        ///     .name("dup-sort-integer-dup")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &68, &120)?;
+        /// db.put(&mut wtxn, &68, &121)?;
+        /// db.put(&mut wtxn, &68, &122)?;
+        /// db.put(&mut wtxn, &68, &123)?;
+        /// db.put(&mut wtxn, &92, &32)?;
+        /// db.put(&mut wtxn, &35, &120)?;
+        /// db.put(&mut wtxn, &0, &120)?;
+        /// db.put(&mut wtxn, &42, &120)?;
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 121)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.last().transpose()?, Some((68, 123)));
+        ///
+        /// assert!(db.delete_one_duplicate(&mut wtxn, &68, &121)?, "The entry must exist");
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+        /// // No more (68, 121) returned here!
+        /// assert_eq!(iter.next().transpose()?, Some((68, 122)));
+        /// assert_eq!(iter.next().transpose()?, Some((68, 123)));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const INTEGER_DUP = ffi::MDB_INTEGERDUP;
         /// With [`DatabaseKey::DUP_SORT`], use reverse string dups.
+        ///
+        /// ```
+        /// # use std::fs;
+        /// # use std::path::Path;
+        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// use heed::types::*;
+        /// use heed::byteorder::BigEndian;
+        ///
+        /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let dir = tempfile::tempdir()?;
+        /// # let env = EnvOpenOptions::new()
+        /// #     .map_size(10 * 1024 * 1024) // 10MB
+        /// #     .max_dbs(3000)
+        /// #     .open(dir.path())?;
+        /// type BEI64 = I64<BigEndian>;
+        ///
+        /// let mut wtxn = env.write_txn()?;
+        /// let db = env.database_options()
+        ///     .types::<BEI64, Str>()
+        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::REVERSE_DUP)
+        ///     .name("dup-sort")
+        ///     .create(&mut wtxn)?;
+        ///
+        /// # db.clear(&mut wtxn)?;
+        /// db.put(&mut wtxn, &68, &"bonjour")?;
+        /// db.put(&mut wtxn, &68, &"holla")?;
+        /// db.put(&mut wtxn, &68, &"hello")?;
+        /// db.put(&mut wtxn, &92, &"hallo")?;
+        ///
+        /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+        /// assert_eq!(iter.next().transpose()?, Some((68, "holla")));
+        /// assert_eq!(iter.next().transpose()?, Some((68, "hello")));
+        /// assert_eq!(iter.next().transpose()?, Some((68, "bonjour")));
+        /// assert_eq!(iter.next().transpose()?, None);
+        /// drop(iter);
+        ///
+        /// wtxn.commit()?;
+        /// # Ok(()) }
+        /// ```
         const REVERSE_DUP = ffi::MDB_REVERSEDUP;
     }
 }
