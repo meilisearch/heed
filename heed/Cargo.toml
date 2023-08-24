@@ -52,9 +52,9 @@ default = ["serde", "serde-bincode", "serde-json"]
 read-txn-no-tls = []
 
 # Enable the serde en/decoders for bincode, serde_json, or rmp_serde
-serde-bincode = ["heed-types/serde", "heed-types/serde-bincode"]
-serde-json = ["heed-types/serde", "heed-types/serde-json"]
-serde-rmp = ["heed-types/serde", "heed-types/serde-rmp"]
+serde-bincode = ["heed-types/serde-bincode"]
+serde-json = ["heed-types/serde-json"]
+serde-rmp = ["heed-types/serde-rmp"]
 
 # serde_json features
 preserve_order = ["heed-types/preserve_order"]
