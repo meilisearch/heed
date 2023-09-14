@@ -1,35 +1,36 @@
 use std::borrow::Cow;
 use std::marker;
 
+use heed_traits::LexicographicComparator;
 use types::LazyDecode;
 
-use super::{advance_key, retreat_key};
 use crate::cursor::MoveOperation;
+use crate::env::NoopComparator;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
 
-fn move_on_prefix_end<'txn>(
+fn move_on_prefix_end<'txn, C: LexicographicComparator>(
     cursor: &mut RoCursor<'txn>,
     prefix: &mut Vec<u8>,
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-    advance_key(prefix);
+    C::advance(prefix);
     let result = cursor
         .move_on_key_greater_than_or_equal_to(prefix)
         .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup));
-    retreat_key(prefix);
+    C::retreat(prefix);
     result
 }
 
 /// A read-only prefix iterator structure.
-pub struct RoPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
+pub struct RoPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
     move_on_first: bool,
-    _phantom: marker::PhantomData<(KC, DC, IM)>,
+    _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RoPrefix<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoPrefix<'txn, KC, DC, IM> {
+impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
+    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoPrefix<'txn, KC, DC, C, IM> {
         RoPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
     }
 
@@ -85,10 +86,11 @@ impl<'txn, KC, DC, IM> RoPrefix<'txn, KC, DC, IM> {
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RoPrefix<'txn, KC, DC, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RoPrefix<'txn, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    C: LexicographicComparator,
     IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
@@ -119,9 +121,12 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
+            match (
+                self.cursor.current(),
+                move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -147,22 +152,22 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RoPrefix<'_, KC, DC, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RoPrefix<'_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RoPrefix").finish()
     }
 }
 
 /// A read-write prefix iterator structure.
-pub struct RwPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
+pub struct RwPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
     move_on_first: bool,
-    _phantom: marker::PhantomData<(KC, DC, IM)>,
+    _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RwPrefix<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwPrefix<'txn, KC, DC, IM> {
+impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
+    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwPrefix<'txn, KC, DC, C, IM> {
         RwPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
     }
 
@@ -331,10 +336,11 @@ impl<'txn, KC, DC, IM> RwPrefix<'txn, KC, DC, IM> {
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RwPrefix<'txn, KC, DC, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RwPrefix<'txn, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    C: LexicographicComparator,
     IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
@@ -365,9 +371,12 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
         } else {
-            match (self.cursor.current(), move_on_prefix_end(&mut self.cursor, &mut self.prefix)) {
+            match (
+                self.cursor.current(),
+                move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix),
+            ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
                 }
@@ -393,22 +402,22 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RwPrefix<'_, KC, DC, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RwPrefix<'_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwPrefix").finish()
     }
 }
 
 /// A reverse read-only prefix iterator structure.
-pub struct RoRevPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
+pub struct RoRevPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
     move_on_last: bool,
-    _phantom: marker::PhantomData<(KC, DC, IM)>,
+    _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RoRevPrefix<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoRevPrefix<'txn, KC, DC, IM> {
+impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
+    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoRevPrefix<'txn, KC, DC, C, IM> {
         RoRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
     }
 
@@ -464,10 +473,11 @@ impl<'txn, KC, DC, IM> RoRevPrefix<'txn, KC, DC, IM> {
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RoRevPrefix<'txn, KC, DC, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RoRevPrefix<'txn, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    C: LexicographicComparator,
     IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
@@ -475,7 +485,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
@@ -528,22 +538,22 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RoRevPrefix").finish()
     }
 }
 
 /// A reverse read-write prefix iterator structure.
-pub struct RwRevPrefix<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
+pub struct RwRevPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
     move_on_last: bool,
-    _phantom: marker::PhantomData<(KC, DC, IM)>,
+    _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RwRevPrefix<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwRevPrefix<'txn, KC, DC, IM> {
+impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
+    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwRevPrefix<'txn, KC, DC, C, IM> {
         RwRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
     }
 
@@ -712,10 +722,11 @@ impl<'txn, KC, DC, IM> RwRevPrefix<'txn, KC, DC, IM> {
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RwRevPrefix<'txn, KC, DC, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RwRevPrefix<'txn, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
+    C: LexicographicComparator,
     IM: IterationMethod,
 {
     type Item = Result<(KC::DItem, DC::DItem)>;
@@ -723,7 +734,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
@@ -776,7 +787,7 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RwRevPrefix<'_, KC, DC, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RwRevPrefix<'_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwRevPrefix").finish()
     }

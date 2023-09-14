@@ -1,4 +1,5 @@
 use std::any::TypeId;
+use std::cmp::Ordering;
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::{c_void, CString};
 use std::fs::{File, Metadata};
@@ -18,6 +19,7 @@ use std::{
 };
 use std::{fmt, io, mem, ptr, sync};
 
+use heed_traits::{Comparator, LexicographicComparator};
 use once_cell::sync::Lazy;
 use synchronoise::event::SignalEvent;
 
@@ -308,7 +310,7 @@ impl fmt::Debug for Env {
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId)>>,
+    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId, TypeId)>>,
     path: PathBuf,
 }
 
@@ -329,6 +331,49 @@ impl Drop for EnvInner {
                 // We signal to all the waiters that the env is closed now.
                 signal_event.signal();
             }
+        }
+    }
+}
+
+/// An helping function that transforms the LMDB types into Rust types (`MDB_val` into slices)
+/// and vice versa, the Rust types into C types (`Ordering` into an integer).
+extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
+    a: *const ffi::MDB_val,
+    b: *const ffi::MDB_val,
+) -> i32 {
+    let a = unsafe { ffi::from_val(*a) };
+    let b = unsafe { ffi::from_val(*b) };
+    match C::compare(a, b) {
+        Ordering::Less => -1,
+        Ordering::Equal => 0,
+        Ordering::Greater => 1,
+    }
+}
+
+/// This is a special implementation of [`LexicographicComparator`] which means that no customized
+/// compare function is set to the underlying LMDB database instance. Its implementation of
+/// [`Comparator::compare`] will not be actually used.
+pub struct NoopComparator;
+
+impl LexicographicComparator for NoopComparator {
+    fn compare_elem(a: u8, b: u8) -> Ordering {
+        a.cmp(&b)
+    }
+
+    fn advance(bytes: &mut Vec<u8>) {
+        match bytes.last_mut() {
+            Some(&mut 255) | None => bytes.push(0),
+            Some(last) => *last += 1,
+        }
+    }
+
+    fn retreat(bytes: &mut Vec<u8>) {
+        match bytes.last_mut() {
+            Some(&mut 0) => {
+                bytes.pop();
+            }
+            Some(last) => *last -= 1,
+            None => panic!("Vec is empty and must not be"),
         }
     }
 }
@@ -421,7 +466,7 @@ impl Env {
         size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
-        let dbi = self.raw_open_dbi(rtxn.txn, None, 0)?;
+        let dbi = self.raw_open_dbi::<NoopComparator>(rtxn.txn, None, 0)?;
 
         // we don’t want anyone to open an environment while we’re computing the stats
         // thus we take a lock on the dbi
@@ -436,7 +481,9 @@ impl Env {
             }
 
             let key = String::from_utf8(key.to_vec()).unwrap();
-            if let Ok(dbi) = self.raw_open_dbi(rtxn.txn, Some(&key), 0) {
+            // Calling `ffi::db_stat` on a database instance does not involve key comparison
+            // in LMDB, so it's safe to specify a noop key compare function for it.
+            if let Ok(dbi) = self.raw_open_dbi::<NoopComparator>(rtxn.txn, Some(&key), 0) {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
@@ -453,7 +500,7 @@ impl Env {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified, Unspecified> {
         DatabaseOpenOptions::new(self)
     }
 
@@ -479,12 +526,12 @@ impl Env {
         &self,
         rtxn: &RoTxn,
         name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC>>>
+    ) -> Result<Option<Database<KC, DC, NoopComparator>>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options = self.database_options().types::<KC, DC>();
+        let mut options = self.database_options().types::<KC, DC>().comparator::<NoopComparator>();
         if let Some(name) = name {
             options.name(name);
         }
@@ -504,27 +551,27 @@ impl Env {
         &self,
         wtxn: &mut RwTxn,
         name: Option<&str>,
-    ) -> Result<Database<KC, DC>>
+    ) -> Result<Database<KC, DC, NoopComparator>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options = self.database_options().types::<KC, DC>();
+        let mut options = self.database_options().types::<KC, DC>().comparator::<NoopComparator>();
         if let Some(name) = name {
             options.name(name);
         }
         options.create(wtxn)
     }
 
-    pub(crate) fn raw_init_database(
+    pub(crate) fn raw_init_database<C: Comparator + 'static>(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
-        types: (TypeId, TypeId),
+        types: (TypeId, TypeId, TypeId),
         flags: AllDatabaseFlags,
     ) -> Result<u32> {
         let mut lock = self.0.dbi_open_mutex.lock().unwrap();
-        match self.raw_open_dbi(raw_txn, name, flags.bits()) {
+        match self.raw_open_dbi::<C>(raw_txn, name, flags.bits()) {
             Ok(dbi) => {
                 let old_types = lock.entry(dbi).or_insert(types);
                 if *old_types == types {
@@ -537,7 +584,7 @@ impl Env {
         }
     }
 
-    fn raw_open_dbi(
+    fn raw_open_dbi<C: Comparator + 'static>(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
@@ -552,7 +599,12 @@ impl Env {
 
         // safety: The name cstring is cloned by LMDB, we can drop it after.
         //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
-        unsafe { mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))? };
+        unsafe {
+            mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))?;
+            if TypeId::of::<C>() != TypeId::of::<NoopComparator>() {
+                mdb_result(ffi::mdb_set_compare(raw_txn, dbi, Some(custom_key_cmp_wrapper::<C>)))?;
+            }
+        };
 
         Ok(dbi)
     }
