@@ -1,5 +1,4 @@
 extern crate cc;
-extern crate pkg_config;
 
 #[cfg(feature = "bindgen")]
 extern crate bindgen;
