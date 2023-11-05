@@ -30,7 +30,6 @@ libc = "0.2.139"
 bindgen = { version = "0.66.1", default-features = false, optional = true, features = ["runtime"] }
 cc = "1.0.78"
 doxygen-rs = "0.4.2"
-pkg-config = "0.3.26"
 
 [dev-dependencies]
 cstr = "0.2.11"
