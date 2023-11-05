@@ -1788,6 +1788,29 @@ impl<KC, DC> Database<KC, DC> {
         }
     }
 
+    pub fn put_reserved_uninit<'a>(
+        &self,
+        txn: &mut RwTxn,
+        key: &'a KC::EItem,
+        data_size: usize,
+    ) -> Result<&mut [mem::MaybeUninit<u8>]>
+    where
+        KC: BytesEncode<'a>,
+    {
+        assert_eq_env_db_txn!(self, txn);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut reserved = ffi::reserve_size_val(data_size);
+        let flags = ffi::MDB_RESERVE;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))?
+        }
+
+        Ok(unsafe { mem::transmute(crate::from_val_mut(reserved)) })
+    }
+
     /// Insert a key-value pair in this database. The entry is written with the specified flags.
     ///
     /// ```
