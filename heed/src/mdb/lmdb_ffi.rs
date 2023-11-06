@@ -1,3 +1,4 @@
+use std::mem::MaybeUninit;
 use std::ptr;
 
 pub use ffi::{
@@ -42,6 +43,6 @@ pub unsafe fn from_val<'a>(value: ffi::MDB_val) -> &'a [u8] {
     std::slice::from_raw_parts(value.mv_data as *const u8, value.mv_size)
 }
 
-pub unsafe fn from_val_mut<'a>(value: ffi::MDB_val) -> &'a mut [u8] {
-    std::slice::from_raw_parts_mut(value.mv_data as *mut u8, value.mv_size)
+pub unsafe fn from_val_uninit_mut<'a>(value: ffi::MDB_val) -> &'a mut [MaybeUninit<u8>] {
+    std::slice::from_raw_parts_mut(value.mv_data as *mut MaybeUninit<u8>, value.mv_size)
 }

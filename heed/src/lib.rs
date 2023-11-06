@@ -73,7 +73,7 @@ pub use self::iterator::{
     RwRevIter, RwRevPrefix, RwRevRange,
 };
 pub use self::mdb::error::Error as MdbError;
-use self::mdb::ffi::{from_val, from_val_mut, into_val};
+use self::mdb::ffi::{from_val, from_val_uninit_mut, into_val};
 pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode};

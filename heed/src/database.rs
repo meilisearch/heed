@@ -1808,7 +1808,7 @@ impl<KC, DC> Database<KC, DC> {
             mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))?
         }
 
-        Ok(unsafe { mem::transmute(crate::from_val_mut(reserved)) })
+        Ok(unsafe { crate::from_val_uninit_mut(reserved) })
     }
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags.
@@ -2219,7 +2219,7 @@ impl<KC, DC> Database<KC, DC> {
 
 impl<KC, DC> Clone for Database<KC, DC> {
     fn clone(&self) -> Database<KC, DC> {
-        Database { env_ident: self.env_ident, dbi: self.dbi, marker: marker::PhantomData }
+        *self
     }
 }
 
