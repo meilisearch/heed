@@ -4,7 +4,6 @@ use std::ops::Bound;
 
 use types::LazyDecode;
 
-use super::{advance_key, retreat_key};
 use crate::cursor::MoveOperation;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
@@ -32,12 +31,10 @@ fn move_on_range_start<'txn>(
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     match start_bound {
         Bound::Included(start) => cursor.move_on_key_greater_than_or_equal_to(start),
-        Bound::Excluded(start) => {
-            advance_key(start);
-            let result = cursor.move_on_key_greater_than_or_equal_to(start);
-            retreat_key(start);
-            result
-        }
+        Bound::Excluded(start) => match cursor.move_on_key_greater_than_or_equal_to(start)? {
+            Some((key, _)) if key == start => cursor.move_on_next(MoveOperation::NoDup),
+            result => Ok(result),
+        },
         Bound::Unbounded => cursor.move_on_first(MoveOperation::NoDup),
     }
 }

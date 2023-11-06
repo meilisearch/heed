@@ -6,27 +6,12 @@ pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::prefix::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
 pub use self::range::{RoRange, RoRevRange, RwRange, RwRevRange};
 
-fn advance_key(bytes: &mut Vec<u8>) {
-    match bytes.last_mut() {
-        Some(&mut 255) | None => bytes.push(0),
-        Some(last) => *last += 1,
-    }
-}
-
-fn retreat_key(bytes: &mut Vec<u8>) {
-    match bytes.last_mut() {
-        Some(&mut 0) => {
-            bytes.pop();
-        }
-        Some(last) => *last -= 1,
-        None => panic!("Vec is empty and must not be"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::ops;
+
     #[test]
-    fn prefix_iter_with_byte_255() {
+    fn prefix_iter_last_with_byte_255() {
         use crate::types::*;
         use crate::EnvOpenOptions;
 
@@ -48,6 +33,18 @@ mod tests {
         db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
         db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
 
+        db.put(&mut wtxn, &[255, 255, 0, 254, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&mut wtxn, &[255, 255, 0, 255, 104, 101, 108, 108, 111], "hello").unwrap();
+        db.put(&mut wtxn, &[255, 255, 0, 255, 119, 111, 114, 108, 100], "world").unwrap();
+        db.put(&mut wtxn, &[255, 255, 1, 0, 119, 111, 114, 108, 100], "world").unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db.prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
+        assert_eq!(
+            iter.last().transpose().unwrap(),
+            Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world"))
+        );
+
         // Lets check that we can prefix_iter on that sequence with the key "255".
         let mut iter = db.prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
         assert_eq!(
@@ -57,6 +54,34 @@ mod tests {
         assert_eq!(
             iter.next().transpose().unwrap(),
             Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], "world"))
+        );
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        drop(iter);
+
+        // Lets check that we properly get the last entry.
+        let iter = db.prefix_iter(&wtxn, &[255]).unwrap();
+        assert_eq!(
+            iter.last().transpose().unwrap(),
+            Some((&[255, 255, 1, 0, 119, 111, 114, 108, 100][..], "world"))
+        );
+
+        // Lets check that we can prefix_iter on that sequence with the key "255".
+        let mut iter = db.prefix_iter(&wtxn, &[255]).unwrap();
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 254, 119, 111, 114, 108, 100][..], "world"))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 255, 104, 101, 108, 108, 111][..], "hello"))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 255, 119, 111, 114, 108, 100][..], "world"))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 1, 0, 119, 111, 114, 108, 100][..], "world"))
         );
         assert_eq!(iter.next().transpose().unwrap(), None);
         drop(iter);
@@ -226,6 +251,54 @@ mod tests {
     }
 
     #[test]
+    fn range_iter_last_with_byte_255() {
+        use crate::types::*;
+        use crate::EnvOpenOptions;
+
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(dir.path())
+            .unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 1], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 2], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1, 0], &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db
+            .range(
+                &wtxn,
+                &(ops::Bound::Excluded(&[0, 0, 0][..]), ops::Bound::Included(&[0, 0, 1, 0][..])),
+            )
+            .unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 1, 0][..], ())));
+
+        // Lets check that we can range_iter on that sequence with the key "255".
+        let mut iter = db
+            .range(
+                &wtxn,
+                &(ops::Bound::Excluded(&[0, 0, 0][..]), ops::Bound::Included(&[0, 0, 1, 0][..])),
+            )
+            .unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 1][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 2][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 1, 0][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        drop(iter);
+
+        wtxn.abort();
+    }
+
+    #[test]
     fn prefix_iter_last() {
         use crate::types::*;
         use crate::EnvOpenOptions;
@@ -376,6 +449,75 @@ mod tests {
     }
 
     #[test]
+    fn rev_prefix_iter_last_with_byte_255() {
+        use crate::types::*;
+        use crate::EnvOpenOptions;
+
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(dir.path())
+            .unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
+
+        db.put(&mut wtxn, &[255, 255, 0, 254, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[255, 255, 0, 255, 104, 101, 108, 108, 111], &()).unwrap();
+        db.put(&mut wtxn, &[255, 255, 0, 255, 119, 111, 114, 108, 100], &()).unwrap();
+        db.put(&mut wtxn, &[255, 255, 1, 0, 119, 111, 114, 108, 100], &()).unwrap();
+
+        // Lets check that we can get last entry on that sequence ending with the key "255".
+        let iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
+        assert_eq!(
+            iter.last().transpose().unwrap(),
+            Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ()))
+        );
+
+        // Lets check that we can prefix_iter on that sequence ending with the key "255".
+        let mut iter = db.rev_prefix_iter(&wtxn, &[0, 0, 0, 255]).unwrap();
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[0, 0, 0, 255, 119, 111, 114, 108, 100][..], ()))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[0, 0, 0, 255, 104, 101, 108, 108, 111][..], ()))
+        );
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        let mut iter = db.rev_prefix_iter(&wtxn, &[255, 255]).unwrap();
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 1, 0, 119, 111, 114, 108, 100][..], ()))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 255, 119, 111, 114, 108, 100][..], ()))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 255, 104, 101, 108, 108, 111][..], ()))
+        );
+        assert_eq!(
+            iter.next().transpose().unwrap(),
+            Some((&[255, 255, 0, 254, 119, 111, 114, 108, 100][..], ()))
+        );
+        assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort();
+    }
+
+    #[test]
     fn rev_range_iter_last() {
         use crate::byteorder::BigEndian;
         use crate::types::*;
@@ -423,6 +565,54 @@ mod tests {
         let mut iter = db.rev_range(&wtxn, &(4..=4)).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((4, ())));
         assert_eq!(iter.last().transpose().unwrap(), None);
+
+        wtxn.abort();
+    }
+
+    #[test]
+    fn rev_range_iter_last_with_byte_255() {
+        use crate::types::*;
+        use crate::EnvOpenOptions;
+
+        let dir = tempfile::tempdir().unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(dir.path())
+            .unwrap();
+
+        let mut wtxn = env.write_txn().unwrap();
+        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        wtxn.commit().unwrap();
+
+        // Create an ordered list of keys...
+        let mut wtxn = env.write_txn().unwrap();
+        db.put(&mut wtxn, &[0, 0, 0], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 1], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 0, 2], &()).unwrap();
+        db.put(&mut wtxn, &[0, 0, 1, 0], &()).unwrap();
+
+        // Lets check that we properly get the last entry.
+        let iter = db
+            .rev_range(
+                &wtxn,
+                &(ops::Bound::Excluded(&[0, 0, 0][..]), ops::Bound::Included(&[0, 0, 1, 0][..])),
+            )
+            .unwrap();
+        assert_eq!(iter.last().transpose().unwrap(), Some((&[0, 0, 0, 1][..], ())));
+
+        // Lets check that we can range_iter on that sequence with the key "255".
+        let mut iter = db
+            .rev_range(
+                &wtxn,
+                &(ops::Bound::Excluded(&[0, 0, 0][..]), ops::Bound::Included(&[0, 0, 1, 0][..])),
+            )
+            .unwrap();
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 1, 0][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 2][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), Some((&[0, 0, 0, 1][..], ())));
+        assert_eq!(iter.next().transpose().unwrap(), None);
+        drop(iter);
 
         wtxn.abort();
     }

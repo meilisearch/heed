@@ -1,2 +1,3 @@
 [workspace]
 members = ["lmdb-master-sys", "heed", "heed-traits", "heed-types"]
+resolver = "2"
