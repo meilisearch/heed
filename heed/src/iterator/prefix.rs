@@ -5,7 +5,7 @@ use heed_traits::LexicographicComparator;
 use types::LazyDecode;
 
 use crate::cursor::MoveOperation;
-use crate::env::NoopComparator;
+use crate::env::DefaultComparator;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
 
@@ -21,7 +21,7 @@ fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
     if idx == 0 {
         return false;
     }
-    bytes[idx - 1] = C::advance(bytes[idx - 1]).expect("Cannot advance byte; this is a bug.");
+    bytes[idx - 1] = C::successor(bytes[idx - 1]).expect("Cannot advance byte; this is a bug.");
     for i in (idx + 1)..=bytes.len() {
         bytes[i - 1] = C::min_elem();
     }
@@ -40,7 +40,7 @@ fn retreat_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
     if idx == 0 {
         return false;
     }
-    bytes[idx - 1] = C::retreat(bytes[idx - 1]).expect("Cannot retreat byte; this is a bug.");
+    bytes[idx - 1] = C::predecessor(bytes[idx - 1]).expect("Cannot retreat byte; this is a bug.");
     for i in (idx + 1)..=bytes.len() {
         bytes[i - 1] = C::max_elem();
     }
@@ -64,7 +64,7 @@ fn move_on_prefix_end<'txn, C: LexicographicComparator>(
 }
 
 /// A read-only prefix iterator structure.
-pub struct RoPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
+pub struct RoPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
     move_on_first: bool,
@@ -201,7 +201,7 @@ impl<KC, DC, C, IM> fmt::Debug for RoPrefix<'_, KC, DC, C, IM> {
 }
 
 /// A read-write prefix iterator structure.
-pub struct RwPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
+pub struct RwPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
     move_on_first: bool,
@@ -451,7 +451,7 @@ impl<KC, DC, C, IM> fmt::Debug for RwPrefix<'_, KC, DC, C, IM> {
 }
 
 /// A reverse read-only prefix iterator structure.
-pub struct RoRevPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
+pub struct RoRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RoCursor<'txn>,
     prefix: Vec<u8>,
     move_on_last: bool,
@@ -587,7 +587,7 @@ impl<KC, DC, C, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, C, IM> {
 }
 
 /// A reverse read-write prefix iterator structure.
-pub struct RwRevPrefix<'txn, KC, DC, C = NoopComparator, IM = MoveThroughDuplicateValues> {
+pub struct RwRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
     prefix: Vec<u8>,
     move_on_last: bool,

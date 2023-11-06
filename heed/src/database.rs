@@ -7,7 +7,7 @@ use heed_traits::{Comparator, LexicographicComparator};
 use types::{DecodeIgnore, LazyDecode};
 
 use crate::cursor::MoveOperation;
-use crate::env::NoopComparator;
+use crate::env::DefaultComparator;
 use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -61,7 +61,7 @@ pub struct DatabaseOpenOptions<'e, KC, DC, C> {
     flags: AllDatabaseFlags,
 }
 
-impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified, Unspecified> {
+impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified, DefaultComparator> {
     /// Create an options struct to open/create a database with specific flags.
     pub fn new(env: &'e Env) -> Self {
         DatabaseOpenOptions {
@@ -78,7 +78,7 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC, NoopComparator> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC, DefaultComparator> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -89,7 +89,7 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn comparator<NC>(self) -> DatabaseOpenOptions<'e, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, KC, DC, NC> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -284,7 +284,7 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct Database<KC, DC, C = NoopComparator> {
+pub struct Database<KC, DC, C = DefaultComparator> {
     pub(crate) env_ident: usize,
     pub(crate) dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(KC, DC, C)>,

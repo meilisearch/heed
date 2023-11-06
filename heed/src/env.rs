@@ -350,19 +350,33 @@ extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
     }
 }
 
-/// This is a special implementation of [`LexicographicComparator`] which means that no customized
-/// compare function is set to the underlying LMDB database instance. Its implementation of
-/// [`Comparator::compare`] will not be actually used.
-pub struct NoopComparator;
+/// A representation of LMDB's default comparator behavior.
+///
+/// This enum is used to indicate the absence of a custom comparator for an LMDB
+/// database instance. When a [`Database`] is created or opened with
+/// [`DefaultComparator`], it signifies that the comparator should not be explicitly
+/// set via [`ffi::mdb_set_compare`]. Consequently, the database
+/// instance utilizes LMDB's built-in default comparator, which inherently performs
+/// lexicographic comparison of keys.
+///
+/// This comparator's lexicographic implementation is employed in scenarios involving
+/// prefix iterators. Specifically, methods other than [`Comparator::compare`] are utilized
+/// to determine the lexicographic successors and predecessors of byte sequences, which
+/// is essential for these iterators' operation.
+///
+/// When a custom comparator is provided, the wrapper is responsible for setting
+/// it with the [`ffi::mdb_set_compare`] function, which overrides the default comparison
+/// behavior of LMDB with the user-defined logic.
+pub enum DefaultComparator {}
 
-impl LexicographicComparator for NoopComparator {
+impl LexicographicComparator for DefaultComparator {
     #[inline]
     fn compare_elem(a: u8, b: u8) -> Ordering {
         a.cmp(&b)
     }
 
     #[inline]
-    fn advance(elem: u8) -> Option<u8> {
+    fn successor(elem: u8) -> Option<u8> {
         match elem {
             u8::MAX => None,
             elem => Some(elem + 1),
@@ -370,7 +384,7 @@ impl LexicographicComparator for NoopComparator {
     }
 
     #[inline]
-    fn retreat(elem: u8) -> Option<u8> {
+    fn predecessor(elem: u8) -> Option<u8> {
         match elem {
             u8::MIN => None,
             elem => Some(elem - 1),
@@ -476,7 +490,7 @@ impl Env {
         size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
-        let dbi = self.raw_open_dbi::<NoopComparator>(rtxn.txn, None, 0)?;
+        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, None, 0)?;
 
         // we don’t want anyone to open an environment while we’re computing the stats
         // thus we take a lock on the dbi
@@ -493,7 +507,7 @@ impl Env {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) = self.raw_open_dbi::<NoopComparator>(rtxn.txn, Some(&key), 0) {
+            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, Some(&key), 0) {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
@@ -510,7 +524,9 @@ impl Env {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified, Unspecified> {
+    pub fn database_options(
+        &self,
+    ) -> DatabaseOpenOptions<Unspecified, Unspecified, DefaultComparator> {
         DatabaseOpenOptions::new(self)
     }
 
@@ -536,12 +552,13 @@ impl Env {
         &self,
         rtxn: &RoTxn,
         name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC, NoopComparator>>>
+    ) -> Result<Option<Database<KC, DC, DefaultComparator>>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options = self.database_options().types::<KC, DC>().comparator::<NoopComparator>();
+        let mut options =
+            self.database_options().types::<KC, DC>().key_comparator::<DefaultComparator>();
         if let Some(name) = name {
             options.name(name);
         }
@@ -561,12 +578,13 @@ impl Env {
         &self,
         wtxn: &mut RwTxn,
         name: Option<&str>,
-    ) -> Result<Database<KC, DC, NoopComparator>>
+    ) -> Result<Database<KC, DC, DefaultComparator>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options = self.database_options().types::<KC, DC>().comparator::<NoopComparator>();
+        let mut options =
+            self.database_options().types::<KC, DC>().key_comparator::<DefaultComparator>();
         if let Some(name) = name {
             options.name(name);
         }
@@ -611,7 +629,7 @@ impl Env {
         //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
         unsafe {
             mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))?;
-            if TypeId::of::<C>() != TypeId::of::<NoopComparator>() {
+            if TypeId::of::<C>() != TypeId::of::<DefaultComparator>() {
                 mdb_result(ffi::mdb_set_compare(raw_txn, dbi, Some(custom_key_cmp_wrapper::<C>)))?;
             }
         };

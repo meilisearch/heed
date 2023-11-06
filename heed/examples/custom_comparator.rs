@@ -7,7 +7,7 @@ use heed::EnvOpenOptions;
 use heed_traits::Comparator;
 use heed_types::{Str, Unit};
 
-struct StringAsIntCmp;
+enum StringAsIntCmp {}
 
 // This function takes two strings which represent positive numbers,
 // parses them into i32s and compare the parsed value.
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db = env
         .database_options()
         .types::<Str, Unit>()
-        .comparator::<StringAsIntCmp>()
+        .key_comparator::<StringAsIntCmp>()
         .create(&mut wtxn)?;
     wtxn.commit()?;
 

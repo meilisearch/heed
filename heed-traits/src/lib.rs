@@ -3,7 +3,7 @@
 #![warn(missing_docs)]
 
 use std::borrow::Cow;
-use std::cmp::Ordering;
+use std::cmp::{Ord, Ordering};
 use std::error::Error as StdError;
 
 /// A boxed `Send + Sync + 'static` error.
@@ -63,12 +63,12 @@ pub trait LexicographicComparator: Comparator {
     /// Advances the given `elem` to its immediate lexicographic successor, if possible.
     /// Returns `None` if `elem` is already at its maximum value with respect to the
     /// lexicographic order defined by this comparator.
-    fn advance(elem: u8) -> Option<u8>;
+    fn successor(elem: u8) -> Option<u8>;
 
     /// Moves the given `elem` to its immediate lexicographic predecessor, if possible.
     /// Returns `None` if `elem` is already at its minimum value with respect to the
     /// lexicographic order defined by this comparator.
-    fn retreat(elem: u8) -> Option<u8>;
+    fn predecessor(elem: u8) -> Option<u8>;
 
     /// Returns the maximum byte value per the comparator's lexicographic order.
     fn max_elem() -> u8;
@@ -84,6 +84,6 @@ impl<C: LexicographicComparator> Comparator for C {
                 return C::compare_elem(a[idx], b[idx]);
             }
         }
-        a.len().cmp(&b.len())
+        Ord::cmp(&a.len(), &b.len())
     }
 }
