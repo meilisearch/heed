@@ -60,18 +60,28 @@ pub trait LexicographicComparator: Comparator {
     /// This function must never crash.
     fn compare_elem(a: u8, b: u8) -> Ordering;
 
-    /// Update `bytes` to its immediate successor.
-    fn advance(bytes: &mut Vec<u8>);
+    /// Advances the given `elem` to its immediate lexicographic successor, if possible.
+    /// Returns `None` if `elem` is already at its maximum value with respect to the
+    /// lexicographic order defined by this comparator.
+    fn advance(elem: u8) -> Option<u8>;
 
-    /// Update `bytes` to its immediate predecessor.
-    fn retreat(bytes: &mut Vec<u8>);
+    /// Moves the given `elem` to its immediate lexicographic predecessor, if possible.
+    /// Returns `None` if `elem` is already at its minimum value with respect to the
+    /// lexicographic order defined by this comparator.
+    fn retreat(elem: u8) -> Option<u8>;
+
+    /// Returns the maximum byte value per the comparator's lexicographic order.
+    fn max_elem() -> u8;
+
+    /// Returns the minimum byte value per the comparator's lexicographic order.
+    fn min_elem() -> u8;
 }
 
 impl<C: LexicographicComparator> Comparator for C {
     fn compare(a: &[u8], b: &[u8]) -> Ordering {
         for idx in 0..std::cmp::min(a.len(), b.len()) {
             if a[idx] != b[idx] {
-                return a[idx].cmp(&b[idx]);
+                return C::compare_elem(a[idx], b[idx]);
             }
         }
         a.len().cmp(&b.len())

@@ -356,25 +356,35 @@ extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
 pub struct NoopComparator;
 
 impl LexicographicComparator for NoopComparator {
+    #[inline]
     fn compare_elem(a: u8, b: u8) -> Ordering {
         a.cmp(&b)
     }
 
-    fn advance(bytes: &mut Vec<u8>) {
-        match bytes.last_mut() {
-            Some(&mut 255) | None => bytes.push(0),
-            Some(last) => *last += 1,
+    #[inline]
+    fn advance(elem: u8) -> Option<u8> {
+        match elem {
+            u8::MAX => None,
+            elem => Some(elem + 1),
         }
     }
 
-    fn retreat(bytes: &mut Vec<u8>) {
-        match bytes.last_mut() {
-            Some(&mut 0) => {
-                bytes.pop();
-            }
-            Some(last) => *last -= 1,
-            None => panic!("Vec is empty and must not be"),
+    #[inline]
+    fn retreat(elem: u8) -> Option<u8> {
+        match elem {
+            u8::MIN => None,
+            elem => Some(elem - 1),
         }
+    }
+
+    #[inline]
+    fn max_elem() -> u8 {
+        u8::MAX
+    }
+
+    #[inline]
+    fn min_elem() -> u8 {
+        u8::MIN
     }
 }
 

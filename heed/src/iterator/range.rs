@@ -32,10 +32,7 @@ fn move_on_range_start<'txn>(
     match start_bound {
         Bound::Included(start) => cursor.move_on_key_greater_than_or_equal_to(start),
         Bound::Excluded(start) => match cursor.move_on_key_greater_than_or_equal_to(start)? {
-            Some((key, _)) if key == start => {
-                cursor.move_on_next(MoveOperation::NoDup)?;
-                cursor.move_on_prev(MoveOperation::NoDup)
-            }
+            Some((key, _)) if key == start => cursor.move_on_next(MoveOperation::NoDup),
             result => Ok(result),
         },
         Bound::Unbounded => cursor.move_on_first(MoveOperation::NoDup),

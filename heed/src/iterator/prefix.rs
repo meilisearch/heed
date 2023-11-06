@@ -9,16 +9,58 @@ use crate::env::NoopComparator;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
 
+/// Advances `bytes` to the immediate lexicographic successor of equal length, as
+/// defined by the `C` comparator. If no successor exists (i.e., `bytes` is the maximal
+/// value), it remains unchanged and the function returns `false`. Otherwise, updates
+/// `bytes` and returns `true`.
+fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
+    let mut idx = bytes.len();
+    while idx > 0 && bytes[idx - 1] == C::max_elem() {
+        idx -= 1;
+    }
+    if idx == 0 {
+        return false;
+    }
+    bytes[idx - 1] = C::advance(bytes[idx - 1]).expect("Cannot advance byte; this is a bug.");
+    for i in (idx + 1)..=bytes.len() {
+        bytes[i - 1] = C::min_elem();
+    }
+    true
+}
+
+/// Retreats `bytes` to the immediate lexicographic predecessor of equal length, as
+/// defined by the `C` comparator. If no predecessor exists (i.e., `bytes` is the minimum
+/// value), it remains unchanged and the function returns `false`. Otherwise, updates
+/// `bytes` and returns `true`.
+fn retreat_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
+    let mut idx = bytes.len();
+    while idx > 0 && bytes[idx - 1] == C::min_elem() {
+        idx -= 1;
+    }
+    if idx == 0 {
+        return false;
+    }
+    bytes[idx - 1] = C::retreat(bytes[idx - 1]).expect("Cannot retreat byte; this is a bug.");
+    for i in (idx + 1)..=bytes.len() {
+        bytes[i - 1] = C::max_elem();
+    }
+    true
+}
+
 fn move_on_prefix_end<'txn, C: LexicographicComparator>(
     cursor: &mut RoCursor<'txn>,
     prefix: &mut Vec<u8>,
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
-    C::advance(prefix);
-    let result = cursor
-        .move_on_key_greater_than_or_equal_to(prefix)
-        .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup));
-    C::retreat(prefix);
-    result
+    if advance_prefix::<C>(prefix) {
+        let result = cursor
+            .move_on_key_greater_than_or_equal_to(prefix)
+            .and_then(|_| cursor.move_on_prev(MoveOperation::NoDup));
+        retreat_prefix::<C>(prefix);
+        result
+    } else {
+        // `prefix` is the maximum among all bytes sequence of the same length.
+        cursor.move_on_last(MoveOperation::NoDup)
+    }
 }
 
 /// A read-only prefix iterator structure.
