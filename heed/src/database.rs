@@ -2153,7 +2153,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
     }
 
-    /// Change the codec types of this uniform database, specifying the codecs.
+    /// Change the codec types of this database, specifying the codecs.
     ///
     /// # Safety
     ///
@@ -2197,12 +2197,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
         Database::new(self.env_ident, self.dbi)
     }
 
-    /// Change the key codec type of this uniform database, specifying the new codec.
+    /// Change the key codec type of this database, specifying the new codec.
     pub fn remap_key_type<KC2>(&self) -> Database<KC2, DC, C> {
         self.remap_types::<KC2, DC>()
     }
 
-    /// Change the data codec type of this uniform database, specifying the new codec.
+    /// Change the data codec type of this database, specifying the new codec.
     pub fn remap_data_type<DC2>(&self) -> Database<KC, DC2, C> {
         self.remap_types::<KC, DC2>()
     }
