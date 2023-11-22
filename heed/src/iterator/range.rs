@@ -335,6 +335,20 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
         self.cursor.put_current_with_flags(flags, &key_bytes, &data_bytes)
     }
 
+    pub unsafe fn put_current_with_data_codec<'a, NDC>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a NDC::EItem,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        NDC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = NDC::bytes_encode(data).map_err(Error::Encoding)?;
+        self.cursor.put_current(&key_bytes, &data_bytes)
+    }
+
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
@@ -766,6 +780,20 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         self.cursor.put_current_with_flags(flags, &key_bytes, &data_bytes)
+    }
+
+    pub unsafe fn put_current_with_data_codec<'a, NDC>(
+        &mut self,
+        key: &'a KC::EItem,
+        data: &'a NDC::EItem,
+    ) -> Result<bool>
+    where
+        KC: BytesEncode<'a>,
+        NDC: BytesEncode<'a>,
+    {
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = NDC::bytes_encode(data).map_err(Error::Encoding)?;
+        self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
     /// Move on the first value of keys, ignoring duplicate values.
