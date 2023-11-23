@@ -276,7 +276,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
-    /// Write a new value to the current entry.
+    /// Write a new value to the current entry. The entry is written with the specified flags.
     ///
     /// The given key **must** be equal to the one this cursor is pointing otherwise the database
     /// can be put into an inconsistent state.
@@ -289,8 +289,9 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
     /// # Safety
     ///
     /// Please read the safety notes of the [`RwRange::put_current`] method.
-    pub unsafe fn put_current_reserved<'a, F>(
+    pub unsafe fn put_current_reserved_with_flags<'a, F>(
         &mut self,
+        flags: PutFlags,
         key: &'a KC::EItem,
         data_size: usize,
         write_func: F,
@@ -300,7 +301,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
+        self.cursor.put_current_reserved_with_flags(flags, &key_bytes, data_size, write_func)
     }
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
@@ -709,7 +710,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
         self.cursor.put_current(&key_bytes, &data_bytes)
     }
 
-    /// Write a new value to the current entry.
+    /// Write a new value to the current entry. The entry is written with the specified flags.
     ///
     /// The given key **must** be equal to the one this cursor is pointing otherwise the database
     /// can be put into an inconsistent state.
@@ -722,8 +723,9 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
     /// # Safety
     ///
     /// Please read the safety notes of the [`RwRevRange::put_current`] method.
-    pub unsafe fn put_current_reserved<'a, F>(
+    pub unsafe fn put_current_reserved_with_flags<'a, F>(
         &mut self,
+        flags: PutFlags,
         key: &'a KC::EItem,
         data_size: usize,
         write_func: F,
@@ -733,7 +735,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
         F: FnMut(&mut ReservedSpace) -> io::Result<()>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        self.cursor.put_current_reserved(&key_bytes, data_size, write_func)
+        self.cursor.put_current_reserved_with_flags(flags, &key_bytes, data_size, write_func)
     }
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
