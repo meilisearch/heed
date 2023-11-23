@@ -329,8 +329,9 @@ impl<'txn> RwCursor<'txn> {
     /// # Safety
     ///
     /// Please read the safety notes of the `[put_current]` method.
-    pub unsafe fn put_current_reserved<F>(
+    pub unsafe fn put_current_reserved_with_flags<F>(
         &mut self,
+        flags: PutFlags,
         key: &[u8],
         data_size: usize,
         mut write_func: F,
@@ -340,7 +341,7 @@ impl<'txn> RwCursor<'txn> {
     {
         let mut key_val = crate::into_val(key);
         let mut reserved = ffi::reserve_size_val(data_size);
-        let flags = ffi::MDB_RESERVE;
+        let flags = ffi::MDB_RESERVE | flags.bits();
 
         let result =
             mdb_result(ffi::mdb_cursor_put(self.cursor.cursor, &mut key_val, &mut reserved, flags));

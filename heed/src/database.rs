@@ -2215,7 +2215,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
 impl<KC, DC, C> Clone for Database<KC, DC, C> {
     fn clone(&self) -> Database<KC, DC, C> {
-        Database { env_ident: self.env_ident, dbi: self.dbi, marker: marker::PhantomData }
+        *self
     }
 }
 
