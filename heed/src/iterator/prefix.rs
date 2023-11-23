@@ -79,7 +79,7 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RoPrefix<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RoPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -93,7 +93,7 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RoPrefix<'txn, KC, DC, MoveThroughDuplicateValues> {
+    ) -> RoPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -103,7 +103,7 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, KC2, DC2, C, IM> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -113,17 +113,17 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoPrefix<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RoPrefix<'txn, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoPrefix<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RoPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
@@ -329,7 +329,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwPrefix<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -343,7 +343,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RwPrefix<'txn, KC, DC, MoveThroughDuplicateValues> {
+    ) -> RwPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -353,7 +353,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwPrefix<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwPrefix<'txn, KC2, DC2, C, IM> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -363,17 +363,17 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwPrefix<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RwPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
@@ -466,7 +466,7 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RoRevPrefix<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RoRevPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -480,7 +480,7 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RoRevPrefix<'txn, KC, DC, MoveThroughDuplicateValues> {
+    ) -> RoRevPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -490,7 +490,7 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRevPrefix<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RoRevPrefix<'txn, KC2, DC2, C, IM> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -500,17 +500,17 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRevPrefix<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RoRevPrefix<'txn, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRevPrefix<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RoRevPrefix<'txn, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRevPrefix<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RoRevPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
@@ -715,7 +715,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwRevPrefix<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwRevPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -729,7 +729,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RwRevPrefix<'txn, KC, DC, MoveThroughDuplicateValues> {
+    ) -> RwRevPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -739,7 +739,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRevPrefix<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwRevPrefix<'txn, KC2, DC2, C, IM> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -749,17 +749,17 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRevPrefix<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwRevPrefix<'txn, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRevPrefix<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwRevPrefix<'txn, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRevPrefix<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RwRevPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
