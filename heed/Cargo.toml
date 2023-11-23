@@ -74,3 +74,6 @@ posix-sem = ["lmdb-master-sys/posix-sem"]
 [[example]]
 name = "rmp-serde"
 required-features = ["serde-rmp"]
+
+[package.metadata.docs.rs]
+features = ["serde", "serde-bincode", "serde-json", "serde-rmp"]
