@@ -387,7 +387,8 @@ bitflags! {
         const NO_DUP_DATA = ffi::MDB_NODUPDATA;
         /// Enter the new key/data pair only if the key does not already appear in the database.
         ///
-        /// The function will return MDB_KEYEXIST if the key already appears in the database, even if the database supports duplicates (MDB_DUPSORT).
+        /// The function will return MDB_KEYEXIST if the key already appears in the database,
+        /// even if the database supports duplicates (MDB_DUPSORT).
         /// The data parameter will be set to point to the existing item.
         const NO_OVERWRITE = ffi::MDB_NOOVERWRITE;
         /// Append the given key/data pair to the end of the database.
