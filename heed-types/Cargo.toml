@@ -1,6 +1,6 @@
 [package]
 name = "heed-types"
-version = "0.20.0-alpha.6"
+version = "0.20.0-alpha.7"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "The types used with the fully typed LMDB wrapper, heed"
 license = "MIT"
@@ -15,7 +15,7 @@ bytemuck = { version = "1.12.3", features = [
     "extern_crate_std",
 ] }
 byteorder = "1.4.3"
-heed-traits = { version = "0.20.0-alpha.6", path = "../heed-traits" }
+heed-traits = { version = "0.20.0-alpha.7", path = "../heed-traits" }
 serde = { version = "1.0.151", optional = true }
 serde_json = { version = "1.0.91", optional = true }
 rmp-serde = { version = "1.1.2", optional = true }
