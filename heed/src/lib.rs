@@ -1,8 +1,8 @@
 #![doc(
-    html_favicon_url = "https://github.com/meilisearch/heed/blob/cb2f1cdff450be0004c80475d47b526ab14e0ed1/assets/heed-pigeon.ico?raw=true"
+    html_favicon_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon.ico?raw=true"
 )]
 #![doc(
-    html_logo_url = "https://github.com/meilisearch/heed/blob/cb2f1cdff450be0004c80475d47b526ab14e0ed1/assets/heed-pigeon-logo.png?raw=true"
+    html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
 //! Crate `heed` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
