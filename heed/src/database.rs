@@ -55,14 +55,14 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C> {
+pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
     env: &'e Env,
     types: marker::PhantomData<(KC, DC, C)>,
     name: Option<&'n str>,
     flags: AllDatabaseFlags,
 }
 
-impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified, DefaultComparator> {
+impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
     pub fn new(env: &'e Env) -> Self {
         DatabaseOpenOptions {
@@ -79,7 +79,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, NKC, NDC, DefaultComparator> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, NKC, NDC> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),

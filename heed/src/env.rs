@@ -524,9 +524,7 @@ impl Env {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(
-        &self,
-    ) -> DatabaseOpenOptions<Unspecified, Unspecified, DefaultComparator> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
         DatabaseOpenOptions::new(self)
     }
 
