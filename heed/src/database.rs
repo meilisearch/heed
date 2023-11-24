@@ -54,14 +54,15 @@ use crate::*;
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct DatabaseOpenOptions<'e, KC, DC, C> {
+#[derive(Debug)]
+pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     env: &'e Env,
     types: marker::PhantomData<(KC, DC, C)>,
-    name: Option<String>,
+    name: Option<&'n str>,
     flags: AllDatabaseFlags,
 }
 
-impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified, DefaultComparator> {
+impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified, DefaultComparator> {
     /// Create an options struct to open/create a database with specific flags.
     pub fn new(env: &'e Env) -> Self {
         DatabaseOpenOptions {
@@ -73,12 +74,12 @@ impl<'e> DatabaseOpenOptions<'e, Unspecified, Unspecified, DefaultComparator> {
     }
 }
 
-impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
+impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, NKC, NDC, DefaultComparator> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, NKC, NDC, DefaultComparator> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -89,7 +90,7 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, KC, DC, NC> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -101,8 +102,8 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
     /// Change the name of the database.
     ///
     /// By default the database is unnamed and there only is a single unnamed database.
-    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
-        self.name = Some(name.into());
+    pub fn name(&mut self, name: &'n str) -> &mut Self {
+        self.name = Some(name);
         self
     }
 
@@ -139,8 +140,7 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
         assert_eq_env_txn!(self.env, rtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>(), TypeId::of::<C>());
-        let name = self.name.as_deref();
-        match self.env.raw_init_database::<C>(rtxn.txn, name, types, self.flags) {
+        match self.env.raw_init_database::<C>(rtxn.txn, self.name, types, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -165,14 +165,21 @@ impl<'e, KC, DC, C> DatabaseOpenOptions<'e, KC, DC, C> {
         assert_eq_env_txn!(self.env, wtxn);
 
         let types = (TypeId::of::<KC>(), TypeId::of::<DC>(), TypeId::of::<C>());
-        let name = self.name.as_deref();
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn, name, types, flags) {
+        match self.env.raw_init_database::<C>(wtxn.txn.txn, self.name, types, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
 }
+
+impl<KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
 
 /// A typed database that accepts only the types it was created with.
 ///

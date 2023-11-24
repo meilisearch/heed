@@ -552,13 +552,12 @@ impl Env {
         &self,
         rtxn: &RoTxn,
         name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC, DefaultComparator>>>
+    ) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options =
-            self.database_options().types::<KC, DC>().key_comparator::<DefaultComparator>();
+        let mut options = self.database_options().types::<KC, DC>();
         if let Some(name) = name {
             options.name(name);
         }
@@ -578,13 +577,12 @@ impl Env {
         &self,
         wtxn: &mut RwTxn,
         name: Option<&str>,
-    ) -> Result<Database<KC, DC, DefaultComparator>>
+    ) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let mut options =
-            self.database_options().types::<KC, DC>().key_comparator::<DefaultComparator>();
+        let mut options = self.database_options().types::<KC, DC>();
         if let Some(name) = name {
             options.name(name);
         }
