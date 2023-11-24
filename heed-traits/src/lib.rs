@@ -1,3 +1,10 @@
+#![doc(
+    html_favicon_url = "https://github.com/meilisearch/heed/blob/cb2f1cdff450be0004c80475d47b526ab14e0ed1/assets/heed-pigeon.ico?raw=true"
+)]
+#![doc(
+    html_logo_url = "https://github.com/meilisearch/heed/blob/cb2f1cdff450be0004c80475d47b526ab14e0ed1/assets/heed-pigeon-logo.png?raw=true"
+)]
+
 //! Crate `heed-traits` contains the traits used to encode and decode database content.
 
 #![warn(missing_docs)]
