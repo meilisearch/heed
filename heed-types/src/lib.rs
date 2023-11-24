@@ -1,3 +1,10 @@
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon.ico?raw=true"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
+)]
+
 //! Types that can be used to serialize and deserialize types inside databases.
 //!
 //! How to choose the right type to store things in this database?
@@ -5,21 +12,6 @@
 //!   - [`Str`] to store [`str`](primitive@str)s
 //!   - [`Unit`] to store `()` types
 //!   - [`SerdeBincode`],  [`SerdeJson`], or [`SerdeRmp`] to store [`Serialize`]/[`Deserialize`] types
-//!
-//! But if you want to store big types that can be efficiently deserialized then
-//! here is a little table to help you in your quest:
-//!
-//! | Available types    | Encoding type | Decoding type | allocations                                             |
-//! |--------------------|:-------------:|:-------------:|---------------------------------------------------------|
-//! | [`CowSlice`]       | `&[T]`        | `Cow<[T]>`    | will allocate if memory is miss-aligned                 |
-//! | [`CowType`]        | `&T`          | `Cow<T>`      | will allocate if memory is miss-aligned                 |
-//! | [`OwnedSlice`]     | `&[T]`        | `Vec<T>`      | will _always_ allocate                                  |
-//! | [`OwnedType`]      | `&T`          | `T`           | will _always_ allocate                                  |
-//! | [`UnalignedSlice`] | `&[T]`        | `&[T]`        | will _never_ allocate because alignment is always valid |
-//! | [`UnalignedType`]  | `&T`          | `&T`          | will _never_ allocate because alignment is always valid |
-//!
-//! [`Serialize`]: serde::Serialize
-//! [`Deserialize`]: serde::Deserialize
 
 #![warn(missing_docs)]
 
