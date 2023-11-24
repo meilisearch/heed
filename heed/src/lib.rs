@@ -189,11 +189,11 @@ pub type Result<T> = result::Result<T, Error>;
 
 /// An unspecified type.
 ///
-/// It is used as placeholders when creating a database,
-/// do not implement the [`BytesEncode`] and [`BytesDecode`] traits
+/// It is used as placeholders when creating a database.
+/// It does not implement the [`BytesEncode`] and [`BytesDecode`] traits
 /// and therefore can't be used as codecs. You must use the [`Database::remap_types`]
 /// to properly define them.
-pub struct Unspecified;
+pub enum Unspecified {}
 
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
