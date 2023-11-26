@@ -23,7 +23,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Str>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Str>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
@@ -263,7 +263,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
@@ -311,7 +311,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
@@ -386,7 +386,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
@@ -461,7 +461,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...
@@ -582,7 +582,7 @@ mod tests {
             .unwrap();
 
         let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<ByteSlice, Unit>(&mut wtxn, None).unwrap();
+        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
         // Create an ordered list of keys...

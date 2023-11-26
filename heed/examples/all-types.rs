@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use heed::bytemuck::{Pod, Zeroable};
 use heed::byteorder::BE;
 use heed::types::*;
 use heed::{Database, EnvOpenOptions};
@@ -18,22 +17,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .max_dbs(3000)
         .open(path)?;
 
-    // you can specify that a database will support some typed key/data
-    //
-    // like here we specify that the key will be an array of two i32
-    // and the data will be an str
-    let mut wtxn = env.write_txn()?;
-    let db: Database<OwnedType<[i32; 2]>, Str> = env.create_database(&mut wtxn, Some("kikou"))?;
-
-    db.put(&mut wtxn, &[2, 3], "what's up?")?;
-    let ret: Option<&str> = db.get(&wtxn, &[2, 3])?;
-
-    println!("{:?}", ret);
-    wtxn.commit()?;
-
     // here the key will be an str and the data will be a slice of u8
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, ByteSlice> = env.create_database(&mut wtxn, Some("kiki"))?;
+    let db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("kiki"))?;
 
     db.put(&mut wtxn, "hello", &[2, 3][..])?;
     let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
@@ -70,25 +56,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    // it is prefered to use bytemuck when possible
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod)]
-    #[repr(C)]
-    struct ZeroBytes {
-        bytes: [u8; 12],
-    }
-
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, UnalignedType<ZeroBytes>> =
-        env.create_database(&mut wtxn, Some("simple-struct"))?;
-
-    let zerobytes = ZeroBytes { bytes: [24; 12] };
-    db.put(&mut wtxn, "zero", &zerobytes)?;
-
-    let ret = db.get(&wtxn, "zero")?;
-
-    println!("{:?}", ret);
-    wtxn.commit()?;
-
     // you can ignore the data
     let mut wtxn = env.write_txn()?;
     let db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
@@ -115,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // NOTE that those types are not saved upon runs and
     // therefore types cannot be checked upon different runs,
     // the first database opening fix the types for this run.
-    let result = env.create_database::<Str, OwnedSlice<i32>>(&mut wtxn, Some("ignored-data"));
+    let result = env.create_database::<Str, SerdeJson<i32>>(&mut wtxn, Some("ignored-data"));
     assert!(result.is_err());
 
     // you can iterate over keys in order

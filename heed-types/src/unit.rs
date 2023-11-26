@@ -1,10 +1,10 @@
 use std::borrow::Cow;
+use std::{error, fmt};
 
-use bytemuck::PodCastError;
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
 /// Describes the `()` type.
-pub struct Unit;
+pub enum Unit {}
 
 impl BytesEncode<'_> for Unit {
     type EItem = ();
@@ -21,7 +21,19 @@ impl BytesDecode<'_> for Unit {
         if bytes.is_empty() {
             Ok(())
         } else {
-            Err(PodCastError::SizeMismatch.into())
+            Err(NonEmptyError.into())
         }
     }
 }
+
+/// The slice of bytes is non-empty and therefore is not a unit `()` type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NonEmptyError;
+
+impl fmt::Display for NonEmptyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("the slice of bytes is non-empty and therefore is not a unit `()` type")
+    }
+}
+
+impl error::Error for NonEmptyError {}

@@ -33,7 +33,7 @@
 //!
 //! // we will open the default unnamed database
 //! let mut wtxn = env.write_txn()?;
-//! let db: Database<Str, OwnedType<i32>> = env.create_database(&mut wtxn, None)?;
+//! let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
 //! db.put(&mut wtxn, "seven", &7)?;

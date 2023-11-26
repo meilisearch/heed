@@ -1,9 +1,10 @@
 use std::borrow::Cow;
+use std::str;
 
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
 /// Describes an [`prim@str`].
-pub struct Str;
+pub enum Str {}
 
 impl BytesEncode<'_> for Str {
     type EItem = str;
@@ -17,6 +18,6 @@ impl<'a> BytesDecode<'a> for Str {
     type DItem = &'a str;
 
     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
-        std::str::from_utf8(bytes).map_err(Into::into)
+        str::from_utf8(bytes).map_err(Into::into)
     }
 }
