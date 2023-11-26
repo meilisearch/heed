@@ -167,7 +167,6 @@ impl EnvOpenOptions {
     /// Creates a blank new set of options ready for configuration.
     pub fn new() -> EnvOpenOptions {
         EnvOpenOptions {
-            checksum: None,
             encrypt: None,
             map_size: None,
             max_readers: None,

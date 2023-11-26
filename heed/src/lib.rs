@@ -73,8 +73,8 @@ pub use {aead, bytemuck, byteorder, heed_types as types};
 use self::cursor::{RoCursor, RwCursor};
 pub use self::database::{Database, DatabaseOpenOptions};
 pub use self::env::{
-    env_closing_event, Checksum, CompactionOption, DefaultComparator, Encrypt, EncryptDecrypt, Env,
-    EnvClosingEvent, EnvInfo, EnvOpenOptions, SimplifiedOpenOptions,
+    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
+    EnvOpenOptions, SimplifiedOpenOptions,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,

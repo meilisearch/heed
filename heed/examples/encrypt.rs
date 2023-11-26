@@ -44,12 +44,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env = options.open(&env_path)?;
 
     // We check that the secret entries are correctly decrypted
-    let mut rtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.open_database(&mut rtxn, Some("first"))?.unwrap();
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, Str> = env.open_database(&rtxn, Some("first"))?.unwrap();
     let mut iter = db.iter(&rtxn)?;
     assert_eq!(iter.next().transpose()?, Some((key1, val1)));
     assert_eq!(iter.next().transpose()?, Some((key2, val2)));
     assert_eq!(iter.next().transpose()?, None);
+
+    eprintln!("Successful test!");
 
     Ok(())
 }
