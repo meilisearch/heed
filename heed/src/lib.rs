@@ -106,10 +106,10 @@ pub struct LmdbVersion {
 /// use heed::{lmdb_version, LmdbVersion};
 ///
 /// let expected = LmdbVersion {
-///     string: "LMDB 0.9.70: (December 19, 2015)",
+///     string: "LMDB 0.9.90: (May 1, 2017)",
 ///     major: 0,
 ///     minor: 9,
-///     patch: 70,
+///     patch: 90,
 /// };
 /// assert_eq!(lmdb_version(), expected);
 /// ```
