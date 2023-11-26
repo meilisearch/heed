@@ -1,6 +1,6 @@
 [package]
 name = "heed"
-version = "0.20.0-alpha.7"
+version = "0.20.0-alpha.8"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB wrapper with minimum overhead"
 license = "MIT"
@@ -14,8 +14,8 @@ edition = "2021"
 bitflags = { version = "2.3.3", features = ["serde"] }
 bytemuck = "1.12.3"
 byteorder = { version = "1.4.3", default-features = false }
-heed-traits = { version = "0.20.0-alpha.7", path = "../heed-traits" }
-heed-types = { version = "0.20.0-alpha.7", default-features = false, path = "../heed-types" }
+heed-traits = { version = "0.20.0-alpha.8", path = "../heed-traits" }
+heed-types = { version = "0.20.0-alpha.8", default-features = false, path = "../heed-types" }
 libc = "0.2.139"
 lmdb-master-sys = { version = "0.1.0", path = "../lmdb-master-sys" }
 once_cell = "1.16.0"

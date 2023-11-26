@@ -297,7 +297,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
     ///
-    /// For more info, see [`RwIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_options`].
     ///
     /// # Safety
     ///
@@ -684,7 +684,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
     ///
-    /// For more info, see [`RwIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_options`].
     ///
     /// # Safety
     ///

@@ -306,7 +306,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
     ///
-    /// For more info, see [`RwIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_options`].
     ///
     /// # Safety
     ///
@@ -740,7 +740,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
 
     /// Insert a key-value pair in this database. The entry is written with the specified flags and data codec.
     ///
-    /// For more info, see [`RwIter::put_current_with_flags`].
+    /// For more info, see [`RwIter::put_current_with_options`].
     ///
     /// # Safety
     ///
