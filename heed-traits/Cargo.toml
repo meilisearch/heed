@@ -1,6 +1,6 @@
 [package]
 name = "heed-traits"
-version = "0.20.0-alpha.8"
+version = "0.20.0-alpha.9"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "The traits used inside of the fully typed LMDB wrapper, heed"
 license = "MIT"
