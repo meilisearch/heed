@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // here the key will be an str and the data will be a slice of u8
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, ByteSlice> = env.create_database(&mut wtxn, None)?;
+    let db: Database<Str, Bytes> = env.create_database(&mut wtxn, None)?;
 
     // clear db
     db.clear(&mut wtxn)?;

@@ -2,8 +2,11 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+use byteorder::BE;
 use heed::types::*;
 use heed::{Database, EnvOpenOptions};
+
+type BEU32 = U32<BE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env1_path = Path::new("target").join("env1.mdb");
@@ -23,9 +26,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut wtxn1 = env1.write_txn()?;
     let mut wtxn2 = env2.write_txn()?;
-    let db1: Database<Str, ByteSlice> = env1.create_database(&mut wtxn1, Some("hello"))?;
-    let db2: Database<OwnedType<u32>, OwnedType<u32>> =
-        env2.create_database(&mut wtxn2, Some("hello"))?;
+    let db1: Database<Str, Bytes> = env1.create_database(&mut wtxn1, Some("hello"))?;
+    let db2: Database<BEU32, BEU32> = env2.create_database(&mut wtxn2, Some("hello"))?;
 
     // clear db
     db1.clear(&mut wtxn1)?;
