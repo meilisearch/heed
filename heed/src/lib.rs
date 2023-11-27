@@ -68,13 +68,13 @@ use std::ffi::CStr;
 use std::{error, fmt, io, mem, result};
 
 use heed_traits as traits;
-pub use {bytemuck, byteorder, heed_types as types};
+pub use {aead, bytemuck, byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::database::{Database, DatabaseOpenOptions};
 pub use self::env::{
     env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions,
+    EnvOpenOptions, SimplifiedOpenOptions,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
@@ -106,10 +106,10 @@ pub struct LmdbVersion {
 /// use heed::{lmdb_version, LmdbVersion};
 ///
 /// let expected = LmdbVersion {
-///     string: "LMDB 0.9.70: (December 19, 2015)",
+///     string: "LMDB 0.9.90: (May 1, 2017)",
 ///     major: 0,
 ///     minor: 9,
-///     patch: 70,
+///     patch: 90,
 /// };
 /// assert_eq!(lmdb_version(), expected);
 /// ```
@@ -147,9 +147,9 @@ pub enum Error {
     DatabaseClosing,
     /// Attempt to open Env with different options
     BadOpenOptions {
-        /// The options that were used to originally open this env.
-        options: EnvOpenOptions,
-        /// The env opened with the original options.
+        /// The simplified options that were used to originally open this [`Env`].
+        original_options: SimplifiedOpenOptions,
+        /// The [`Env`] opened with the original options.
         env: Env,
     },
 }

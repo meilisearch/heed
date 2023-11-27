@@ -3,14 +3,14 @@ use std::fs::{self, File};
 use std::ptr;
 
 use cstr::cstr;
-use lmdb_master_sys::*;
+use lmdb_master3_sys::*;
 
 // https://github.com/victorporof/lmdb/blob/mdb.master/libraries/liblmdb/moz-test.c
 
 macro_rules! E {
     ($expr:expr) => {{
         match $expr {
-            lmdb_master_sys::MDB_SUCCESS => (),
+            lmdb_master3_sys::MDB_SUCCESS => (),
             err_code => assert!(false, "Failed with code {}", err_code),
         }
     }};
