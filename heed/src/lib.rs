@@ -68,7 +68,7 @@ use std::ffi::CStr;
 use std::{error, fmt, io, mem, result};
 
 use heed_traits as traits;
-pub use {bytemuck, byteorder, heed_types as types};
+pub use {byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::database::{Database, DatabaseOpenOptions};
