@@ -3,7 +3,7 @@ use std::{error, fmt};
 
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
-/// Describes the `()` type.
+/// Describes the unit `()` type.
 pub enum Unit {}
 
 impl BytesEncode<'_> for Unit {

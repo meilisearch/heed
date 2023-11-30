@@ -10,7 +10,7 @@ use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDupli
 use crate::*;
 
 /// Advances `bytes` to the immediate lexicographic successor of equal length, as
-/// defined by the `C` comparator. If no successor exists (i.e., `bytes` is the maximal
+/// defined by the `C` comparator. If no successor exists (i.e. `bytes` is the maximal
 /// value), it remains unchanged and the function returns `false`. Otherwise, updates
 /// `bytes` and returns `true`.
 fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
@@ -29,7 +29,7 @@ fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
 }
 
 /// Retreats `bytes` to the immediate lexicographic predecessor of equal length, as
-/// defined by the `C` comparator. If no predecessor exists (i.e., `bytes` is the minimum
+/// defined by the `C` comparator. If no predecessor exists (i.e. `bytes` is the minimum
 /// value), it remains unchanged and the function returns `false`. Otherwise, updates
 /// `bytes` and returns `true`.
 fn retreat_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
@@ -247,7 +247,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// this function.
     ///
     /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them i.e. `&str` into `String`.
+    /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
@@ -306,7 +306,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// this function.
     ///
     /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them i.e. `&str` into `String`.
+    /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
@@ -634,7 +634,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// this function.
     ///
     /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them i.e. `&str` into `String`.
+    /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
@@ -693,7 +693,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// this function.
     ///
     /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them i.e. `&str` into `String`.
+    /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
     /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).

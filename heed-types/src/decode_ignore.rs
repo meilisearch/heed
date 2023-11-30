@@ -2,8 +2,8 @@ use heed_traits::BoxedError;
 
 /// A convenient struct made to ignore the type when decoding it.
 ///
-/// It is appropriate to be used to count keys for example
-/// or to ensure that an entry exist for example.
+/// For example, it is appropriate to be used to count keys or to ensure that an
+/// entry exists.
 pub enum DecodeIgnore {}
 
 impl heed_traits::BytesDecode<'_> for DecodeIgnore {

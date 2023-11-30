@@ -3,7 +3,7 @@ use std::str;
 
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
-/// Describes an [`prim@str`].
+/// Describes a [`prim@str`].
 pub enum Str {}
 
 impl BytesEncode<'_> for Str {

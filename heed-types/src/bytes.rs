@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
-/// Describes a slice of bytes `[u8]` that is totally
-/// borrowed and doesn't depends on any [memory alignment].
+/// Describes a byte slice `[u8]` that is totally borrowed and doesn't depend on
+/// any [memory alignment].
 ///
 /// [memory alignment]: std::mem::align_of()
 pub enum Bytes {}

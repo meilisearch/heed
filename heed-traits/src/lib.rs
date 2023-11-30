@@ -5,7 +5,7 @@
     html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
-//! Crate `heed-traits` contains the traits used to encode and decode database content.
+//! Contains the traits used to encode and decode database content.
 
 #![warn(missing_docs)]
 
@@ -18,19 +18,19 @@ pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
 
 /// A trait that represents an encoding structure.
 pub trait BytesEncode<'a> {
-    /// The type to encode
+    /// The type to encode.
     type EItem: ?Sized + 'a;
 
-    /// Encode the given item as bytes
+    /// Encode the given item as bytes.
     fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError>;
 }
 
 /// A trait that represents a decoding structure.
 pub trait BytesDecode<'a> {
-    /// The type to decode
+    /// The type to decode.
     type DItem: 'a;
 
-    /// Decode the given bytes as DItem
+    /// Decode the given bytes as `DItem`.
     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError>;
 }
 

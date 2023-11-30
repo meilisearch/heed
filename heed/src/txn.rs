@@ -16,14 +16,14 @@ use crate::{Env, Result};
 ///
 /// ## OSX/Darwin Limitation
 ///
-/// At least 10 transactions can be active at the same time in the same process, since only 10 Posix semaphores can
+/// At least 10 transactions can be active at the same time in the same process, since only 10 POSIX semaphores can
 /// be active at the same time for a process. Threads are in the same process space.
 ///
-/// If the process crash in the Posix semaphore locking section of the transaction, the semaphore will be kept locked.
+/// If the process crashes in the POSIX semaphore locking section of the transaction, the semaphore will be kept locked.
 ///
-/// Note: if you program already use Posix Semaphore then you will have less available for heed/lmdb!
+/// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
-/// You may changing it by editing at **your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+/// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
 pub struct RoTxn<'e> {
     pub(crate) txn: *mut ffi::MDB_txn,
     env: &'e Env,
@@ -51,12 +51,12 @@ impl<'e> RoTxn<'e> {
 
     /// Commit a read transaction.
     ///
-    /// Synchronizing some [Env] metadata with the global handle.
+    /// Synchronizing some [`Env`] metadata with the global handle.
     ///
-    /// ## Lmdb
+    /// ## LMDB
     ///
-    /// It's mandatory in a multi-process setup to call [RoTxn::commit] upon read-only database opening.
-    /// After the transaction opening, the database is `drop`ed. The next transaction might return
+    /// It's mandatory in a multi-process setup to call [`RoTxn::commit`] upon read-only database opening.
+    /// After the transaction opening, the database is dropped. The next transaction might return
     /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
     pub fn commit(mut self) -> Result<()> {
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn)) };
@@ -86,20 +86,20 @@ fn abort_txn(txn: *mut ffi::MDB_txn) {
 ///
 /// ## LMDB Limitations
 ///
-/// Only one [RwTxn] may exist in the same environment at the same time,
-/// it two exist, the new one may wait on a Mutex for [RwTxn::commit] or [RwTxn::abort] of
-/// the first one.
+/// Only one [`RwTxn`] may exist in the same environment at the same time.
+/// If two exist, the new one may wait on a mutex for [`RwTxn::commit`] or [`RwTxn::abort`] to
+/// be called for the first one.
 ///
 /// ## OSX/Darwin Limitation
 ///
-/// At least 10 transactions can be active at the same time in the same process, since only 10 Posix semaphores can
+/// At least 10 transactions can be active at the same time in the same process, since only 10 POSIX semaphores can
 /// be active at the same time for a process. Threads are in the same process space.
 ///
-/// If the process crash in the Posix semaphore locking section of the transaction, the semaphore will be kept locked.
+/// If the process crashes in the POSIX semaphore locking section of the transaction, the semaphore will be kept locked.
 ///
-/// Note: if you program already use Posix Semaphore then you will have less available for heed/lmdb!
+/// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
-/// You may changing it by editing at **your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+/// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
 pub struct RwTxn<'p> {
     pub(crate) txn: RoTxn<'p>,
 }

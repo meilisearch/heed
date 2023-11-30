@@ -7,15 +7,15 @@
 [![dependency status](https://deps.rs/repo/github/meilisearch/heed/status.svg)](https://deps.rs/repo/github/meilisearch/heed)
 [![Build](https://github.com/meilisearch/heed/actions/workflows/rust.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/rust.yml)
 
-A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, uses bytemuck internally.
+A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, using bytemuck internally.
 
-This library is able to serialize all kind of types, not just bytes slices, even _Serde_ types are supported.
+This library is able to serialize all kinds of types, not just byte slices, and even _Serde_ types are supported.
 
 Go check out [the examples](heed/examples/).
 
 ## Building from Source
 
-If you don't already cloned the repository you can use this command:
+You can use this command to clone the repository:
 
 ```bash
 git clone --recursive https://github.com/meilisearch/heed.git
@@ -23,7 +23,7 @@ cd heed
 cargo build
 ```
 
-However, if you already cloned it and forgot to initialize the submodules execute the follwing command:
+However, if you already cloned it and forgot to initialize the submodules, execute the following command:
 
 ```bash
 git submodule update --init

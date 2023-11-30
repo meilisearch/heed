@@ -16,7 +16,7 @@ impl ReservedSpace {
         ReservedSpace { size: val.mv_size, start_ptr: val.mv_data as *mut u8, written: 0 }
     }
 
-    /// The total number of bytes that this memory buffer is.
+    /// The total number of bytes that this memory buffer has.
     pub fn size(&self) -> usize {
         self.size
     }
