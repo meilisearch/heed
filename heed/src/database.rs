@@ -119,17 +119,17 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     ///
     /// ## Important Information
     ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
     ///
-    /// ## Lmdb read-only access of existing database
+    /// ## LMDB read-only access of existing database
     ///
     /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote you might need to call manually `RoTxn::commit` to get metadata
-    /// and the databases handles opened and shared with the global [Env] handle.
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
     ///
-    /// If not done you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
     pub fn open(&self, rtxn: &RoTxn) -> Result<Option<Database<KC, DC, C>>>
     where
@@ -153,9 +153,9 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     ///
     /// ## Important Information
     ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
     pub fn create(&self, wtxn: &mut RwTxn) -> Result<Database<KC, DC, C>>
     where
         KC: 'static,

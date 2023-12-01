@@ -143,7 +143,7 @@ impl EnvOpenOptions {
         self
     }
 
-    /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
+    /// Set one or more [LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
     /// ```
     /// use std::fs;
     /// use std::path::Path;
@@ -157,7 +157,7 @@ impl EnvOpenOptions {
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = env_builder.open(dir.path())?;
     ///
-    /// // we will open the default unamed database
+    /// // we will open the default unnamed database
     /// let mut wtxn = env.write_txn()?;
     /// let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
     ///
@@ -168,7 +168,7 @@ impl EnvOpenOptions {
     /// db.put(&mut wtxn, "three", &3)?;
     /// wtxn.commit()?;
     ///
-    /// // Force the OS to flush the buffers (see Flag::NoSync and Flag::NoMetaSync).
+    /// // force the OS to flush the buffers (see Flag::NoSync and Flag::NoMetaSync).
     /// env.force_sync();
     ///
     /// // opening a read transaction
@@ -335,7 +335,7 @@ impl Drop for EnvInner {
     }
 }
 
-/// An helping function that transforms the LMDB types into Rust types (`MDB_val` into slices)
+/// A helper function that transforms the LMDB types into Rust types (`MDB_val` into slices)
 /// and vice versa, the Rust types into C types (`Ordering` into an integer).
 extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
     a: *const ffi::MDB_val,
@@ -492,11 +492,11 @@ impl Env {
         let rtxn = self.read_txn()?;
         let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, None, 0)?;
 
-        // we don’t want anyone to open an environment while we’re computing the stats
+        // We don't want anyone to open an environment while we're computing the stats
         // thus we take a lock on the dbi
         let dbi_open = self.0.dbi_open_mutex.lock().unwrap();
 
-        // We’re going to iterate on the unnamed database
+        // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
 
         while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
@@ -513,7 +513,7 @@ impl Env {
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
 
-                // if the db wasn’t already opened
+                // If the db wasn't already opened
                 if !dbi_open.contains_key(&dbi) {
                     unsafe { ffi::mdb_dbi_close(self.env_mut_ptr(), dbi) }
                 }
@@ -534,17 +534,17 @@ impl Env {
     ///
     /// ## Important Information
     ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
     ///
-    /// ## Lmdb read-only access of existing database
+    /// ## LMDB read-only access of existing database
     ///
     /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote you might need to call manually `RoTxn::commit` to get metadata
-    /// and the databases handles opened and shared with the global [Env] handle.
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
     ///
-    /// If not done you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
@@ -564,13 +564,13 @@ impl Env {
 
     /// Creates a typed database that can already exist in this environment.
     ///
-    /// If the database was previously opened in this program run, types will be checked.
+    /// If the database was previously opened during this program run, types will be checked.
     ///
     /// ## Important Information
     ///
-    /// LMDB have an important restriction on the unnamed database when named ones are opened,
-    /// the names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// these keys can only be read and not written.
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
     pub fn create_database<KC, DC>(
         &self,
         wtxn: &mut RwTxn,
@@ -637,7 +637,7 @@ impl Env {
     ///
     /// ## LMDB Limitations
     ///
-    /// Only one [RwTxn] may exist simultaneously in the current environment.
+    /// Only one [`RwTxn`] may exist simultaneously in the current environment.
     /// If another write transaction is initiated, while another write transaction exists
     /// the thread initiating the new one will wait on a mutex upon completion of the previous
     /// transaction.
@@ -671,10 +671,10 @@ impl Env {
     ///
     /// ## Errors
     ///
-    /// * [crate::MdbError::Panic]: A fatal error occurred earlier, and the environment must be shut down
-    /// * [crate::MdbError::MapResized]: Another process wrote data beyond this [Env] mapsize and this env
+    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
     /// map must be resized
-    /// * [crate::MdbError::ReadersFull]: a read-only transaction was requested, and the reader lock table is
+    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     /// full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
@@ -765,9 +765,9 @@ impl Env {
     ///
     /// # Safety
     ///
-    /// According to the [lmdb docs](http://www.lmdb.tech/doc/group__mdb.html#gaa2506ec8dab3d969b0e609cd82e619e5),
-    /// it is ok to call mdb_env_set_mapsize for an open environment as long as no transactions are active,
-    /// but the library does not check for this condition, the caller must ensure it explicitly.
+    /// According to the [LMDB documentation](http://www.lmdb.tech/doc/group__mdb.html#gaa2506ec8dab3d969b0e609cd82e619e5),
+    /// it is okay to call `mdb_env_set_mapsize` for an open environment as long as no transactions are active,
+    /// but the library does not check for this condition, so the caller must ensure it explicitly.
     pub unsafe fn resize(&self, new_size: usize) -> Result<()> {
         if new_size % page_size::get() != 0 {
             let msg = format!(
@@ -785,7 +785,7 @@ impl Env {
 /// Contains information about the environment.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvInfo {
-    /// Address of map, if fixed.
+    /// Address of the map, if fixed.
     pub map_addr: *mut c_void,
     /// Size of the data memory map.
     pub map_size: usize,
@@ -795,12 +795,12 @@ pub struct EnvInfo {
     pub last_txn_id: usize,
     /// Maximum number of reader slots in the environment.
     pub maximum_number_of_readers: u32,
-    /// Maximum number of reader slots used in the environment.
+    /// Number of reader slots used in the environment.
     pub number_of_readers: u32,
 }
 
-/// A structure that can be used to wait for the closing event,
-/// multiple threads can wait on this event.
+/// A structure that can be used to wait for the closing event.
+/// Multiple threads can wait on this event.
 #[derive(Clone)]
 pub struct EnvClosingEvent(Arc<SignalEvent>);
 
@@ -810,13 +810,13 @@ impl EnvClosingEvent {
     /// # Safety
     ///
     /// Make sure that you don't have any copy of the environment in the thread
-    /// that is waiting for a close event, if you do, you will have a dead-lock.
+    /// that is waiting for a close event. If you do, you will have a deadlock.
     pub fn wait(&self) {
         self.0.wait()
     }
 
     /// Blocks this thread until either the environment has been closed
-    /// or until the timeout elapses, returns `true` if the environment
+    /// or until the timeout elapses. Returns `true` if the environment
     /// has been effectively closed.
     pub fn wait_timeout(&self, timeout: Duration) -> bool {
         self.0.wait_timeout(timeout)

@@ -5,7 +5,7 @@ use std::mem::size_of;
 use byteorder::{ByteOrder, ReadBytesExt};
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 
-/// Encodable version of [`u8`]
+/// Encodable version of [`u8`].
 pub struct U8;
 
 impl BytesEncode<'_> for U8 {
@@ -24,7 +24,7 @@ impl BytesDecode<'_> for U8 {
     }
 }
 
-/// Encodable version of [`i8`]
+/// Encodable version of [`i8`].
 pub struct I8;
 
 impl BytesEncode<'_> for I8 {

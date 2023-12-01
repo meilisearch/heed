@@ -5,20 +5,20 @@
     html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
-//! Crate `heed` is a high-level wrapper of [LMDB], high-level doesn't mean heavy (think about Rust).
+//! `heed` is a high-level wrapper of [LMDB]; high-level doesn't mean heavy (think about Rust).
 //!
-//! It provides you a way to store types in LMDB without any limit and with a minimal overhead as possible,
-//! relying on the [bytemuck] library to avoid copying bytes when that's unnecessary and the serde library
+//! It provides you a way to store types in LMDB without any limit and with as minimal an overhead as possible,
+//! relying on the [bytemuck] library to avoid copying bytes when it's unnecessary and the serde library
 //! when this is unavoidable.
 //!
-//! The Lightning Memory-Mapped Database (LMDB) directly maps files parts into main memory, combined
-//! with the bytemuck library allows us to safely zero-copy parse and serialize Rust types into LMDB.
+//! The Lightning Memory-Mapped Database (LMDB) directly maps file parts into main memory; combined
+//! with the bytemuck library, this allows us to safely zero-copy parse and serialize Rust types into LMDB.
 //!
 //! [LMDB]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
 //!
 //! # Examples
 //!
-//! Open a database, that will support some typed key/data and ensures, at compile time,
+//! Open a database that will support some typed key/data and ensure, at compile time,
 //! that you'll write those types and not others.
 //!
 //! ```
@@ -133,19 +133,19 @@ pub fn lmdb_version() -> LmdbVersion {
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]
 pub enum Error {
-    /// I/O error: can come from the std or be a rewrapped [`MdbError`]
+    /// I/O error: can come from the standard library or be a rewrapped [`MdbError`].
     Io(io::Error),
-    /// Lmdb error
+    /// LMDB error.
     Mdb(MdbError),
-    /// Encoding error
+    /// Encoding error.
     Encoding(BoxedError),
-    /// Decoding error
+    /// Decoding error.
     Decoding(BoxedError),
-    /// Incoherent types when opening a database
+    /// Incoherent types when opening a database.
     InvalidDatabaseTyping,
-    /// Database closing in progress
+    /// Database closing in progress.
     DatabaseClosing,
-    /// Attempt to open Env with different options
+    /// Attempt to open [`Env`] with different options.
     BadOpenOptions {
         /// The options that were used to originally open this env.
         options: EnvOpenOptions,

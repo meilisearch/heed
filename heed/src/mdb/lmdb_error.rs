@@ -9,12 +9,12 @@ use lmdb_master_sys as ffi;
 /// An LMDB error kind.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {
-    /// key/data pair already exists.
+    /// A key/data pair already exists.
     ///
-    /// May be also returned by append functions, data are passed
+    /// May be also returned by append functions. Data passed
     /// doesn't respect the database ordering.
     KeyExist,
-    /// key/data pair not found (EOF).
+    /// A key/data pair was not found (EOF).
     NotFound,
     /// Requested page not found - this usually indicates corruption.
     PageNotFound,
@@ -63,7 +63,7 @@ pub enum Error {
 }
 
 impl Error {
-    /// Return true if the given error is [`Error::NotFound`]
+    /// Returns `true` if the given error is [`Error::NotFound`].
     pub fn not_found(&self) -> bool {
         *self == Error::NotFound
     }
