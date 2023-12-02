@@ -26,6 +26,8 @@ const MDB_IDL_LOGN: u8 = 13;
 const MDB_IDL_LOGN: u8 = 14;
 #[cfg(feature = "mdb_idl_logn_15")]
 const MDB_IDL_LOGN: u8 = 15;
+#[cfg(feature = "mdb_idl_logn_16")]
+const MDB_IDL_LOGN: u8 = 16;
 #[cfg(not(any(
     feature = "mdb_idl_logn_8",
     feature = "mdb_idl_logn_9",
@@ -35,6 +37,7 @@ const MDB_IDL_LOGN: u8 = 15;
     feature = "mdb_idl_logn_13",
     feature = "mdb_idl_logn_14",
     feature = "mdb_idl_logn_15",
+    feature = "mdb_idl_logn_16",
 )))]
 const MDB_IDL_LOGN: u8 = 16; // default
 
