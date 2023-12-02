@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs;
+use std::iter::repeat_with;
 use std::path::Path;
 
 use heed::types::*;
@@ -75,5 +76,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ret = db.get(&rtxn, "humm...")?;
     println!("parent (reader) \"humm...\": {:?}", ret);
 
+    drop(rtxn);
+
+    // ------
+
+    println!("We generates 100 nested transactions");
+    let wtxn = env.write_txn()?;
+    let rtxns: Result<Vec<_>, _> = repeat_with(|| wtxn.nested_read_txn()).take(100).collect();
+    let rtxns = rtxns.unwrap();
+
+    // Always use a different transaction to fetch
+    // the stored numbers in the database.
+    let mut big_sum = 0usize;
+    for rtxn in &rtxns {
+        big_sum +=
+            db.get(rtxn, "hello").unwrap().unwrap_or_default().iter().copied().sum::<u8>() as usize;
+    }
+    rtxns.into_iter().for_each(is_send);
+
+    assert_eq!(big_sum, 100 * (2 + 3));
+    println!("We computed that the big sum of numbers is {big_sum}");
+
     Ok(())
 }
+
+fn is_send<T: Send>(_: T) {}
