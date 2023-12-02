@@ -72,6 +72,26 @@ unbounded_depth = ["heed-types/unbounded_depth"]
 # <https://github.com/LMDB/lmdb/blob/3947014aed7ffe39a79991fa7fb5b234da47ad1a/libraries/liblmdb/lmdb.h#L46-L69>
 posix-sem = ["lmdb-master-sys/posix-sem"]
 
+# These features configure the MDB_IDL_LOGN macro, which determines
+# the size of the free and dirty page lists (and thus the amount of memory
+# allocated when opening an LMDB environment in read-write mode).
+#
+# Each feature defines MDB_IDL_LOGN as the value in the name of the feature.
+# That means these features are mutually exclusive, and you must not specify
+# more than one at the same time (or the crate will fail to compile).
+#
+# For more information on the motivation for these features (and their effect),
+# see https://github.com/mozilla/lmdb/pull/2.
+mdb_idl_logn_8 = ["lmdb-master-sys/mdb_idl_logn_8"]
+mdb_idl_logn_9 = ["lmdb-master-sys/mdb_idl_logn_9"]
+mdb_idl_logn_10 = ["lmdb-master-sys/mdb_idl_logn_10"]
+mdb_idl_logn_11 = ["lmdb-master-sys/mdb_idl_logn_11"]
+mdb_idl_logn_12 = ["lmdb-master-sys/mdb_idl_logn_12"]
+mdb_idl_logn_13 = ["lmdb-master-sys/mdb_idl_logn_13"]
+mdb_idl_logn_14 = ["lmdb-master-sys/mdb_idl_logn_14"]
+mdb_idl_logn_15 = ["lmdb-master-sys/mdb_idl_logn_15"]
+mdb_idl_logn_16 = ["lmdb-master-sys/mdb_idl_logn_16"]
+
 [[example]]
 name = "rmp-serde"
 required-features = ["serde-rmp"]
