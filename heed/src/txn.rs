@@ -45,6 +45,30 @@ impl<'e> RoTxn<'e> {
         Ok(RoTxn { txn, env })
     }
 
+    /// Create a nested transaction with read only access for use with the environment.
+    ///
+    /// The new transaction will be a nested transaction, with the current transaction
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// A parent transaction and its cursors may not issue any other operations than _commit_ and
+    /// _abort_ while it has active child transactions.
+    pub fn nested_read_txn(&self) -> Result<RoTxn> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let env = self.env;
+        let parent_ptr: *mut ffi::MDB_txn = self.txn;
+
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr(),
+                parent_ptr,
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
+        };
+
+        Ok(RoTxn { txn, env })
+    }
+
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.env.env_mut_ptr()
     }
@@ -113,9 +137,17 @@ impl<'p> RwTxn<'p> {
         Ok(RwTxn { txn: RoTxn { txn, env } })
     }
 
-    pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+    /// Create a nested transaction with read and write access for use with the environment.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// A parent transaction and its cursors may not issue any other operations than _commit_ and
+    /// _abort_ while it has active child transactions.
+    pub fn nested_write_txn(&mut self) -> Result<RwTxn> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
+        let env = self.txn.env;
+        let parent_ptr: *mut ffi::MDB_txn = self.txn.txn;
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
 

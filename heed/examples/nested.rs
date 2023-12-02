@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // -----
 
     let mut wtxn = env.write_txn()?;
-    let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
+    let mut nwtxn = wtxn.nested_write_txn()?;
 
     db.put(&mut nwtxn, "what", &[4, 5][..])?;
     let ret = db.get(&nwtxn, "what")?;
@@ -42,8 +42,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!();
 
     // also try with multiple levels of nesting
-    let mut nwtxn = env.nested_write_txn(&mut wtxn)?;
-    let mut nnwtxn = env.nested_write_txn(&mut nwtxn)?;
+    let mut nwtxn = wtxn.nested_write_txn()?;
+    let mut nnwtxn = nwtxn.nested_write_txn()?;
 
     db.put(&mut nnwtxn, "humm...", &[6, 7][..])?;
     let ret = db.get(&nnwtxn, "humm...")?;

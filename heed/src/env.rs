@@ -645,17 +645,6 @@ impl Env {
         RwTxn::new(self)
     }
 
-    /// Create a nested transaction with read and write access for use with the environment.
-    ///
-    /// The new transaction will be a nested transaction, with the transaction indicated by parent
-    /// as its parent. Transactions may be nested to any level.
-    ///
-    /// A parent transaction and its cursors may not issue any other operations than _commit_ and
-    /// _abort_ while it has active child transactions.
-    pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
-        RwTxn::nested(self, parent)
-    }
-
     /// Create a transaction with read-only access for use with the environment.
     ///
     /// ## LMDB Limitations
