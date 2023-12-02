@@ -45,28 +45,19 @@ impl<'e> RoTxn<'e> {
         Ok(RoTxn { txn, env })
     }
 
-    /// Create a nested transaction with read only access for use with the environment.
+    /// A reference to the environment this transaction is opened with.
     ///
-    /// The new transaction will be a nested transaction, with the current transaction
-    /// as its parent. Transactions may be nested to any level.
+    /// Any `RoTxn` created from this environment will no see the non-committed changes of possible `RwTxn`s.
     ///
-    /// A parent transaction and its cursors may not issue any other operations than _commit_ and
-    /// _abort_ while it has active child transactions.
-    pub fn nested_read_txn(&self) -> Result<RoTxn> {
-        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let env = self.env;
-        let parent_ptr: *mut ffi::MDB_txn = self.txn;
-
-        unsafe {
-            mdb_result(ffi::mdb_txn_begin(
-                env.env_mut_ptr(),
-                parent_ptr,
-                ffi::MDB_RDONLY,
-                &mut txn,
-            ))?
-        };
-
-        Ok(RoTxn { txn, env })
+    /// # Safety
+    ///
+    /// If a call to [`Env::write_txn`] is made on an environment coming from a call
+    /// to `RoTxn::env` of a `RwTxn` (through `Deref::deref`) it will hang infinitely.
+    ///
+    /// You must only call [`Env::read_txn`] if you enabled the `read-txn-no-tls` feature
+    /// as it is forbidden to have multiple transactions at the same time on a given thread.
+    pub fn env(&self) -> &'e Env {
+        self.env
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {

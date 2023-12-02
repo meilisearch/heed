@@ -82,8 +82,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("We generates 100 nested transactions");
     let wtxn = env.write_txn()?;
-    let rtxns: Result<Vec<_>, _> = repeat_with(|| wtxn.nested_read_txn()).take(100).collect();
-    let rtxns = rtxns.unwrap();
+    let rtxns: Result<Vec<_>, _> = repeat_with(|| wtxn.env().read_txn()).take(100).collect();
+    let rtxns = rtxns?;
 
     // Always use a different transaction to fetch
     // the stored numbers in the database.
