@@ -10,36 +10,97 @@ mod generate;
 use std::env;
 use std::path::PathBuf;
 
-#[cfg(feature = "mdb_idl_logn_8")]
-const MDB_IDL_LOGN: u8 = 8;
-#[cfg(feature = "mdb_idl_logn_9")]
-const MDB_IDL_LOGN: u8 = 9;
-#[cfg(feature = "mdb_idl_logn_10")]
-const MDB_IDL_LOGN: u8 = 10;
-#[cfg(feature = "mdb_idl_logn_11")]
-const MDB_IDL_LOGN: u8 = 11;
-#[cfg(feature = "mdb_idl_logn_12")]
-const MDB_IDL_LOGN: u8 = 12;
-#[cfg(feature = "mdb_idl_logn_13")]
-const MDB_IDL_LOGN: u8 = 13;
-#[cfg(feature = "mdb_idl_logn_14")]
-const MDB_IDL_LOGN: u8 = 14;
-#[cfg(feature = "mdb_idl_logn_15")]
-const MDB_IDL_LOGN: u8 = 15;
-#[cfg(feature = "mdb_idl_logn_16")]
-const MDB_IDL_LOGN: u8 = 16;
-#[cfg(not(any(
+#[cfg(all(
     feature = "mdb_idl_logn_8",
+    not(any(
+        feature = "mdb_idl_logn_9",
+        feature = "mdb_idl_logn_10",
+        feature = "mdb_idl_logn_11",
+        feature = "mdb_idl_logn_12",
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 8;
+#[cfg(all(
     feature = "mdb_idl_logn_9",
+    not(any(
+        feature = "mdb_idl_logn_10",
+        feature = "mdb_idl_logn_11",
+        feature = "mdb_idl_logn_12",
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 9;
+#[cfg(all(
     feature = "mdb_idl_logn_10",
+    not(any(
+        feature = "mdb_idl_logn_11",
+        feature = "mdb_idl_logn_12",
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 10;
+#[cfg(all(
     feature = "mdb_idl_logn_11",
+    not(any(
+        feature = "mdb_idl_logn_12",
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 11;
+#[cfg(all(
     feature = "mdb_idl_logn_12",
+    not(any(
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 12;
+#[cfg(all(
     feature = "mdb_idl_logn_13",
+    not(any(
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16"
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 13;
+#[cfg(all(
     feature = "mdb_idl_logn_14",
-    feature = "mdb_idl_logn_15",
+    not(any(feature = "mdb_idl_logn_15", feature = "mdb_idl_logn_16"))
+))]
+const MDB_IDL_LOGN: u8 = 14;
+#[cfg(all(feature = "mdb_idl_logn_15", not(any(feature = "mdb_idl_logn_16"))))]
+const MDB_IDL_LOGN: u8 = 15;
+#[cfg(any(
     feature = "mdb_idl_logn_16",
-)))]
-const MDB_IDL_LOGN: u8 = 16; // default
+    not(any(
+        feature = "mdb_idl_logn_8",
+        feature = "mdb_idl_logn_9",
+        feature = "mdb_idl_logn_10",
+        feature = "mdb_idl_logn_11",
+        feature = "mdb_idl_logn_12",
+        feature = "mdb_idl_logn_13",
+        feature = "mdb_idl_logn_14",
+        feature = "mdb_idl_logn_15",
+        feature = "mdb_idl_logn_16",
+    ))
+))]
+const MDB_IDL_LOGN: u8 = 16;
 
 macro_rules! warn {
     ($message:expr) => {
