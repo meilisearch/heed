@@ -11,7 +11,7 @@ readme = "../README.md"
 edition = "2021"
 
 [dependencies]
-bitflags = { version = "2.3.3", features = ["serde"] }
+bitflags = "2.3.3"
 bytemuck = "1.12.3"
 byteorder = { version = "1.4.3", default-features = false }
 heed-traits = { version = "0.20.0-alpha.9", path = "../heed-traits" }
@@ -35,6 +35,7 @@ url = "2.3.1"
 # The `serde` feature makes some types serializable,
 # like the `EnvOpenOptions` struct.
 default = ["serde", "serde-bincode", "serde-json"]
+serde = ["bitflags/serde", "dep:serde"]
 
 # The #MDB_NOTLS flag is automatically set on Env opening and
 # RoTxn implements the Send trait. This allows the user to move
