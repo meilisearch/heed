@@ -24,7 +24,6 @@ synchronoise = "1.0.1"
 
 [dev-dependencies]
 serde = { version = "1.0.151", features = ["derive"] }
-bytemuck = { version = "1.12.3", features = ["derive"] }
 tempfile = "3.3.0"
 
 [target.'cfg(windows)'.dependencies]
