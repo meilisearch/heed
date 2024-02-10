@@ -31,6 +31,8 @@ jobs:
   check_all_features:
     name: Check all the features of the heed project
     runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -D warnings
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
