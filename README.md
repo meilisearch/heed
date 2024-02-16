@@ -7,11 +7,11 @@
 [![dependency status](https://deps.rs/repo/github/meilisearch/heed/status.svg)](https://deps.rs/repo/github/meilisearch/heed)
 [![Build](https://github.com/meilisearch/heed/actions/workflows/rust.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/rust.yml)
 
-A fully typed [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) wrapper with minimum overhead, using bytemuck internally.
+A Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) abstraction with minimal overhead.
 
-This library is able to serialize all kinds of types, not just byte slices, and even _Serde_ types are supported.
+`heed` enables the storage of various Rust types within LMDB, extending support to include Serde-compatible types.
 
-Go check out [the examples](heed/examples/).
+For usage examples, see [heed/examples/](heed/examples/).
 
 ## Building from Source
 
