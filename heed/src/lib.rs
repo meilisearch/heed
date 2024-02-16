@@ -5,14 +5,17 @@
     html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
-//! `heed` is a high-level wrapper of [LMDB]; high-level doesn't mean heavy (think about Rust).
+//! `heed` is a high-level wrapper of [LMDB].
 //!
-//! It provides you a way to store types in LMDB without any limit and with as minimal an overhead as possible,
-//! relying on the [bytemuck] library to avoid copying bytes when it's unnecessary and the serde library
-//! when this is unavoidable.
+//! This crate simply facilitates the use of LMDB by providing a mechanism to store and
+//! retrieve Rust types. It abstracts away some of the complexities of the raw LMDB usage
+//! while retaining its performance characteristics. The functionality is achieved with the help
+//! of the serde library for data serialization concerns.
 //!
-//! The Lightning Memory-Mapped Database (LMDB) directly maps file parts into main memory; combined
-//! with the bytemuck library, this allows us to safely zero-copy parse and serialize Rust types into LMDB.
+//! LMDB stands for Lightning Memory-Mapped Database, which utilizes memory-mapped files
+//! for efficient data storage and retrieval by mapping file content directly into the virtual
+//! address space. `heed` derives its efficiency from the underlying LMDB without imposing
+//! additional runtime costs.
 //!
 //! [LMDB]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
 //!
@@ -71,7 +74,7 @@ use heed_traits as traits;
 pub use {byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::database::{Database, DatabaseOpenOptions};
+pub use self::database::{Database, DatabaseOpenOptions, DatabaseStat};
 pub use self::env::{
     env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
     EnvOpenOptions,
