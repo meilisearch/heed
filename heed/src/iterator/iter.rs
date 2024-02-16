@@ -206,6 +206,9 @@ impl<KC, DC, IM> fmt::Debug for RoIter<'_, KC, DC, IM> {
     }
 }
 
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoIter<'_, KC, DC, IM> {}
+
 /// A read-write iterator structure.
 pub struct RwIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -551,6 +554,9 @@ impl<KC, DC, IM> fmt::Debug for RoRevIter<'_, KC, DC, IM> {
         f.debug_struct("RoRevIter").finish()
     }
 }
+
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoRevIter<'_, KC, DC, IM> {}
 
 /// A reverse read-write iterator structure.
 pub struct RwRevIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
