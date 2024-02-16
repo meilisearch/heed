@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
@@ -139,8 +138,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     {
         assert_eq_env_txn!(self.env, rtxn);
 
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>(), TypeId::of::<C>());
-        match self.env.raw_init_database::<C>(rtxn.txn, self.name, types, self.flags) {
+        match self.env.raw_init_database::<C>(rtxn.txn, self.name, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -164,9 +162,8 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     {
         assert_eq_env_txn!(self.env, wtxn);
 
-        let types = (TypeId::of::<KC>(), TypeId::of::<DC>(), TypeId::of::<C>());
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn, self.name, types, flags) {
+        match self.env.raw_init_database::<C>(wtxn.txn.txn, self.name, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
