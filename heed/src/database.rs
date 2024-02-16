@@ -854,18 +854,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// # Ok(()) }
     /// ```
     pub fn len(&self, txn: &RoTxn) -> Result<u64> {
-        assert_eq_env_db_txn!(self, txn);
-
-        let mut db_stat = mem::MaybeUninit::uninit();
-        let result = unsafe { mdb_result(ffi::mdb_stat(txn.txn, self.dbi, db_stat.as_mut_ptr())) };
-
-        match result {
-            Ok(()) => {
-                let stats = unsafe { db_stat.assume_init() };
-                Ok(stats.ms_entries as u64)
-            }
-            Err(e) => Err(e.into()),
-        }
+        self.stat(txn).map(|stat| stat.entries as u64)
     }
 
     /// Returns `true` if and only if this database is empty.
@@ -908,6 +897,65 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// ```
     pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         self.len(txn).map(|l| l == 0)
+    }
+
+    /// Returns some statistics for this database.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?;
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
+    /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
+    /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
+    /// db.put(&mut wtxn, &521, "i-am-five-hundred-and-twenty-one")?;
+    ///
+    /// let stat = db.stat(&wtxn)?;
+    /// assert_eq!(stat.depth, 1);
+    /// assert_eq!(stat.branch_pages, 0);
+    /// assert_eq!(stat.leaf_pages, 1);
+    /// assert_eq!(stat.overflow_pages, 0);
+    /// assert_eq!(stat.entries, 4);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn stat(&self, txn: &RoTxn) -> Result<DatabaseStat> {
+        assert_eq_env_db_txn!(self, txn);
+
+        let mut db_stat = mem::MaybeUninit::uninit();
+        let result = unsafe { mdb_result(ffi::mdb_stat(txn.txn, self.dbi, db_stat.as_mut_ptr())) };
+
+        match result {
+            Ok(()) => {
+                let stats = unsafe { db_stat.assume_init() };
+                Ok(DatabaseStat {
+                    page_size: stats.ms_psize,
+                    depth: stats.ms_depth,
+                    branch_pages: stats.ms_branch_pages,
+                    leaf_pages: stats.ms_leaf_pages,
+                    overflow_pages: stats.ms_overflow_pages,
+                    entries: stats.ms_entries,
+                })
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
@@ -2236,4 +2284,22 @@ impl<KC, DC, C> fmt::Debug for Database<KC, DC, C> {
             .field("comparator", &any::type_name::<C>())
             .finish()
     }
+}
+
+/// Statistics for a database in the environment.
+#[derive(Debug, Clone, Copy)]
+pub struct DatabaseStat {
+    /// Size of a database page.
+    /// This is currently the same for all databases.
+    pub page_size: u32,
+    /// Depth (height) of the B-tree.
+    pub depth: u32,
+    /// Number of internal (non-leaf) pages
+    pub branch_pages: usize,
+    /// Number of leaf pages.
+    pub leaf_pages: usize,
+    /// Number of overflow pages.
+    pub overflow_pages: usize,
+    /// Number of data items.
+    pub entries: usize,
 }
