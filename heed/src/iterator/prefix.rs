@@ -200,6 +200,9 @@ impl<KC, DC, C, IM> fmt::Debug for RoPrefix<'_, KC, DC, C, IM> {
     }
 }
 
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoPrefix<'_, KC, DC, IM> {}
+
 /// A read-write prefix iterator structure.
 pub struct RwPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -586,6 +589,9 @@ impl<KC, DC, C, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, C, IM> {
         f.debug_struct("RoRevPrefix").finish()
     }
 }
+
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoRevPrefix<'_, KC, DC, IM> {}
 
 /// A reverse read-write prefix iterator structure.
 pub struct RwRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {

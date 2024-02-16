@@ -658,6 +658,9 @@ impl Env {
 
     /// Create a transaction with read-only access for use with the environment.
     ///
+    /// You can make this transaction `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
     /// ## LMDB Limitations
     ///
     /// It's possible to have multiple read transactions in the same environment

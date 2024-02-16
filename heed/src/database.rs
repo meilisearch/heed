@@ -367,6 +367,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
     /// Returns an iterator over all of the values of a single key.
     ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -960,6 +963,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
     /// Return a lexicographically ordered iterator of all key-value pairs in this database.
     ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1055,6 +1061,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
+    ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
     ///
     /// ```
     /// # use std::fs;
@@ -1155,6 +1164,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
     ///
     /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
     ///
     /// ```
     /// # use std::fs;
@@ -1325,6 +1337,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1494,6 +1509,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
@@ -1620,6 +1638,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// in this database that starts with the given prefix.
     ///
     /// Comparisons are made by using the bytes representation of the key.
+    ///
+    /// You can make this iterator `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
     ///
     /// ```
     /// # use std::fs;

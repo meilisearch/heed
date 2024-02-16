@@ -198,6 +198,9 @@ impl<KC, DC, IM> fmt::Debug for RoRange<'_, KC, DC, IM> {
     }
 }
 
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoRange<'_, KC, DC, IM> {}
+
 /// A read-write range iterator structure.
 pub struct RwRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -631,6 +634,9 @@ impl<KC, DC, IM> fmt::Debug for RoRevRange<'_, KC, DC, IM> {
         f.debug_struct("RoRevRange").finish()
     }
 }
+
+#[cfg(feature = "read-txn-no-tls")]
+unsafe impl<KC, DC, IM> Send for RoRevRange<'_, KC, DC, IM> {}
 
 /// A reverse read-write range iterator structure.
 pub struct RwRevRange<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
