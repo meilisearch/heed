@@ -76,15 +76,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtxn = env.write_txn()?;
     let _db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
 
-    // and here we try to open it with other types
-    // asserting that it correctly returns an error
-    //
-    // NOTE that those types are not saved upon runs and
-    // therefore types cannot be checked upon different runs,
-    // the first database opening fix the types for this run.
-    let result = env.create_database::<Str, SerdeJson<i32>>(&mut wtxn, Some("ignored-data"));
-    assert!(result.is_err());
-
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
