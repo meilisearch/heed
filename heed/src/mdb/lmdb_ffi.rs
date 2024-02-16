@@ -2,7 +2,7 @@ use std::ptr;
 
 pub use ffi::{
     mdb_cursor_close, mdb_cursor_del, mdb_cursor_get, mdb_cursor_open, mdb_cursor_put,
-    mdb_dbi_close, mdb_dbi_open, mdb_del, mdb_drop, mdb_env_close, mdb_env_copyfd2, mdb_env_create,
+    mdb_dbi_open, mdb_del, mdb_drop, mdb_env_close, mdb_env_copyfd2, mdb_env_create,
     mdb_env_get_fd, mdb_env_get_flags, mdb_env_info, mdb_env_open, mdb_env_set_mapsize,
     mdb_env_set_maxdbs, mdb_env_set_maxreaders, mdb_env_stat, mdb_env_sync, mdb_filehandle_t,
     mdb_get, mdb_put, mdb_reader_check, mdb_set_compare, mdb_stat, mdb_txn_abort, mdb_txn_begin,

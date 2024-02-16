@@ -144,8 +144,6 @@ pub enum Error {
     Encoding(BoxedError),
     /// Decoding error.
     Decoding(BoxedError),
-    /// Incoherent types when opening a database.
-    InvalidDatabaseTyping,
     /// Database closing in progress.
     DatabaseClosing,
     /// Attempt to open [`Env`] with different options.
@@ -164,9 +162,6 @@ impl fmt::Display for Error {
             Error::Mdb(error) => write!(f, "{}", error),
             Error::Encoding(error) => write!(f, "error while encoding: {}", error),
             Error::Decoding(error) => write!(f, "error while decoding: {}", error),
-            Error::InvalidDatabaseTyping => {
-                f.write_str("database was previously opened with different types")
-            }
             Error::DatabaseClosing => {
                 f.write_str("database is in a closing phase, you can't open it at the same time")
             }

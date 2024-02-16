@@ -17,7 +17,7 @@ use std::{
     ffi::OsStr,
     os::windows::io::{AsRawHandle, BorrowedHandle, RawHandle},
 };
-use std::{fmt, io, mem, ptr, sync};
+use std::{fmt, io, mem, ptr};
 
 use heed_traits::{Comparator, LexicographicComparator};
 use once_cell::sync::Lazy;
@@ -266,11 +266,7 @@ impl EnvOpenOptions {
                     match result {
                         Ok(()) => {
                             let signal_event = Arc::new(SignalEvent::manual(false));
-                            let inner = EnvInner {
-                                env,
-                                dbi_open_mutex: sync::Mutex::default(),
-                                path: path.clone(),
-                            };
+                            let inner = EnvInner { env, path: path.clone() };
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
                                 env: Some(env.clone()),
@@ -303,14 +299,13 @@ pub struct Env(Arc<EnvInner>);
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvInner { env: _, dbi_open_mutex: _, path } = self.0.as_ref();
+        let EnvInner { env: _, path } = self.0.as_ref();
         f.debug_struct("Env").field("path", &path.display()).finish_non_exhaustive()
     }
 }
 
 struct EnvInner {
     env: *mut ffi::MDB_env,
-    dbi_open_mutex: sync::Mutex<HashMap<u32, (TypeId, TypeId, TypeId)>>,
     path: PathBuf,
 }
 
@@ -476,6 +471,10 @@ impl Env {
     }
 
     /// Returns the size used by all the databases in the environment without the free pages.
+    ///
+    /// It is crucial to configure [`EnvOpenOptions::max_dbs`] with a sufficiently large value
+    /// before invoking this function. All databases within the environment will be opened
+    /// and remain so.
     pub fn non_free_pages_size(&self) -> Result<u64> {
         let compute_size = |stat: ffi::MDB_stat| {
             (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
@@ -490,11 +489,8 @@ impl Env {
         size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
+        // Open the main database
         let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, None, 0)?;
-
-        // We don't want anyone to open an environment while we're computing the stats
-        // thus we take a lock on the dbi
-        let dbi_open = self.0.dbi_open_mutex.lock().unwrap();
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -512,11 +508,6 @@ impl Env {
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
-
-                // If the db wasn't already opened
-                if !dbi_open.contains_key(&dbi) {
-                    unsafe { ffi::mdb_dbi_close(self.env_mut_ptr(), dbi) }
-                }
             }
         }
 
@@ -591,19 +582,10 @@ impl Env {
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
-        types: (TypeId, TypeId, TypeId),
         flags: AllDatabaseFlags,
     ) -> Result<u32> {
-        let mut lock = self.0.dbi_open_mutex.lock().unwrap();
         match self.raw_open_dbi::<C>(raw_txn, name, flags.bits()) {
-            Ok(dbi) => {
-                let old_types = lock.entry(dbi).or_insert(types);
-                if *old_types == types {
-                    Ok(dbi)
-                } else {
-                    Err(Error::InvalidDatabaseTyping)
-                }
-            }
+            Ok(dbi) => Ok(dbi),
             Err(e) => Err(e.into()),
         }
     }
