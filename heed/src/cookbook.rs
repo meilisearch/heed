@@ -1,52 +1,147 @@
 //! A cookbook of examples on how to use heed.
 //!
-//! # Implement a custom codec with `BytesEncode`/`BytesDecode`
+//! # Create custom and prefix codecs
 //!
 //! With heed you can store any kind of data and serialize it the way you want.
-//! To do so you'll need to create a codec by usin the [`BytesEncode`] and [`BytesDecode`] traits.
+//! To do so you'll need to create a codec by using the [`BytesEncode`] and [`BytesDecode`] traits.
+//!
+//! Now imagine that your data is lexicographically well ordered. You can now leverage
+//! the use of prefix codecs. Those are classic codecs but are only used to encode key prefixes.
+//!
+//! In this example we will store logs associated to a timestamp. By encoding the timestamp
+//! in big endian we can create a prefix codec that restricts a subset of the data. It is recommended
+//! to create codecs to encode prefixes when possible instead of using a slice of bytes.
 //!
 //! ```
 //! use std::borrow::Cow;
-//! use heed::{BoxedError, BytesEncode, BytesDecode};
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
 //!
-//! pub enum MyCounter<'a> {
-//!   One,
-//!   Two,
-//!   WhatIsThat(&'a [u8]),
+//! use heed::types::*;
+//! use heed::{BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
+//!
+//! #[derive(Debug, PartialEq, Eq)]
+//! pub enum Level {
+//!     Debug,
+//!     Warn,
+//!     Error,
 //! }
 //!
-//! pub struct MyCounterCodec;
+//! #[derive(Debug, PartialEq, Eq)]
+//! pub struct LogKey {
+//!     timestamp: u32,
+//!     level: Level,
+//! }
 //!
-//! impl<'a> BytesEncode<'a> for MyCounterCodec {
-//!     type EItem = MyCounter<'a>;
+//! pub struct LogKeyCodec;
 //!
-//!     fn bytes_encode(my_counter: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+//! impl<'a> BytesEncode<'a> for LogKeyCodec {
+//!     type EItem = LogKey;
+//!
+//!     /// Encodes the u32 timestamp in big endian followed by the log level with a single byte.
+//!     fn bytes_encode(log: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+//!         let (timestamp_bytes, level_byte) = match log {
+//!             LogKey { timestamp, level: Level::Debug } => (timestamp.to_be_bytes(), 0),
+//!             LogKey { timestamp, level: Level::Warn } => (timestamp.to_be_bytes(), 1),
+//!             LogKey { timestamp, level: Level::Error } => (timestamp.to_be_bytes(), 2),
+//!         };
+//!
 //!         let mut output = Vec::new();
-//!
-//!         match my_counter {
-//!             MyCounter::One => output.push(1),
-//!             MyCounter::Two => output.push(2),
-//!             MyCounter::WhatIsThat(bytes) => {
-//!                 output.push(u8::MAX);
-//!                 output.extend_from_slice(bytes);
-//!             },
-//!         }
-//!
+//!         output.extend_from_slice(&timestamp_bytes);
+//!         output.push(level_byte);
 //!         Ok(Cow::Owned(output))
 //!     }
 //! }
 //!
-//! impl<'a> BytesDecode<'a> for MyCounterCodec {
-//!     type DItem = MyCounter<'a>;
+//! impl<'a> BytesDecode<'a> for LogKeyCodec {
+//!     type DItem = LogKey;
 //!
 //!     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
-//!         match bytes[0] {
-//!             1 => Ok(MyCounter::One),
-//!             2 => Ok(MyCounter::One),
-//!             u8::MAX => Ok(MyCounter::WhatIsThat(&bytes[1..])),
-//!             _ => Err("invalid input".into()),
-//!         }
+//!         use std::mem::size_of;
+//!
+//!         let timestamp = match bytes.get(..size_of::<u32>()) {
+//!             Some(bytes) => bytes.try_into().map(u32::from_be_bytes).unwrap(),
+//!             None => return Err("invalid log key: cannot extract timestamp".into()),
+//!         };
+//!
+//!         let level = match bytes.get(size_of::<u32>()) {
+//!             Some(&0) => Level::Debug,
+//!             Some(&1) => Level::Warn,
+//!             Some(&2) => Level::Error,
+//!             Some(_) => return Err("invalid log key: invalid log level".into()),
+//!             None => return Err("invalid log key: cannot extract log level".into()),
+//!         };
+//!
+//!         Ok(LogKey { timestamp, level })
 //!     }
+//! }
+//!
+//! /// Encodes the high part of a timestamp. As it is located
+//! /// at the start of the key it can be used to only return
+//! /// the logs that appeared during a, rather long, period.
+//! pub struct LogAtHalfTimestampCodec;
+//!
+//! impl<'a> BytesEncode<'a> for LogAtHalfTimestampCodec {
+//!     type EItem = u32;
+//!
+//!     /// This method encodes only the prefix of the keys in this particular case, the timestamp.
+//!     fn bytes_encode(half_timestamp: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+//!         Ok(Cow::Owned(half_timestamp.to_be_bytes()[..2].to_vec()))
+//!     }
+//! }
+//!
+//! impl<'a> BytesDecode<'a> for LogAtHalfTimestampCodec {
+//!     type DItem = LogKey;
+//!
+//!     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem, BoxedError> {
+//!         LogKeyCodec::bytes_decode(bytes)
+//!     }
+//! }
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let path = Path::new("target").join("heed.mdb");
+//!
+//!     fs::create_dir_all(&path)?;
+//!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(10 * 1024 * 1024) // 10MB
+//!         .max_dbs(3000)
+//!         .open(path)?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<LogKeyCodec, Str> = env.create_database(&mut wtxn, None)?;
+//!
+//!     db.put(
+//!         &mut wtxn,
+//!         &LogKey { timestamp: 1608326232, level: Level::Debug },
+//!         "this is a very old log",
+//!     )?;
+//!     db.put(
+//!         &mut wtxn,
+//!         &LogKey { timestamp: 1708326232, level: Level::Debug },
+//!         "fibonacci was executed in 21ms",
+//!     )?;
+//!     db.put(&mut wtxn, &LogKey { timestamp: 1708326242, level: Level::Error }, "fibonacci crashed")?;
+//!     db.put(
+//!         &mut wtxn,
+//!         &LogKey { timestamp: 1708326272, level: Level::Warn },
+//!         "fibonacci is running since 12s",
+//!     )?;
+//!
+//!     // We change the way we want to read our database by changing the key codec.
+//!     // In this example we can prefix search only for the logs between a period of time
+//!     // (the two high bytes of the u32 timestamp).
+//!     let iter = db.remap_key_type::<LogAtHalfTimestampCodec>().prefix_iter(&wtxn, &1708326232)?;
+//!
+//!     // As we filtered the log for a specific
+//!     // period of time we must not see the very old log.
+//!     for result in iter {
+//!         let (LogKey { timestamp: _, level: _ }, content) = result?;
+//!         assert_ne!(content, "this is a very old log");
+//!     }
+//!
+//!     Ok(())
 //! }
 //! ```
 //!
