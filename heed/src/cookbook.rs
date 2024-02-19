@@ -145,10 +145,68 @@
 //! }
 //! ```
 //!
+//! # Change the environment size dynamically
 //!
+//! As you may now, you must specify the maximum size of an LMDB environment when you open it.
+//! Environment do not dynamically increase there size for performance reasons and also to
+//! have more control on it.
 //!
+//! Here is a simple example on the way to go to dynamically increase the size
+//! of an environment when you detect that it is going out of space.
 //!
+//! ```
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
 //!
+//! use heed::types::*;
+//! use heed::{Database, EnvOpenOptions};
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let path = Path::new("target").join("heed.mdb");
+//!
+//!     fs::create_dir_all(&path)?;
+//!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(16384) // one page
+//!         .open(&path)?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!
+//!     // Ho! Crap! We don't have enough space in this environment...
+//!     assert!(matches!(
+//!         fill_with_data(&mut wtxn, db),
+//!         Err(heed::Error::Mdb(heed::MdbError::MapFull))
+//!     ));
+//!
+//!     drop(wtxn);
+//!
+//!     // We need to increase the page size and we can only do that
+//!     // when no transaction are running so closing the env is easier.
+//!     env.prepare_for_closing().wait();
+//!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(10 * 16384) // 10 pages
+//!         .open(&path)?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!
+//!     // We now have enough space in the env to store all of our entries.
+//!     assert!(matches!(fill_with_data(&mut wtxn, db), Ok(())));
+//!
+//!     Ok(())
+//! }
+//!
+//! fn fill_with_data(wtxn: &mut heed::RwTxn, db: Database<Str, Str>) -> heed::Result<()> {
+//!     for i in 0..100 {
+//!         let key = i.to_string();
+//!         db.put(wtxn, &key, "I am a very long string")?;
+//!     }
+//!     Ok(())
+//! }
+//! ```
 //!
 //!
 //!
