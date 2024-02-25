@@ -163,7 +163,7 @@
 //! use heed::{Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
-//!     let path = Path::new("target").join("heed.mdb");
+//!     let path = Path::new("target").join("small-space.mdb");
 //!
 //!     fs::create_dir_all(&path)?;
 //!
