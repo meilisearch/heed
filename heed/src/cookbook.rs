@@ -200,7 +200,7 @@
 //! }
 //!
 //! fn fill_with_data(wtxn: &mut heed::RwTxn, db: Database<Str, Str>) -> heed::Result<()> {
-//!     for i in 0..100 {
+//!     for i in 0..1000 {
 //!         let key = i.to_string();
 //!         db.put(wtxn, &key, "I am a very long string")?;
 //!     }
