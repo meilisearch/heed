@@ -208,17 +208,74 @@
 //! }
 //! ```
 //!
+//! # Decode values on demand
 //!
+//! Sometimes, you need to iterate on the content of a database and
+//! conditionnaly decode the value depending on the key. You can use the
+//! [`Database::lazily_decode_data`] method to indicate this to heed.
 //!
+//! ```
+//! use std::collections::HashMap;
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
 //!
+//! use heed::types::*;
+//! use heed::{Database, EnvOpenOptions};
 //!
+//! pub type StringMap = HashMap<String, String>;
 //!
+//! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+//!     let path = Path::new("target").join("heed.mdb");
 //!
+//!     fs::create_dir_all(&path)?;
 //!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(1024 * 1024 * 100) // 100 MiB
+//!         .open(&path)?;
 //!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
+//!
+//!     fill_with_data(&mut wtxn, db)?;
+//!
+//!     // We make sure that iterating over this database will
+//!     // not deserialize the values. We just want to decode
+//!     // the value corresponding to 43th key.
+//!     for (i, result) in db.lazily_decode_data().iter(&wtxn)?.enumerate() {
+//!         let (_key, lazy_value) = result?;
+//!         if i == 43 {
+//!             // This is where the magix happen. We receive a Lazy type
+//!             // that wraps a slice of bytes. We can decode on purpose.
+//!             let value = lazy_value.decode()?;
+//!             assert_eq!(value.get("secret"), Some(&String::from("434343")));
+//!             break;
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }
+//!
+//! fn fill_with_data(
+//!     wtxn: &mut heed::RwTxn,
+//!     db: Database<Str, SerdeJson<StringMap>>,
+//! ) -> heed::Result<()> {
+//!     // This represents a very big value that we only want to decode when necessary.
+//!     let mut big_string_map = HashMap::new();
+//!     big_string_map.insert("key1".into(), "I am a very long string".into());
+//!     big_string_map.insert("key2".into(), "I am a also very long string".into());
+//!
+//!     for i in 0..100 {
+//!         let key = format!("{i:5}");
+//!         big_string_map.insert("secret".into(), format!("{i}{i}{i}"));
+//!         db.put(wtxn, &key, &big_string_map)?;
+//!     }
+//!     Ok(())
+//! }
+//! ```
 //!
 
 // To let cargo generate doc links
 #![allow(unused_imports)]
 
-use crate::{BytesDecode, BytesEncode};
+use crate::{BytesDecode, BytesEncode, Database};
