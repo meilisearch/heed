@@ -274,6 +274,101 @@
 //! }
 //! ```
 //!
+//! # Advanced multithreaded access of entries
+//!
+//! LMDB disallow sharing cursors amongs threads. It is only possible to send
+//! them between threads when the heed `read-txn-no-tls` feature is enabled.
+//!
+//! This limits some usecases that require a parallel access to the content of the databases
+//! to process stuff faster. This is the case of arroy, a multithreads fast approximate
+//! neighbors search library. I wrote [an article to explain the tricks I implemented to be able
+//! to read entries in parallel while writing in another file][arroy article].
+//!
+//! It is forbidden to write in an environement while reading in it. However, it is possible
+//! to keep pointers to the values of the entries returned by LMDB. Those pointers are valid
+//! until the end of the transaction.
+//!
+//! Here is a small example on how to declare a datastructure to be used in parallel across thread,
+//! safely. The unsafe part declare that the datastructure can be shared between thread despite
+//! the write transaction not being `Send` nor `Sync`.
+//!
+//! [arroy article]: https://blog.kerollmops.com/multithreading-and-memory-mapping-refining-ann-performance-with-arroy
+//!
+//! ```
+//! use std::collections::HashMap;
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
+//!
+//! use heed::types::*;
+//! use heed::{Database, EnvOpenOptions, RoTxn};
+//!
+//! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+//!     let path = Path::new("target").join("heed.mdb");
+//!
+//!     fs::create_dir_all(&path)?;
+//!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(1024 * 1024 * 100) // 100 MiB
+//!         .open(&path)?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!
+//!     fill_with_data(&mut wtxn, db)?;
+//!
+//!     let immutable_map = ImmutableMap::from_db(&wtxn, db)?;
+//!
+//!     // We can share the immutable map over multiple threads because it is Sync.
+//!     // It is safe because we keep the write transaction lifetime in this type.
+//!     std::thread::scope(|s| {
+//!         s.spawn(|| {
+//!             let value = immutable_map.get("10");
+//!             assert_eq!(value, Some("I am a very long string"));
+//!         });
+//!         s.spawn(|| {
+//!             let value = immutable_map.get("20");
+//!             assert_eq!(value, Some("I am a very long string"));
+//!         });
+//!     });
+//!
+//!     // You can see that we always have it on the main thread.
+//!     // We didn't sent it over threads.
+//!     let value = immutable_map.get("50");
+//!     assert_eq!(value, Some("I am a very long string"));
+//!
+//!     Ok(())
+//! }
+//!
+//! fn fill_with_data(wtxn: &mut heed::RwTxn, db: Database<Str, Str>) -> heed::Result<()> {
+//!     for i in 0..100 {
+//!         let key = i.to_string();
+//!         db.put(wtxn, &key, "I am a very long string")?;
+//!     }
+//!     Ok(())
+//! }
+//!
+//! struct ImmutableMap<'a> {
+//!     map: HashMap<&'a str, &'a str>,
+//! }
+//!
+//! impl<'t> ImmutableMap<'t> {
+//!     fn from_db(rtxn: &'t RoTxn, db: Database<Str, Str>) -> heed::Result<Self> {
+//!         let mut map = HashMap::new();
+//!         for result in db.iter(rtxn)? {
+//!             let (k, v) = result?;
+//!             map.insert(k, v);
+//!         }
+//!         Ok(ImmutableMap { map })
+//!     }
+//!
+//!     fn get(&self, key: &str) -> Option<&'t str> {
+//!         self.map.get(key).copied()
+//!     }
+//! }
+//!
+//! unsafe impl Sync for ImmutableMap<'_> {}
+//! ```
 
 // To let cargo generate doc links
 #![allow(unused_imports)]
