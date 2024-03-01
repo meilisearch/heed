@@ -192,7 +192,41 @@ impl EnvOpenOptions {
     }
 
     /// Open an environment that will be located at the specified path.
-    pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+    ///
+    /// # Safety
+    /// LMDB is backed by a memory map [^1] which comes with some safety precautions.
+    ///
+    /// Memory map constructors are marked `unsafe` because of the potential
+    /// for Undefined Behavior (UB) using the map if the underlying file is
+    /// subsequently modified, in or out of process.
+    ///
+    /// LMDB itself has a locking system that solves this problem,
+    /// but it will not save you from making mistakes yourself.
+    ///
+    /// These are some things to take note of:
+    ///
+    /// - Do not call [`EnvOpenOptions::open`] twice in the same process, at the same time [^2]
+    /// - Avoid long-lived transactions, they will cause the database to grow quickly [^3]
+    /// - Avoid aborting your process with an active transaction [^4]
+    /// - Do not use LMDB on remote filesystems, even between processes on the same host [^5]
+    /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^6]
+    ///
+    /// For more details, it is highly recommended to read LMDB's official documentation. [^7]
+    ///
+    /// [^1]: <https://en.wikipedia.org/wiki/Memory_map>
+    ///
+    /// [^2]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
+    ///
+    /// [^3]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L107-L114>
+    ///
+    /// [^4]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L118-L121>
+    ///
+    /// [^5]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    ///
+    /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    ///
+    /// [^7]: <http://www.lmdb.tech/doc/index.html>
+    pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
         let path = match canonicalize_path(path.as_ref()) {
