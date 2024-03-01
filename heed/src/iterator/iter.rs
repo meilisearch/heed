@@ -29,10 +29,11 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -81,10 +82,11 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;

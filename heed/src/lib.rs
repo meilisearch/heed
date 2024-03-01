@@ -32,7 +32,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let dir = tempfile::tempdir()?;
-//! let env = EnvOpenOptions::new().open(dir.path())?;
+//! let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
 //!
 //! // we will open the default unnamed database
 //! let mut wtxn = env.write_txn()?;

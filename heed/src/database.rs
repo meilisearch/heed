@@ -28,10 +28,11 @@ use crate::*;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let dir = tempfile::tempdir()?;
-/// # let env = EnvOpenOptions::new()
+/// # let env = unsafe { EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(dir.path())?;
+/// #     .open(dir.path())?
+/// # };
 /// type BEI64 = I64<BigEndian>;
 ///
 /// // Imagine you have an optional name
@@ -196,10 +197,11 @@ impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let dir = tempfile::tempdir()?;
-/// # let env = EnvOpenOptions::new()
+/// # let env = unsafe { EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(dir.path())?;
+/// #     .open(dir.path())?
+/// # };
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let mut wtxn = env.write_txn()?;
@@ -243,10 +245,11 @@ impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let dir = tempfile::tempdir()?;
-/// # let env = EnvOpenOptions::new()
+/// # let env = unsafe { EnvOpenOptions::new()
 /// #     .map_size(10 * 1024 * 1024) // 10MB
 /// #     .max_dbs(3000)
-/// #     .open(dir.path())?;
+/// #     .open(dir.path())?
+/// # };
 /// type BEI64 = I64<BigEndian>;
 ///
 /// let mut wtxn = env.write_txn()?;
@@ -313,10 +316,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32= U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -376,10 +380,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -449,10 +454,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -517,10 +523,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -589,10 +596,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -660,10 +668,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -725,10 +734,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -778,10 +788,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -827,10 +838,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -869,10 +881,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -911,10 +924,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -973,10 +987,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1014,10 +1029,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1072,10 +1088,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1115,10 +1132,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1175,10 +1193,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1253,10 +1272,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1347,10 +1367,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1425,10 +1446,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1519,10 +1541,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1576,10 +1599,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1649,10 +1673,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1706,10 +1731,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1773,10 +1799,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1828,10 +1855,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1892,10 +1920,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -1979,10 +2008,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -2040,10 +2070,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -2130,10 +2161,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -2197,10 +2229,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
@@ -2246,10 +2279,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
-    /// # let env = EnvOpenOptions::new()
+    /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
-    /// #     .open(dir.path())?;
+    /// #     .open(dir.path())?
+    /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;

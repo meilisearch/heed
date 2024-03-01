@@ -13,16 +13,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env2_path = Path::new("target").join("env2.mdb");
 
     fs::create_dir_all(&env1_path)?;
-    let env1 = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024) // 10MB
-        .max_dbs(3000)
-        .open(env1_path)?;
+    let env1 = unsafe {
+        EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(env1_path)?
+    };
 
     fs::create_dir_all(&env2_path)?;
-    let env2 = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024) // 10MB
-        .max_dbs(3000)
-        .open(env2_path)?;
+    let env2 = unsafe {
+        EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(env2_path)?
+    };
 
     let mut wtxn1 = env1.write_txn()?;
     let mut wtxn2 = env2.write_txn()?;

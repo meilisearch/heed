@@ -73,10 +73,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         ///
         /// let mut wtxn = env.write_txn()?;
         /// let db = env.database_options()
@@ -119,10 +120,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
         /// let mut wtxn = env.write_txn()?;
@@ -179,10 +181,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
         /// let mut wtxn = env.write_txn()?;
@@ -223,10 +226,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
         /// let mut wtxn = env.write_txn()?;
@@ -282,10 +286,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
         /// let mut wtxn = env.write_txn()?;
@@ -341,10 +346,11 @@ bitflags! {
         ///
         /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
         /// # let dir = tempfile::tempdir()?;
-        /// # let env = EnvOpenOptions::new()
+        /// # let env = unsafe { EnvOpenOptions::new()
         /// #     .map_size(10 * 1024 * 1024) // 10MB
         /// #     .max_dbs(3000)
-        /// #     .open(dir.path())?;
+        /// #     .open(dir.path())?
+        /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
         /// let mut wtxn = env.write_txn()?;

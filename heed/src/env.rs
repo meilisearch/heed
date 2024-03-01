@@ -155,7 +155,7 @@ impl EnvOpenOptions {
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
-    /// let env = env_builder.open(dir.path())?;
+    /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// // we will open the default unnamed database
     /// let mut wtxn = env.write_txn()?;
@@ -211,7 +211,10 @@ impl EnvOpenOptions {
     /// - Do not use LMDB on remote filesystems, even between processes on the same host [^5]
     /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^6]
     ///
-    /// For more details, it is highly recommended to read LMDB's official documentation. [^7]
+    /// Anything that causes the lock file to be broken (whether listed here or not)
+    /// will cause synchronization issues and may introduce UB. [^7]
+    ///
+    /// For more details, it is highly recommended to read LMDB's official documentation. [^8]
     ///
     /// [^1]: <https://en.wikipedia.org/wiki/Memory_map>
     ///
@@ -225,7 +228,9 @@ impl EnvOpenOptions {
     ///
     /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
     ///
-    /// [^7]: <http://www.lmdb.tech/doc/index.html>
+    /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
+    ///
+    /// [^8]: <http://www.lmdb.tech/doc/index.html>
     pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
@@ -480,7 +485,7 @@ impl Env {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let dir = tempfile::tempdir()?;
     /// let size_in_bytes = 1024 * 1024;
-    /// let env = EnvOpenOptions::new().map_size(size_in_bytes).open(dir.path())?;
+    /// let env = unsafe { EnvOpenOptions::new().map_size(size_in_bytes).open(dir.path())? };
     ///
     /// let actual_size = env.real_disk_size()? as usize;
     /// assert!(actual_size < size_in_bytes);
@@ -513,7 +518,7 @@ impl Env {
     /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// let dir = tempfile::tempdir().unwrap();
-    /// let mut env = env_builder.open(dir.path())?;
+    /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// // Env was opened without flags.
     /// assert_eq!(env.get_flags().unwrap(), EnvFlags::empty().bits());
@@ -927,11 +932,13 @@ mod tests {
     #[test]
     fn close_env() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(30)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(30)
+                .open(dir.path())
+                .unwrap()
+        };
 
         // Force a thread to keep the env for 1 second.
         let env_cloned = env.clone();
@@ -970,14 +977,18 @@ mod tests {
     #[test]
     fn reopen_env_with_different_options_is_err() {
         let dir = tempfile::tempdir().unwrap();
-        let _env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(dir.path())
-            .unwrap();
+        let _env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .open(dir.path())
+                .unwrap()
+        };
 
-        let result = EnvOpenOptions::new()
-            .map_size(12 * 1024 * 1024) // 12MB
-            .open(dir.path());
+        let result = unsafe {
+            EnvOpenOptions::new()
+                .map_size(12 * 1024 * 1024) // 12MB
+                .open(dir.path())
+        };
 
         assert!(matches!(result, Err(Error::BadOpenOptions { .. })));
     }
@@ -986,15 +997,19 @@ mod tests {
     fn open_env_with_named_path() {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("babar.mdb")).unwrap();
-        let _env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(dir.path().join("babar.mdb"))
-            .unwrap();
+        let _env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .open(dir.path().join("babar.mdb"))
+                .unwrap()
+        };
 
-        let _env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .open(dir.path().join("babar.mdb"))
-            .unwrap();
+        let _env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .open(dir.path().join("babar.mdb"))
+                .unwrap()
+        };
     }
 
     #[test]
@@ -1005,7 +1020,7 @@ mod tests {
         envbuilder.map_size(10 * 1024 * 1024); // 10MB
         envbuilder.max_dbs(10);
         unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
-        let env = envbuilder.open(dir.path()).unwrap();
+        let env = unsafe { envbuilder.open(dir.path()).unwrap() };
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -1017,17 +1032,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut envbuilder = EnvOpenOptions::new();
         unsafe { envbuilder.flags(crate::EnvFlags::NO_SUB_DIR) };
-        let _env = envbuilder.open(dir.path().join("data.mdb")).unwrap();
+        let _env = unsafe { envbuilder.open(dir.path().join("data.mdb")).unwrap() };
     }
 
     #[test]
     fn create_database_without_commit() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(10)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(10)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -1041,11 +1058,13 @@ mod tests {
     #[test]
     fn open_already_existing_database() {
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(10)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(10)
+                .open(dir.path())
+                .unwrap()
+        };
 
         // we first create a database
         let mut wtxn = env.write_txn().unwrap();
@@ -1054,11 +1073,13 @@ mod tests {
 
         // Close the environement and reopen it, databases must not be loaded in memory.
         env.prepare_for_closing().wait();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(10)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(10)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let rtxn = env.read_txn().unwrap();
         let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
@@ -1069,8 +1090,9 @@ mod tests {
     fn resize_database() {
         let dir = tempfile::tempdir().unwrap();
         let page_size = page_size::get();
-        let env =
-            EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
@@ -1112,11 +1134,13 @@ mod tests {
 
         {
             // We really need this env to be dropped before the read-only access.
-            let env = EnvOpenOptions::new()
-                .map_size(16 * 1024 * 1024 * 1024) // 10MB
-                .max_dbs(32)
-                .open(dir.path())
-                .unwrap();
+            let env = unsafe {
+                EnvOpenOptions::new()
+                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .max_dbs(32)
+                    .open(dir.path())
+                    .unwrap()
+            };
             let mut wtxn = env.write_txn().unwrap();
             let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
 
@@ -1130,11 +1154,13 @@ mod tests {
 
         {
             // Open now we do a read-only opening
-            let env = EnvOpenOptions::new()
-                .map_size(16 * 1024 * 1024 * 1024) // 10MB
-                .max_dbs(32)
-                .open(dir.path())
-                .unwrap();
+            let env = unsafe {
+                EnvOpenOptions::new()
+                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .max_dbs(32)
+                    .open(dir.path())
+                    .unwrap()
+            };
             let database0 = {
                 let rtxn = env.read_txn().unwrap();
                 let database0 =
@@ -1158,11 +1184,13 @@ mod tests {
         // To avoid reintroducing the bug let's try to open again but without the commit
         {
             // Open now we do a read-only opening
-            let env = EnvOpenOptions::new()
-                .map_size(16 * 1024 * 1024 * 1024) // 10MB
-                .max_dbs(32)
-                .open(dir.path())
-                .unwrap();
+            let env = unsafe {
+                EnvOpenOptions::new()
+                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .max_dbs(32)
+                    .open(dir.path())
+                    .unwrap()
+            };
             let database0 = {
                 let rtxn = env.read_txn().unwrap();
                 let database0 =

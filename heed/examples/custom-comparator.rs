@@ -26,10 +26,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let _ = fs::remove_dir_all(&env_path);
 
     fs::create_dir_all(&env_path)?;
-    let env = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024) // 10MB
-        .max_dbs(3)
-        .open(env_path)?;
+    let env = unsafe {
+        EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3)
+            .open(env_path)?
+    };
 
     let mut wtxn = env.write_txn()?;
     let db = env
