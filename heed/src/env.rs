@@ -410,6 +410,27 @@ pub enum CompactionOption {
     Disabled,
 }
 
+/// Whether to enable or disable flags in [`Env::set_flag`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FlagSetMode {
+    /// Enable the flags.
+    Enable,
+    /// Disable the flags.
+    Disable,
+}
+
+impl FlagSetMode {
+    /// Convert the enum into the `i32` required by LMDB.
+    /// "A non-zero value sets the flags, zero clears them."
+    /// <http://www.lmdb.tech/doc/group__mdb.html#ga83f66cf02bfd42119451e9468dc58445>
+    fn as_mdb_env_set_flags_input(self) -> i32 {
+        match self {
+            Self::Enable => 1,
+            Self::Disable => 0,
+        }
+    }
+}
+
 impl Env {
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
         self.0.env
@@ -443,11 +464,57 @@ impl Env {
     ///
     /// Returns `None` if the environment flags are different from the [`EnvFlags`] set.
     pub fn flags(&self) -> Result<Option<EnvFlags>> {
-        self.raw_flags().map(EnvFlags::from_bits)
+        self.get_flags().map(EnvFlags::from_bits)
     }
 
-    /// Return the raw flags the environment was opened with.
-    pub fn raw_flags(&self) -> Result<u32> {
+    /// Enable or disable the environment's currently active [`EnvFlags`].
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let mut env = env_builder.open(dir.path())?;
+    ///
+    /// // Env was opened without flags.
+    /// assert_eq!(env.get_flags().unwrap(), EnvFlags::empty().bits());
+    ///
+    /// // Enable a flag after opening.
+    /// unsafe { env.set_flags(EnvFlags::NO_SYNC, FlagSetMode::Enable).unwrap(); }
+    /// assert_eq!(env.get_flags().unwrap(), EnvFlags::NO_SYNC.bits());
+    ///
+    /// // Disable a flag after opening.
+    /// unsafe { env.set_flags(EnvFlags::NO_SYNC, FlagSetMode::Disable).unwrap(); }
+    /// assert_eq!(env.get_flags().unwrap(), EnvFlags::empty().bits());
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// It is unsafe to use unsafe LMDB flags such as `NO_SYNC`, `NO_META_SYNC`, or `NO_LOCK`.
+    ///
+    /// LMDB also requires that only 1 thread calls this function at any given moment.
+    /// Neither `heed` or LMDB check for this condition, so the caller must ensure it explicitly.
+    pub unsafe fn set_flags(&mut self, flags: EnvFlags, mode: FlagSetMode) -> Result<()> {
+        // safety: caller must ensure no other thread is calling this function.
+        // <http://www.lmdb.tech/doc/group__mdb.html#ga83f66cf02bfd42119451e9468dc58445>
+        mdb_result(unsafe {
+            ffi::mdb_env_set_flags(
+                self.env_mut_ptr(),
+                flags.bits(),
+                mode.as_mdb_env_set_flags_input(),
+            )
+        })
+        .map_err(Into::into)
+    }
+
+    /// Return the raw flags the environment is currently set with.
+    pub fn get_flags(&self) -> Result<u32> {
         let mut flags = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
         let flags = unsafe { flags.assume_init() };

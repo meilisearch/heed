@@ -77,7 +77,7 @@ use self::cursor::{RoCursor, RwCursor};
 pub use self::database::{Database, DatabaseOpenOptions, DatabaseStat};
 pub use self::env::{
     env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions,
+    EnvOpenOptions, FlagSetMode,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
