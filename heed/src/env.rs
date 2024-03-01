@@ -500,7 +500,7 @@ impl Env {
     ///
     /// LMDB also requires that only 1 thread calls this function at any given moment.
     /// Neither `heed` or LMDB check for this condition, so the caller must ensure it explicitly.
-    pub unsafe fn set_flags(&mut self, flags: EnvFlags, mode: FlagSetMode) -> Result<()> {
+    pub unsafe fn set_flags(&self, flags: EnvFlags, mode: FlagSetMode) -> Result<()> {
         // safety: caller must ensure no other thread is calling this function.
         // <http://www.lmdb.tech/doc/group__mdb.html#ga83f66cf02bfd42119451e9468dc58445>
         mdb_result(unsafe {
