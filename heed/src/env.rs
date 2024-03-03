@@ -205,30 +205,30 @@ impl EnvOpenOptions {
     ///
     /// These are some things to take note of:
     ///
-    /// - Do not call [`EnvOpenOptions::open`] twice in the same process, at the same time [^2]
-    /// - Avoid long-lived transactions, they will cause the database to grow quickly [^3]
-    /// - Avoid aborting your process with an active transaction [^4]
-    /// - Do not use LMDB on remote filesystems, even between processes on the same host [^5]
-    /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^6]
+    /// - Avoid long-lived transactions, they will cause the database to grow quickly [^2]
+    /// - Avoid aborting your process with an active transaction [^3]
+    /// - Do not use LMDB on remote filesystems, even between processes on the same host [^4]
+    /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^5]
+    /// - Anything that causes LMDB's lock file to be broken will cause synchronization issues and may introduce UB [^6]
     ///
-    /// Anything that causes the lock file to be broken (whether listed here or not)
-    /// will cause synchronization issues and may introduce UB. [^7]
+    /// `heed` itself upholds some safety invariants, including but not limited to:
+    /// - Calling [`EnvOpenOptions::open`] twice in the same process, at the same time is OK [^7]
     ///
     /// For more details, it is highly recommended to read LMDB's official documentation. [^8]
     ///
     /// [^1]: <https://en.wikipedia.org/wiki/Memory_map>
     ///
-    /// [^2]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
+    /// [^2]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L107-L114>
     ///
-    /// [^3]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L107-L114>
+    /// [^3]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L118-L121>
     ///
-    /// [^4]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L118-L121>
+    /// [^4]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
     ///
     /// [^5]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
     ///
-    /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
     ///
-    /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
+    /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     ///
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
