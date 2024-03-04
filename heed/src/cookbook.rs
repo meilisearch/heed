@@ -28,10 +28,12 @@
 //!
 //!     fs::create_dir_all(&env_path)?;
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(10 * 1024 * 1024) // 10MB
-//!         .max_dbs(3) // Number of opened databases
-//!         .open(env_path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(10 * 1024 * 1024) // 10MB
+//!             .max_dbs(3) // Number of opened databases
+//!             .open(env_path)?
+//!     };
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let unnamed: Database<Str, DecodeIgnore> =
@@ -165,10 +167,12 @@
 //!
 //!     fs::create_dir_all(&path)?;
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(10 * 1024 * 1024) // 10MB
-//!         .max_dbs(3000)
-//!         .open(path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(10 * 1024 * 1024) // 10MB
+//!             .max_dbs(3000)
+//!             .open(path)?
+//!     };
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!     let db: Database<LogKeyCodec, Str> = env.create_database(&mut wtxn, None)?;
@@ -228,9 +232,11 @@
 //!
 //!     fs::create_dir_all(&path)?;
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(16384) // one page
-//!         .open(&path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(16384) // one page
+//!             .open(&path)?
+//!     };
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
@@ -247,9 +253,11 @@
 //!     // when no transaction are running so closing the env is easier.
 //!     env.prepare_for_closing().wait();
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(10 * 16384) // 10 pages
-//!         .open(&path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(10 * 16384) // 10 pages
+//!             .open(&path)?
+//!     };
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
@@ -291,9 +299,11 @@
 //!
 //!     fs::create_dir_all(&path)?;
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(1024 * 1024 * 100) // 100 MiB
-//!         .open(&path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(1024 * 1024 * 100) // 100 MiB
+//!             .open(&path)?
+//!     };
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
@@ -369,9 +379,11 @@
 //!
 //!     fs::create_dir_all(&path)?;
 //!
-//!     let env = EnvOpenOptions::new()
-//!         .map_size(1024 * 1024 * 100) // 100 MiB
-//!         .open(&path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(1024 * 1024 * 100) // 100 MiB
+//!             .open(&path)?
+//!     };
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
