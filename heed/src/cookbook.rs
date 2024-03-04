@@ -1,4 +1,10 @@
-//! A cookbook of examples on how to use heed.
+//! A cookbook of examples on how to use heed. Here is the list of the different topics you can learn about:
+//!
+//! - [Listing and Opening the Named Databases](#listing-and-opening-the-named-databases)
+//! - [Create Custom and Prefix Codecs](#create-custom-and-prefix-codecs)
+//! - [Change the Environment Size Dynamically](#change-the-environment-size-dynamically)
+//! - [Decode Values on Demand](#decode-values-on-demand)
+//! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
 //!
 //! # Listing and Opening the Named Databases
 //!
