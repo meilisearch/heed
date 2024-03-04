@@ -1,6 +1,61 @@
 //! A cookbook of examples on how to use heed.
 //!
-//! # Create custom and prefix codecs
+//! # Listing and Opening the Named Databases
+//!
+//! Sometimes it is useful to list the databases available in an environment.
+//! LMDB stores them already in the unnamed database, a database that is always
+//! there in which you can write.
+//!
+//! However, once you create new databases, after defining the [`EnvOpenOptions::max_dbs`]
+//! parameter, the names of those databases are automatically stored in the unnamed one.
+//!
+//! ```
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
+//!
+//! use heed::types::*;
+//! use heed::{Database, EnvOpenOptions};
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let env_path = Path::new("target").join("heed.mdb");
+//!
+//!     fs::create_dir_all(&env_path)?;
+//!
+//!     let env = EnvOpenOptions::new()
+//!         .map_size(10 * 1024 * 1024) // 10MB
+//!         .max_dbs(3) // Number of opened databases
+//!         .open(env_path)?;
+//!
+//!     let rtxn = env.read_txn()?;
+//!     let unnamed: Database<Str, DecodeIgnore> =
+//!         env.open_database(&rtxn, None)?.expect("the unnamed database always exists");
+//!
+//!     // The unnamed (or main) database contains the other
+//!     // database names associated to empty values.
+//!     for result in unnamed.iter(&rtxn)? {
+//!         let (name, ()) = result?;
+//!
+//!         if let Ok(Some(_db)) = env.open_database::<Str, Bytes>(&rtxn, Some(name)) {
+//!             // We succeeded into opening a new database that
+//!             // contains strings associated to raw bytes.
+//!         }
+//!     }
+//!
+//!     // When opening databases in a read-only transaction
+//!     // you must commit your read transaction to make your
+//!     // freshly opened databases globally available.
+//!     rtxn.commit()?;
+//!
+//!     // If you abort (or drop) your read-only transaction
+//!     // the database handle will be invalid outside
+//!     // the transaction scope.
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Create Custom and Prefix Codecs
 //!
 //! With heed you can store any kind of data and serialize it the way you want.
 //! To do so you'll need to create a codec by using the [`BytesEncode`] and [`BytesDecode`] traits.
@@ -145,7 +200,7 @@
 //! }
 //! ```
 //!
-//! # Change the environment size dynamically
+//! # Change the Environment Size Dynamically
 //!
 //! As you may now, you must specify the maximum size of an LMDB environment when you open it.
 //! Environment do not dynamically increase there size for performance reasons and also to
@@ -208,7 +263,7 @@
 //! }
 //! ```
 //!
-//! # Decode values on demand
+//! # Decode Values on Demand
 //!
 //! Sometimes, you need to iterate on the content of a database and
 //! conditionnaly decode the value depending on the key. You can use the
@@ -274,7 +329,7 @@
 //! }
 //! ```
 //!
-//! # Advanced multithreaded access of entries
+//! # Advanced Multithreaded Access of Entries
 //!
 //! LMDB disallow sharing cursors amongs threads. It is only possible to send
 //! them between threads when the heed `read-txn-no-tls` feature is enabled.
@@ -369,8 +424,9 @@
 //!
 //! unsafe impl Sync for ImmutableMap<'_> {}
 //! ```
+//!
 
 // To let cargo generate doc links
 #![allow(unused_imports)]
 
-use crate::{BytesDecode, BytesEncode, Database};
+use crate::{BytesDecode, BytesEncode, Database, EnvOpenOptions};
