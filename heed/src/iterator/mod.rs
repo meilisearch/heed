@@ -16,11 +16,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Str>(&mut wtxn, None).unwrap();
@@ -96,11 +98,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
@@ -164,11 +168,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
@@ -256,11 +262,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
@@ -304,11 +312,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
@@ -379,11 +389,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
@@ -454,11 +466,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
@@ -524,11 +538,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
@@ -575,11 +591,13 @@ mod tests {
         use crate::EnvOpenOptions;
 
         let dir = tempfile::tempdir().unwrap();
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024) // 10MB
-            .max_dbs(3000)
-            .open(dir.path())
-            .unwrap();
+        let env = unsafe {
+            EnvOpenOptions::new()
+                .map_size(10 * 1024 * 1024) // 10MB
+                .max_dbs(3000)
+                .open(dir.path())
+                .unwrap()
+        };
 
         let mut wtxn = env.write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();

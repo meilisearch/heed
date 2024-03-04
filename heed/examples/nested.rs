@@ -10,10 +10,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     fs::create_dir_all(&path)?;
 
-    let env = EnvOpenOptions::new()
-        .map_size(10 * 1024 * 1024) // 10MB
-        .max_dbs(3000)
-        .open(path)?;
+    let env = unsafe {
+        EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3000)
+            .open(path)?
+    };
 
     // here the key will be an str and the data will be a slice of u8
     let mut wtxn = env.write_txn()?;
