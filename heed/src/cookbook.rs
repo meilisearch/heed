@@ -36,6 +36,8 @@
 //!     };
 //!
 //!     let rtxn = env.read_txn()?;
+//!     // The database names are mixed with the user entries therefore we prefer
+//!     // ignoring the values and try to open the databases one by one using the keys.
 //!     let unnamed: Database<Str, DecodeIgnore> =
 //!         env.open_database(&rtxn, None)?.expect("the unnamed database always exists");
 //!
