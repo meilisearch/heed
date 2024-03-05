@@ -212,7 +212,7 @@
 //!
 //! # Change the Environment Size Dynamically
 //!
-//! As you may now, you must specify the maximum size of an LMDB environment when you open it.
+//! You must specify the maximum size of an LMDB environment when you open it.
 //! Environment do not dynamically increase there size for performance reasons and also to
 //! have more control on it.
 //!
