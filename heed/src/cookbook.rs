@@ -352,8 +352,8 @@
 //!
 //! This limits some usecases that require a parallel access to the content of the databases
 //! to process stuff faster. This is the case of arroy, a multithreads fast approximate
-//! neighbors search library. I wrote [an article to explain the tricks I implemented to be able
-//! to read entries in parallel while writing in another file][arroy article].
+//! neighbors search library. I wrote [an article explaining how
+//! to read entries in parallel][arroy article].
 //!
 //! It is forbidden to write in an environement while reading in it. However, it is possible
 //! to keep pointers to the values of the entries returned by LMDB. Those pointers are valid
