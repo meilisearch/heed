@@ -1,10 +1,78 @@
 //! A cookbook of examples on how to use heed. Here is the list of the different topics you can learn about:
 //!
+//! - [Decode Values on Demand](#decode-values-on-demand)
 //! - [Listing and Opening the Named Databases](#listing-and-opening-the-named-databases)
 //! - [Create Custom and Prefix Codecs](#create-custom-and-prefix-codecs)
 //! - [Change the Environment Size Dynamically](#change-the-environment-size-dynamically)
-//! - [Decode Values on Demand](#decode-values-on-demand)
 //! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
+//!
+//! # Decode Values on Demand
+//!
+//! Sometimes, you need to iterate on the content of a database and
+//! conditionnaly decode the value depending on the key. You can use the
+//! [`Database::lazily_decode_data`] method to indicate this to heed.
+//!
+//! ```
+//! use std::collections::HashMap;
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
+//!
+//! use heed::types::*;
+//! use heed::{Database, EnvOpenOptions};
+//!
+//! pub type StringMap = HashMap<String, String>;
+//!
+//! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+//!     let path = Path::new("target").join("heed.mdb");
+//!
+//!     fs::create_dir_all(&path)?;
+//!
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(1024 * 1024 * 100) // 100 MiB
+//!             .open(&path)?
+//!     };
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
+//!
+//!     fill_with_data(&mut wtxn, db)?;
+//!
+//!     // We make sure that iterating over this database will
+//!     // not deserialize the values. We just want to decode
+//!     // the value corresponding to 43th key.
+//!     for (i, result) in db.lazily_decode_data().iter(&wtxn)?.enumerate() {
+//!         let (_key, lazy_value) = result?;
+//!         if i == 43 {
+//!             // This is where the magic happens. We receive a Lazy type
+//!             // that wraps a slice of bytes. We can decode on purpose.
+//!             let value = lazy_value.decode()?;
+//!             assert_eq!(value.get("secret"), Some(&String::from("434343")));
+//!             break;
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }
+//!
+//! fn fill_with_data(
+//!     wtxn: &mut heed::RwTxn,
+//!     db: Database<Str, SerdeJson<StringMap>>,
+//! ) -> heed::Result<()> {
+//!     // This represents a very big value that we only want to decode when necessary.
+//!     let mut big_string_map = HashMap::new();
+//!     big_string_map.insert("key1".into(), "I am a very long string".into());
+//!     big_string_map.insert("key2".into(), "I am a also very long string".into());
+//!
+//!     for i in 0..100 {
+//!         let key = format!("{i:5}");
+//!         big_string_map.insert("secret".into(), format!("{i}{i}{i}"));
+//!         db.put(wtxn, &key, &big_string_map)?;
+//!     }
+//!     Ok(())
+//! }
+//! ```
 //!
 //! # Listing and Opening the Named Databases
 //!
@@ -274,74 +342,6 @@
 //!     for i in 0..1000 {
 //!         let key = i.to_string();
 //!         db.put(wtxn, &key, "I am a very long string")?;
-//!     }
-//!     Ok(())
-//! }
-//! ```
-//!
-//! # Decode Values on Demand
-//!
-//! Sometimes, you need to iterate on the content of a database and
-//! conditionnaly decode the value depending on the key. You can use the
-//! [`Database::lazily_decode_data`] method to indicate this to heed.
-//!
-//! ```
-//! use std::collections::HashMap;
-//! use std::error::Error;
-//! use std::fs;
-//! use std::path::Path;
-//!
-//! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
-//!
-//! pub type StringMap = HashMap<String, String>;
-//!
-//! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-//!     let path = Path::new("target").join("heed.mdb");
-//!
-//!     fs::create_dir_all(&path)?;
-//!
-//!     let env = unsafe {
-//!         EnvOpenOptions::new()
-//!             .map_size(1024 * 1024 * 100) // 100 MiB
-//!             .open(&path)?
-//!     };
-//!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
-//!
-//!     fill_with_data(&mut wtxn, db)?;
-//!
-//!     // We make sure that iterating over this database will
-//!     // not deserialize the values. We just want to decode
-//!     // the value corresponding to 43th key.
-//!     for (i, result) in db.lazily_decode_data().iter(&wtxn)?.enumerate() {
-//!         let (_key, lazy_value) = result?;
-//!         if i == 43 {
-//!             // This is where the magic happens. We receive a Lazy type
-//!             // that wraps a slice of bytes. We can decode on purpose.
-//!             let value = lazy_value.decode()?;
-//!             assert_eq!(value.get("secret"), Some(&String::from("434343")));
-//!             break;
-//!         }
-//!     }
-//!
-//!     Ok(())
-//! }
-//!
-//! fn fill_with_data(
-//!     wtxn: &mut heed::RwTxn,
-//!     db: Database<Str, SerdeJson<StringMap>>,
-//! ) -> heed::Result<()> {
-//!     // This represents a very big value that we only want to decode when necessary.
-//!     let mut big_string_map = HashMap::new();
-//!     big_string_map.insert("key1".into(), "I am a very long string".into());
-//!     big_string_map.insert("key2".into(), "I am a also very long string".into());
-//!
-//!     for i in 0..100 {
-//!         let key = format!("{i:5}");
-//!         big_string_map.insert("secret".into(), format!("{i}{i}{i}"));
-//!         db.put(wtxn, &key, &big_string_map)?;
 //!     }
 //!     Ok(())
 //! }
