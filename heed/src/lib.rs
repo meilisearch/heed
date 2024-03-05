@@ -7,6 +7,10 @@
 
 //! `heed` is a high-level wrapper of [LMDB].
 //!
+//! The [cookbook] will give you a variety of complete Rust programs to use with heed.
+//!
+//! ----
+//!
 //! This crate simply facilitates the use of LMDB by providing a mechanism to store and
 //! retrieve Rust types. It abstracts away some of the complexities of the raw LMDB usage
 //! while retaining its performance characteristics. The functionality is achieved with the help
@@ -58,6 +62,7 @@
 //! ```
 #![warn(missing_docs)]
 
+pub mod cookbook;
 mod cursor;
 mod database;
 mod env;
