@@ -9,8 +9,8 @@
 //! # Listing and Opening the Named Databases
 //!
 //! Sometimes it is useful to list the databases available in an environment.
-//! LMDB stores them already in the unnamed database, a database that is always
-//! there in which you can write.
+//! LMDB automatically stores their names in the unnamed database, a database that doesn't
+//! need to be created in which you can write.
 //!
 //! However, once you create new databases, after defining the [`EnvOpenOptions::max_dbs`]
 //! parameter, the names of those databases are automatically stored in the unnamed one.
