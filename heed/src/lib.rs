@@ -7,7 +7,7 @@
 
 //! `heed` is a high-level wrapper of [LMDB].
 //!
-//! The [cookbook] will give you a variety of complete Rust programs to use heed.
+//! The [cookbook] will give you a variety of complete Rust programs to use with heed.
 //!
 //! ----
 //!
