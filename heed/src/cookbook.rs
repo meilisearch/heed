@@ -316,7 +316,7 @@
 //!     for (i, result) in db.lazily_decode_data().iter(&wtxn)?.enumerate() {
 //!         let (_key, lazy_value) = result?;
 //!         if i == 43 {
-//!             // This is where the magix happen. We receive a Lazy type
+//!             // This is where the magic happens. We receive a Lazy type
 //!             // that wraps a slice of bytes. We can decode on purpose.
 //!             let value = lazy_value.decode()?;
 //!             assert_eq!(value.get("secret"), Some(&String::from("434343")));
