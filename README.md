@@ -1,4 +1,4 @@
-<p align="center"><img width="280px" src="https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png"></a>
+<p align="center"><img width="280px" src="https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png"></a></p>
 <h1 align="center" >heed</h1>
 
 [![License](https://img.shields.io/badge/license-MIT-green)](#LICENSE)
