@@ -449,7 +449,7 @@ pub enum CompactionOption {
     Disabled,
 }
 
-/// Whether to enable or disable flags in [`Env::set_flag`].
+/// Whether to enable or disable flags in [`Env::set_flags`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FlagSetMode {
     /// Enable the flags.
