@@ -1882,11 +1882,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
         txn: &mut RwTxn,
         key: &'a KC::EItem,
         data_size: usize,
-        mut write_func: F,
+        write_func: F,
     ) -> Result<()>
     where
         KC: BytesEncode<'a>,
-        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
     {
         assert_eq_env_db_txn!(self, txn);
 
@@ -1900,7 +1900,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         }
 
         let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
-        (write_func)(&mut reserved)?;
+        write_func(&mut reserved)?;
         if reserved.remaining() == 0 {
             Ok(())
         } else {

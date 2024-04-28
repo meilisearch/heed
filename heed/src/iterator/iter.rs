@@ -299,7 +299,7 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
     ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
-        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved_with_flags(flags, &key_bytes, data_size, write_func)
@@ -648,7 +648,7 @@ impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
     ) -> Result<bool>
     where
         KC: BytesEncode<'a>,
-        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
     {
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         self.cursor.put_current_reserved_with_flags(flags, &key_bytes, data_size, write_func)

@@ -334,10 +334,10 @@ impl<'txn> RwCursor<'txn> {
         flags: PutFlags,
         key: &[u8],
         data_size: usize,
-        mut write_func: F,
+        write_func: F,
     ) -> Result<bool>
     where
-        F: FnMut(&mut ReservedSpace) -> io::Result<()>,
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
     {
         let mut key_val = crate::into_val(key);
         let mut reserved = ffi::reserve_size_val(data_size);
@@ -353,7 +353,7 @@ impl<'txn> RwCursor<'txn> {
         };
 
         let mut reserved = ReservedSpace::from_val(reserved);
-        (write_func)(&mut reserved)?;
+        write_func(&mut reserved)?;
 
         if reserved.remaining() == 0 {
             Ok(found)
