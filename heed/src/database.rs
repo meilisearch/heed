@@ -1787,7 +1787,8 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
-    /// Insert a key-value pair in this database. The entry is written with no specific flag.
+    /// Insert a key-value pair in this database, replacing any previous value. The entry is
+    /// written with no specific flag.
     ///
     /// ```
     /// # use std::fs;
@@ -1842,7 +1843,8 @@ impl<KC, DC, C> Database<KC, DC, C> {
         Ok(())
     }
 
-    /// Insert a key-value pair where the value can directly be written to disk.
+    /// Insert a key-value pair where the value can directly be written to disk, replacing any
+    /// previous value.
     ///
     /// ```
     /// # use std::fs;
@@ -1908,7 +1910,8 @@ impl<KC, DC, C> Database<KC, DC, C> {
         }
     }
 
-    /// Insert a key-value pair in this database. The entry is written with the specified flags.
+    /// Insert a key-value pair in this database, replacing any previous value. The entry is
+    /// written with the specified flags.
     ///
     /// ```
     /// # use std::fs;
