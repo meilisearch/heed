@@ -2103,14 +2103,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
         match result {
             // the value was successfully inserted
             Ok(()) => Ok(None),
-
             // the key already exists: the previous value is stored in the data parameter
             Err(MdbError::KeyExist) => {
                 let bytes = unsafe { crate::from_val(data_val) };
                 let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
                 Ok(Some(data))
             }
-
             Err(error) => Err(error.into()),
         }
     }
@@ -2263,14 +2261,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
                     Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
                 }
             }
-
             // the key already exists: the previous value is stored in the data parameter
             Err(MdbError::KeyExist) => {
                 let bytes = unsafe { crate::from_val(reserved) };
                 let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
                 Ok(Some(data))
             }
-
             Err(error) => Err(error.into()),
         }
     }
