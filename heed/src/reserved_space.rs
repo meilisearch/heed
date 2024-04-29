@@ -108,6 +108,12 @@ impl io::Write for ReservedSpace {
         }
     }
 
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        let count = self.write(buf)?;
+        debug_assert_eq!(count, buf.len());
+        Ok(())
+    }
+
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
