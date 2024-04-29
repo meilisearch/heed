@@ -2091,18 +2091,23 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = (flags | PutFlags::NO_OVERWRITE).bits();
 
-        unsafe {
-            match ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags) {
-                lmdb_master_sys::MDB_KEYEXIST => {
-                    let bytes = crate::from_val(data_val);
-                    let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
-                    return Ok(Some(data));
-                }
-                err_code => mdb_result(err_code)?,
-            }
-        }
+        let result = unsafe {
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))
+        };
 
-        Ok(None)
+        match result {
+            // the value was successfully inserted
+            Ok(()) => Ok(None),
+
+            // the key already exists: the previous value is stored in the data parameter
+            Err(MdbError::KeyExist) => {
+                let bytes = unsafe { crate::from_val(data_val) };
+                let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
+                Ok(Some(data))
+            }
+
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Attempt to insert a key-value pair in this database, where the value can be directly
@@ -2235,23 +2240,30 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = (flags | PutFlags::NO_OVERWRITE).bits() | lmdb_master_sys::MDB_RESERVE;
 
-        unsafe {
-            match ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags) {
-                lmdb_master_sys::MDB_KEYEXIST => {
-                    let bytes = crate::from_val(reserved);
-                    let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
-                    return Ok(Some(data));
-                }
-                err_code => mdb_result(err_code)?,
-            }
-        }
+        let result = unsafe {
+            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))
+        };
 
-        let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
-        write_func(&mut reserved)?;
-        if reserved.remaining() == 0 {
-            Ok(None)
-        } else {
-            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
+        match result {
+            // value was inserted: fill the reserved space
+            Ok(()) => {
+                let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
+                write_func(&mut reserved)?;
+                if reserved.remaining() == 0 {
+                    Ok(None)
+                } else {
+                    Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
+                }
+            }
+
+            // the key already exists: the previous value is stored in the data parameter
+            Err(MdbError::KeyExist) => {
+                let bytes = unsafe { crate::from_val(reserved) };
+                let data = DC::bytes_decode(bytes).map_err(Error::Decoding)?;
+                Ok(Some(data))
+            }
+
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -2620,8 +2632,9 @@ pub struct DatabaseStat {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use heed_types::*;
+
+    use super::*;
 
     #[test]
     fn put_overwrite() -> Result<()> {
