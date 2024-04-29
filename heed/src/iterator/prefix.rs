@@ -13,7 +13,7 @@ use crate::*;
 /// defined by the `C` comparator. If no successor exists (i.e. `bytes` is the maximal
 /// value), it remains unchanged and the function returns `false`. Otherwise, updates
 /// `bytes` and returns `true`.
-fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
+fn advance_prefix<C: LexicographicComparator>(bytes: &mut [u8]) -> bool {
     let mut idx = bytes.len();
     while idx > 0 && bytes[idx - 1] == C::max_elem() {
         idx -= 1;
@@ -32,7 +32,7 @@ fn advance_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
 /// defined by the `C` comparator. If no predecessor exists (i.e. `bytes` is the minimum
 /// value), it remains unchanged and the function returns `false`. Otherwise, updates
 /// `bytes` and returns `true`.
-fn retreat_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
+fn retreat_prefix<C: LexicographicComparator>(bytes: &mut [u8]) -> bool {
     let mut idx = bytes.len();
     while idx > 0 && bytes[idx - 1] == C::min_elem() {
         idx -= 1;
@@ -49,7 +49,7 @@ fn retreat_prefix<C: LexicographicComparator>(bytes: &mut Vec<u8>) -> bool {
 
 fn move_on_prefix_end<'txn, C: LexicographicComparator>(
     cursor: &mut RoCursor<'txn>,
-    prefix: &mut Vec<u8>,
+    prefix: &mut [u8],
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     if advance_prefix::<C>(prefix) {
         let result = cursor
