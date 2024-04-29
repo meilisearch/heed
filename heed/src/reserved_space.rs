@@ -39,6 +39,9 @@ impl ReservedSpace {
 
     /// Fills the remaining reserved space with zeroes.
     ///
+    /// This can be used together with [`written_mut`](Self::written_mut) to get a mutable view of
+    /// the entire reserved space.
+    ///
     /// ### Note
     ///
     /// After calling this function, the entire space is considered to be filled and any
