@@ -9,14 +9,16 @@ use crate::mdb::ffi;
 pub struct ReservedSpace {
     /// Total size of the space.
     size: usize,
-
     /// Pointer to the start of the reserved space.
     start_ptr: *mut u8,
-
     /// Number of bytes which have been written: all bytes in `0..written`.
     written: usize,
-
     /// Index of the byte which should be written next.
+    ///
+    /// # Safety
+    ///
+    /// To ensure there are no unwritten gaps in the buffer this should be kept in the range
+    /// `0..=written` at all times.
     write_head: usize,
 }
 
@@ -60,7 +62,7 @@ impl ReservedSpace {
     /// After calling this function, the entire space is considered to be filled and any
     /// further attempt to [`write`](std::io::Write::write) anything else will fail.
     pub fn fill_zeroes(&mut self) {
-        for i in self.written..self.size {
+        for i in self.write_head..self.size {
             unsafe { self.start_ptr.add(i).write(0) };
         }
         self.written = self.size;
@@ -121,7 +123,7 @@ impl io::Write for ReservedSpace {
 
 /// ## Note
 ///
-/// May only seek within the already within the previously written space.
+/// May only seek within the previously written space.
 /// Attempts to do otherwise will result in an error.
 impl io::Seek for ReservedSpace {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
