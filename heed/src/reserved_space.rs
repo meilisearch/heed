@@ -6,11 +6,8 @@ use crate::mdb::ffi;
 /// A structure that is used to improve the write speed in LMDB.
 ///
 /// You must write the exact amount of bytes, no less, no more.
-pub struct ReservedSpace {
-    /// Total size of the space.
-    size: usize,
-    /// Pointer to the start of the reserved space.
-    start_ptr: *mut u8,
+pub struct ReservedSpace<'a> {
+    bytes: &'a mut [MaybeUninit<u8>],
     /// Number of bytes which have been written: all bytes in `0..written`.
     written: usize,
     /// Index of the byte which should be written next.
@@ -22,11 +19,13 @@ pub struct ReservedSpace {
     write_head: usize,
 }
 
-impl ReservedSpace {
-    pub(crate) unsafe fn from_val(val: ffi::MDB_val) -> ReservedSpace {
+impl ReservedSpace<'_> {
+    pub(crate) unsafe fn from_val<'a>(val: ffi::MDB_val) -> ReservedSpace<'a> {
+        let len = val.mv_size;
+        let ptr = val.mv_data;
+
         ReservedSpace {
-            size: val.mv_size,
-            start_ptr: val.mv_data as *mut u8,
+            bytes: std::slice::from_raw_parts_mut(ptr.cast(), len),
             written: 0,
             write_head: 0,
         }
@@ -34,12 +33,12 @@ impl ReservedSpace {
 
     /// The total number of bytes that this memory buffer has.
     pub fn size(&self) -> usize {
-        self.size
+        self.bytes.len()
     }
 
     /// The remaining number of bytes that this memory buffer has.
     pub fn remaining(&self) -> usize {
-        self.size - self.write_head
+        self.bytes.len() - self.write_head
     }
 
     /// Get a slice of all the bytes that have previously been written.
@@ -49,7 +48,9 @@ impl ReservedSpace {
     /// checksum over the bytes, and then write that checksum to a header at the start of the
     /// reserved space.
     pub fn written_mut(&mut self) -> &mut [u8] {
-        unsafe { std::slice::from_raw_parts_mut(self.start_ptr, self.written) }
+        let ptr = self.bytes.as_mut_ptr();
+        let len = self.written;
+        unsafe { std::slice::from_raw_parts_mut(ptr.cast(), len) }
     }
 
     /// Fills the remaining reserved space with zeroes.
@@ -62,11 +63,9 @@ impl ReservedSpace {
     /// After calling this function, the entire space is considered to be filled and any
     /// further attempt to [`write`](std::io::Write::write) anything else will fail.
     pub fn fill_zeroes(&mut self) {
-        for i in self.write_head..self.size {
-            unsafe { self.start_ptr.add(i).write(0) };
-        }
-        self.written = self.size;
-        self.write_head = self.size;
+        self.bytes[self.write_head..].fill(MaybeUninit::new(0));
+        self.written = self.bytes.len();
+        self.write_head = self.bytes.len();
     }
 
     /// Get a slice of bytes corresponding to the *entire* reserved space.
@@ -81,7 +80,7 @@ impl ReservedSpace {
     /// initialized. Thus, it is up to the caller to ensure that only initialized memory is read
     /// (ensured by the [`MaybeUninit`] API).
     pub fn as_uninit_mut(&mut self) -> &mut [MaybeUninit<u8>] {
-        unsafe { std::slice::from_raw_parts_mut(self.start_ptr.cast(), self.size) }
+        self.bytes
     }
 
     /// Marks the bytes in the range `0..len` as being initialized by advancing the internal write
@@ -91,17 +90,17 @@ impl ReservedSpace {
     ///
     /// The caller guarantees that all bytes in the range have been initialized.
     pub unsafe fn assume_written(&mut self, len: usize) {
-        debug_assert!(len <= self.size);
+        debug_assert!(len <= self.bytes.len());
         self.written = len;
         self.write_head = len;
     }
 }
 
-impl io::Write for ReservedSpace {
+impl io::Write for ReservedSpace<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.remaining() >= buf.len() {
-            let dest = unsafe { self.start_ptr.add(self.write_head) };
-            unsafe { buf.as_ptr().copy_to_nonoverlapping(dest, buf.len()) };
+            let dest = unsafe { self.bytes.as_mut_ptr().add(self.write_head) };
+            unsafe { buf.as_ptr().copy_to_nonoverlapping(dest.cast(), buf.len()) };
             self.write_head += buf.len();
             self.written = usize::max(self.written, self.write_head);
             Ok(buf.len())
@@ -125,7 +124,7 @@ impl io::Write for ReservedSpace {
 ///
 /// May only seek within the previously written space.
 /// Attempts to do otherwise will result in an error.
-impl io::Seek for ReservedSpace {
+impl io::Seek for ReservedSpace<'_> {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         let (base, offset) = match pos {
             io::SeekFrom::Start(start) => (start, 0),
@@ -162,7 +161,7 @@ impl io::Seek for ReservedSpace {
     }
 }
 
-impl fmt::Debug for ReservedSpace {
+impl fmt::Debug for ReservedSpace<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ReservedSpace").finish()
     }
