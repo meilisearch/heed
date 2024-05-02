@@ -105,17 +105,15 @@ impl ReservedSpace<'_> {
 impl io::Write for ReservedSpace<'_> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let count = usize::min(self.remaining(), buf.len());
-
-        unsafe {
-            let dest = self.bytes.as_mut_ptr().add(self.write_head);
-            buf.as_ptr().copy_to_nonoverlapping(dest.cast(), count);
+        if self.remaining() >= buf.len() {
+            let dest = unsafe { self.bytes.as_mut_ptr().add(self.write_head) };
+            unsafe { buf.as_ptr().copy_to_nonoverlapping(dest.cast(), buf.len()) };
+            self.write_head += buf.len();
+            self.written = usize::max(self.written, self.write_head);
+            Ok(buf.len())
+        } else {
+            Err(io::Error::from(io::ErrorKind::WriteZero))
         }
-
-        self.write_head += count;
-        self.written = usize::max(self.written, self.write_head);
-
-        Ok(count)
     }
 
     #[inline]
