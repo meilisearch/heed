@@ -32,11 +32,13 @@ impl ReservedSpace<'_> {
     }
 
     /// The total number of bytes that this memory buffer has.
+    #[inline]
     pub fn size(&self) -> usize {
         self.bytes.len()
     }
 
     /// The remaining number of bytes that this memory buffer has.
+    #[inline]
     pub fn remaining(&self) -> usize {
         self.bytes.len() - self.write_head
     }
@@ -47,6 +49,7 @@ impl ReservedSpace<'_> {
     /// serialization. For example, this method can be used to serialize a value, then compute a
     /// checksum over the bytes, and then write that checksum to a header at the start of the
     /// reserved space.
+    #[inline]
     pub fn written_mut(&mut self) -> &mut [u8] {
         let ptr = self.bytes.as_mut_ptr();
         let len = self.written;
@@ -62,6 +65,7 @@ impl ReservedSpace<'_> {
     ///
     /// After calling this function, the entire space is considered to be filled and any
     /// further attempt to [`write`](std::io::Write::write) anything else will fail.
+    #[inline]
     pub fn fill_zeroes(&mut self) {
         self.bytes[self.write_head..].fill(MaybeUninit::new(0));
         self.written = self.bytes.len();
@@ -79,6 +83,7 @@ impl ReservedSpace<'_> {
     /// As the memory comes from within the database itself, the bytes may not yet be
     /// initialized. Thus, it is up to the caller to ensure that only initialized memory is read
     /// (ensured by the [`MaybeUninit`] API).
+    #[inline]
     pub fn as_uninit_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         self.bytes
     }
@@ -89,6 +94,7 @@ impl ReservedSpace<'_> {
     /// # Safety
     ///
     /// The caller guarantees that all bytes in the range have been initialized.
+    #[inline]
     pub unsafe fn assume_written(&mut self, len: usize) {
         debug_assert!(len <= self.bytes.len());
         self.written = len;
@@ -97,24 +103,31 @@ impl ReservedSpace<'_> {
 }
 
 impl io::Write for ReservedSpace<'_> {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.remaining() >= buf.len() {
-            let dest = unsafe { self.bytes.as_mut_ptr().add(self.write_head) };
-            unsafe { buf.as_ptr().copy_to_nonoverlapping(dest.cast(), buf.len()) };
-            self.write_head += buf.len();
-            self.written = usize::max(self.written, self.write_head);
-            Ok(buf.len())
+        let count = usize::min(self.remaining(), buf.len());
+
+        unsafe {
+            let dest = self.bytes.as_mut_ptr().add(self.write_head);
+            buf.as_ptr().copy_to_nonoverlapping(dest.cast(), count);
+        }
+
+        self.write_head += count;
+        self.written = usize::max(self.written, self.write_head);
+
+        Ok(count)
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        if self.write(buf)? == buf.len() {
+            Ok(())
         } else {
-            Err(io::Error::from(io::ErrorKind::WriteZero))
+            Err(std::io::ErrorKind::WriteZero.into())
         }
     }
 
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        let count = self.write(buf)?;
-        debug_assert_eq!(count, buf.len());
-        Ok(())
-    }
-
+    #[inline(always)]
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
@@ -125,6 +138,7 @@ impl io::Write for ReservedSpace<'_> {
 /// May only seek within the previously written space.
 /// Attempts to do otherwise will result in an error.
 impl io::Seek for ReservedSpace<'_> {
+    #[inline]
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         let (base, offset) = match pos {
             io::SeekFrom::Start(start) => (start, 0),
@@ -151,11 +165,13 @@ impl io::Seek for ReservedSpace<'_> {
         Ok(new_pos)
     }
 
+    #[inline]
     fn rewind(&mut self) -> io::Result<()> {
         self.write_head = 0;
         Ok(())
     }
 
+    #[inline]
     fn stream_position(&mut self) -> io::Result<u64> {
         Ok(self.write_head as u64)
     }
