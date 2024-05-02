@@ -111,17 +111,17 @@ impl io::Write for ReservedSpace<'_> {
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        let remaining = &mut self.bytes[self.write_head..];
+        let remaining = unsafe { self.bytes.get_unchecked_mut(self.write_head..) };
 
         if buf.len() > remaining.len() {
             return Err(io::Error::from(io::ErrorKind::WriteZero));
         }
 
-        // SAFETY: we can always cast `T` -> `MaybeUninit<T>` as it's a transparent wrapper
-        let buf_uninit: &[std::mem::MaybeUninit<u8>] =
-            unsafe { std::slice::from_raw_parts(buf.as_ptr().cast(), buf.len()) };
-
-        remaining[..buf.len()].copy_from_slice(buf_uninit);
+        unsafe {
+            // SAFETY: we can always cast `T` -> `MaybeUninit<T>` as it's a transparent wrapper
+            let buf_uninit = std::slice::from_raw_parts(buf.as_ptr().cast(), buf.len());
+            remaining.get_unchecked_mut(..buf.len()).copy_from_slice(buf_uninit);
+        }
 
         self.write_head += buf.len();
         self.written = usize::max(self.written, self.write_head);
