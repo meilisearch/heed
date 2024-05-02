@@ -120,7 +120,7 @@ impl io::Write for ReservedSpace<'_> {
         unsafe {
             // SAFETY: we can always cast `T` -> `MaybeUninit<T>` as it's a transparent wrapper
             let buf_uninit = std::slice::from_raw_parts(buf.as_ptr().cast(), buf.len());
-            remaining.get_unchecked_mut(..buf.len()).copy_from_slice(buf_uninit);
+            remaining.as_mut_ptr().copy_from_nonoverlapping(buf_uninit.as_ptr(), buf.len());
         }
 
         self.write_head += buf.len();
