@@ -748,6 +748,7 @@ impl Env {
     ///
     /// You can make this transaction `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
+    /// See [`Self::static_read_txn`] if you want the txn to own the environment.
     ///
     /// ## LMDB Limitations
     ///
@@ -769,6 +770,35 @@ impl Env {
     /// full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
+    }
+
+    /// Create a transaction with read-only access for use with the environment.
+    /// Contrary to [`Self::read_txn`], this version **owns** the environment, which
+    /// means you won't be able to close the environment while this transaction is alive.
+    ///
+    /// You can make this transaction `Send`able between threads by
+    /// using the `read-txn-no-tls` crate feature.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// It's possible to have multiple read transactions in the same environment
+    /// while there is a write transaction ongoing.
+    ///
+    /// But read transactions prevent reuse of pages freed by newer write transactions,
+    /// thus the database can grow quickly. Write transactions prevent other write transactions,
+    /// since writes are serialized.
+    ///
+    /// So avoid long-lived read transactions.
+    ///
+    /// ## Errors
+    ///
+    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
+    /// map must be resized
+    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
+    /// full
+    pub fn static_read_txn(self) -> Result<RoTxn<'static>> {
+        RoTxn::static_read_txn(self)
     }
 
     /// Copy an LMDB environment to the specified path, with options.
