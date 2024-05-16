@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::ptr;
 
@@ -26,7 +27,7 @@ use crate::{Env, Result};
 /// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
 pub struct RoTxn<'e> {
     pub(crate) txn: *mut ffi::MDB_txn,
-    env: &'e Env,
+    env: Cow<'e, Env>,
 }
 
 impl<'e> RoTxn<'e> {
@@ -42,7 +43,22 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn, env })
+        Ok(RoTxn { txn, env: Cow::Borrowed(env) })
+    }
+
+    pub(crate) fn static_read_txn(env: Env) -> Result<RoTxn<'static>> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr(),
+                ptr::null_mut(),
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
+        };
+
+        Ok(RoTxn { txn, env: Cow::Owned(env) })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
@@ -110,7 +126,7 @@ impl<'p> RwTxn<'p> {
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), ptr::null_mut(), 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env } })
+        Ok(RwTxn { txn: RoTxn { txn, env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
@@ -119,7 +135,7 @@ impl<'p> RwTxn<'p> {
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env } })
+        Ok(RwTxn { txn: RoTxn { txn, env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
