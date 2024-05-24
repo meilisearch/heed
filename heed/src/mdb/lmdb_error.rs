@@ -53,6 +53,14 @@ pub enum Error {
     /// Transaction cannot recover - it must be aborted.
     BadTxn,
     /// Unsupported size of key/DB name/data, or wrong DUP_FIXED size.
+    ///
+    /// Common causes of this error:
+    ///   - You tried to store a zero-length key
+    ///   - You tried to store a key longer than the max allowed key (511 bytes by default)
+    ///   - You are using [DUP_SORT](crate::DatabaseFlags::DUP_SORT) and trying to store a
+    ///     value longer than the max allowed key size (511 bytes by default)
+    ///
+    /// In the last two cases you can enable the `longer-keys` feature to increase the max allowed key size.
     BadValSize,
     /// The specified DBI was changed unexpectedly.
     BadDbi,

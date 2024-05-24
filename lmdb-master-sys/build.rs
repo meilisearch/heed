@@ -147,5 +147,9 @@ fn main() {
         builder.flag("-fsanitize=fuzzer-no-link");
     }
 
+    if cfg!(feature = "longer-keys") {
+        builder.define("MDB_MAXKEYSIZE", "0");
+    }
+
     builder.compile("liblmdb.a")
 }
