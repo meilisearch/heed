@@ -2657,4 +2657,26 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    #[cfg(feature = "longer-keys")]
+    fn longer_keys() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
+        let mut txn = env.write_txn()?;
+        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+
+        // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
+        let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";
+
+        assert_eq!(db.get(&txn, long_key).unwrap(), None);
+
+        db.put(&mut txn, long_key, b"hi").unwrap();
+        assert_eq!(db.get(&txn, long_key).unwrap(), Some(&b"hi"[..]));
+
+        db.put(&mut txn, long_key, b"bye").unwrap();
+        assert_eq!(db.get(&txn, long_key).unwrap(), Some(&b"bye"[..]));
+
+        Ok(())
+    }
 }

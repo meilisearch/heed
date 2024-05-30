@@ -901,6 +901,14 @@ impl Env {
         mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr(), new_size) })
             .map_err(Into::into)
     }
+
+    /// Get the maximum size of keys and MDB_DUPSORT data we can write.
+    ///
+    /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
+    pub fn max_key_size(&self) -> usize {
+        let maxsize: i32 = unsafe { ffi::mdb_env_get_maxkeysize(self.env_mut_ptr()) };
+        maxsize as usize
+    }
 }
 
 /// Contains information about the environment.
@@ -1249,6 +1257,23 @@ mod tests {
             }
 
             env.prepare_for_closing().wait();
+        }
+    }
+
+    #[test]
+    fn max_key_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = unsafe { EnvOpenOptions::new().open(dir.path().join(dir.path())).unwrap() };
+        let maxkeysize = env.max_key_size();
+
+        eprintln!("maxkeysize: {}", maxkeysize);
+
+        if cfg!(feature = "longer-keys") {
+            // Should be larger than the default of 511
+            assert!(maxkeysize > 511);
+        } else {
+            // Should be the default of 511
+            assert_eq!(maxkeysize, 511);
         }
     }
 }
