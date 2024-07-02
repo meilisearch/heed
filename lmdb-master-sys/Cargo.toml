@@ -24,15 +24,15 @@ name = "lmdb_master_sys"
 doctest = false
 
 [dependencies]
-libc = "0.2.139"
+libc = "0.2.155"
 
 [build-dependencies]
-bindgen = { version = "0.69.1", default-features = false, optional = true, features = ["runtime"] }
-cc = "1.0.78"
+bindgen = { version = "0.69.4", default-features = false, optional = true, features = ["runtime"] }
+cc = "1.0.104"
 doxygen-rs = "0.4.2"
 
 [dev-dependencies]
-cstr = "0.2.11"
+cstr = "0.2.12"
 
 [features]
 default = []
