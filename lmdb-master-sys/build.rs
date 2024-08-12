@@ -117,8 +117,8 @@ fn main() {
     lmdb.push("libraries");
     lmdb.push("liblmdb");
 
-    if cfg!(feature = "with-fuzzer") && cfg!(feature = "with-fuzzer-no-link") {
-        warn!("Features `with-fuzzer` and `with-fuzzer-no-link` are mutually exclusive.");
+    if cfg!(feature = "fuzzer") && cfg!(feature = "fuzzer-no-link") {
+        warn!("Features `fuzzer` and `fuzzer-no-link` are mutually exclusive.");
         warn!("Building with `-fsanitize=fuzzer`.");
     }
 
