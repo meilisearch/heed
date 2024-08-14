@@ -1,3 +1,4 @@
+use std::array;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::mem::size_of;
@@ -12,7 +13,7 @@ impl BytesEncode<'_> for U8 {
     type EItem = u8;
 
     fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-        Ok(Cow::from([*item].to_vec()))
+        Ok(Cow::Borrowed(array::from_ref(item)))
     }
 }
 
@@ -31,7 +32,9 @@ impl BytesEncode<'_> for I8 {
     type EItem = i8;
 
     fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-        Ok(Cow::from([*item as u8].to_vec()))
+        // SAFETY: i8 and u8 have the same layout
+        let ref_u8 = unsafe { &*(item as *const i8 as *const u8) };
+        Ok(Cow::Borrowed(array::from_ref(ref_u8)))
     }
 }
 
@@ -55,9 +58,17 @@ macro_rules! define_type {
             type EItem = $native;
 
             fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-                let mut buf = vec![0; size_of::<Self::EItem>()];
-                O::$write_method(&mut buf, *item);
-                Ok(Cow::from(buf))
+                Ok(if is_native_byte_order::<O>() {
+                    // SAFETY: Casting from $native to [u8; size_of::<$native>()] is sound because
+                    // they have the same size and [u8; size_of::<$native>()] has an align of 1.
+                    let bytes =
+                        unsafe { &*(item as *const $native as *const [u8; size_of::<$native>()]) };
+                    Cow::Borrowed(bytes)
+                } else {
+                    let mut buf = vec![0; size_of::<Self::EItem>()];
+                    O::$write_method(&mut buf, *item);
+                    Cow::from(buf)
+                })
             }
         }
 
@@ -79,3 +90,29 @@ define_type!(I16, i16, read_i16, write_i16);
 define_type!(I32, i32, read_i32, write_i32);
 define_type!(I64, i64, read_i64, write_i64);
 define_type!(I128, i128, read_i128, write_i128);
+
+fn is_native_byte_order<O: ByteOrder>() -> bool {
+    O::read_u16(&1u16.to_ne_bytes()) == 1
+}
+
+#[cfg(test)]
+mod tests {
+    use byteorder::{BigEndian, LittleEndian};
+
+    use super::is_native_byte_order;
+
+    #[test]
+    fn test_is_native_byte_order() {
+        #[cfg(target_endian = "little")]
+        {
+            assert!(is_native_byte_order::<LittleEndian>());
+            assert!(!is_native_byte_order::<BigEndian>());
+        }
+
+        #[cfg(target_endian = "big")]
+        {
+            assert!(is_native_byte_order::<BigEndian>());
+            assert!(!is_native_byte_order::<LittleEndian>());
+        }
+    }
+}
