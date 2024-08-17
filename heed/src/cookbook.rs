@@ -144,7 +144,7 @@
 //! to create codecs to encode prefixes when possible instead of using a slice of bytes.
 //!
 //! ```
-//! use std::borrow::Cow;
+//! use std::convert::Infallible;
 //! use std::error::Error;
 //! use std::fs;
 //! use std::path::Path;
@@ -152,7 +152,7 @@
 //! use heed::types::*;
 //! use heed::{BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
 //!
-//! #[derive(Debug, PartialEq, Eq)]
+//! #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 //! pub enum Level {
 //!     Debug,
 //!     Warn,
@@ -170,18 +170,20 @@
 //! impl<'a> BytesEncode<'a> for LogKeyCodec {
 //!     type EItem = LogKey;
 //!
-//!     /// Encodes the u32 timestamp in big endian followed by the log level with a single byte.
-//!     fn bytes_encode(log: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-//!         let (timestamp_bytes, level_byte) = match log {
-//!             LogKey { timestamp, level: Level::Debug } => (timestamp.to_be_bytes(), 0),
-//!             LogKey { timestamp, level: Level::Warn } => (timestamp.to_be_bytes(), 1),
-//!             LogKey { timestamp, level: Level::Error } => (timestamp.to_be_bytes(), 2),
-//!         };
+//!     type ReturnBytes = [u8; 5];
 //!
-//!         let mut output = Vec::new();
-//!         output.extend_from_slice(&timestamp_bytes);
-//!         output.push(level_byte);
-//!         Ok(Cow::Owned(output))
+//!     type Error = Infallible;
+//!
+//!     /// Encodes the u32 timestamp in big endian followed by the log level with a single byte.
+//!     fn bytes_encode(log: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+//!         let mut output = [0; 5];
+//!
+//!         let [timestamp @ .., level] = &mut output;
+//!
+//!         *timestamp = log.timestamp.to_be_bytes();
+//!         *level = log.level as u8;
+//!
+//!         Ok(output)
 //!     }
 //! }
 //!
@@ -216,9 +218,14 @@
 //! impl<'a> BytesEncode<'a> for LogAtHalfTimestampCodec {
 //!     type EItem = u32;
 //!
+//!     type ReturnBytes = [u8; 2];
+//!
+//!     type Error = Infallible;
+//!
 //!     /// This method encodes only the prefix of the keys in this particular case, the timestamp.
-//!     fn bytes_encode(half_timestamp: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-//!         Ok(Cow::Owned(half_timestamp.to_be_bytes()[..2].to_vec()))
+//!     fn bytes_encode(half_timestamp: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+//!         let [bytes @ .., _, _] = half_timestamp.to_be_bytes();
+//!         Ok(bytes)
 //!     }
 //! }
 //!

@@ -1,8 +1,7 @@
-use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
 
-use heed_traits::{Comparator, LexicographicComparator};
+use heed_traits::{BytesEncode, Comparator, LexicographicComparator};
 use types::{DecodeIgnore, LazyDecode};
 
 use crate::cursor::MoveOperation;
@@ -361,9 +360,9 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
         let mut data_val = mem::MaybeUninit::uninit();
 
         let result = unsafe {
@@ -450,8 +449,8 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        if cursor.move_on_key(&key_bytes)? {
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        if cursor.move_on_key(key_bytes.as_ref())? {
             Ok(Some(RoIter::new(cursor)))
         } else {
             Ok(None)
@@ -514,8 +513,8 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        cursor.move_on_key_greater_than_or_equal_to(&key_bytes)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        cursor.move_on_key_greater_than_or_equal_to(key_bytes.as_ref())?;
 
         match cursor.move_on_prev(MoveOperation::NoDup) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
@@ -583,9 +582,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let result = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
-            Ok(Some((key, data))) if key == &key_bytes[..] => Ok(Some((key, data))),
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let key_bytes = key_bytes.as_ref();
+        let result = match cursor.move_on_key_greater_than_or_equal_to(key_bytes) {
+            Ok(Some((key, data))) if key == key_bytes => Ok(Some((key, data))),
             Ok(_) => cursor.move_on_prev(MoveOperation::NoDup),
             Err(e) => Err(e),
         };
@@ -656,9 +656,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let entry = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes)? {
-            Some((key, data)) if key > &key_bytes[..] => Some((key, data)),
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let key_bytes = key_bytes.as_ref();
+        let entry = match cursor.move_on_key_greater_than_or_equal_to(key_bytes)? {
+            Some((key, data)) if key > key_bytes => Some((key, data)),
             Some((_key, _data)) => cursor.move_on_next(MoveOperation::NoDup)?,
             None => None,
         };
@@ -728,8 +729,8 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        match cursor.move_on_key_greater_than_or_equal_to(key_bytes.as_ref()) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
                 (Err(e), _) | (_, Err(e)) => Err(Error::Decoding(e)),
@@ -1295,26 +1296,31 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
@@ -1386,26 +1392,31 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
@@ -1468,26 +1479,31 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
@@ -1559,26 +1575,31 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
         let start_bound = match range.start_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let end_bound = match range.end_bound() {
             Bound::Included(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Included(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Included(bytes.into())
             }
             Bound::Excluded(bound) => {
-                let bytes = KC::bytes_encode(bound).map_err(Error::Encoding)?;
-                Bound::Excluded(bytes.into_owned())
+                let bytes =
+                    KC::bytes_encode(bound).map_err(|err| Error::Encoding(Box::new(err)))?;
+                Bound::Excluded(bytes.into())
             }
             Bound::Unbounded => Bound::Unbounded,
         };
@@ -1643,8 +1664,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
-        let prefix_bytes = prefix_bytes.into_owned();
+        let prefix_bytes =
+            KC::bytes_encode(prefix).map_err(|err| Error::Encoding(Box::new(err)))?;
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
+        let prefix_bytes = prefix_bytes.into();
         RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
 
@@ -1714,8 +1737,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
-        let prefix_bytes = prefix_bytes.into_owned();
+        let prefix_bytes =
+            KC::bytes_encode(prefix).map_err(|err| Error::Encoding(Box::new(err)))?;
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
+        let prefix_bytes = prefix_bytes.into();
         RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
@@ -1776,8 +1801,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
-        let prefix_bytes = prefix_bytes.into_owned();
+        let prefix_bytes =
+            KC::bytes_encode(prefix).map_err(|err| Error::Encoding(Box::new(err)))?;
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
+        let prefix_bytes = prefix_bytes.into();
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
@@ -1847,8 +1874,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
-        let prefix_bytes = prefix_bytes.into_owned();
+        let prefix_bytes =
+            KC::bytes_encode(prefix).map_err(|err| Error::Encoding(Box::new(err)))?;
+        // TODO optimize, this might do unnecessary allocations on types that are already 'static
+        let prefix_bytes = prefix_bytes.into();
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
@@ -1894,11 +1923,11 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let data_bytes = DC::bytes_encode(data).map_err(|err| Error::Encoding(Box::new(err)))?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data_bytes.as_ref()) };
         let flags = 0;
 
         unsafe {
@@ -1963,8 +1992,8 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = ffi::MDB_RESERVE;
 
@@ -2059,11 +2088,11 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let data_bytes = DC::bytes_encode(data).map_err(|err| Error::Encoding(Box::new(err)))?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data_bytes.as_ref()) };
         let flags = flags.bits();
 
         unsafe {
@@ -2172,11 +2201,11 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let data_bytes = DC::bytes_encode(data).map_err(|err| Error::Encoding(Box::new(err)))?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data_bytes.as_ref()) };
         let flags = (flags | PutFlags::NO_OVERWRITE).bits();
 
         let result = unsafe {
@@ -2329,9 +2358,9 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = (flags | PutFlags::NO_OVERWRITE).bits() | ffi::MDB_RESERVE;
 
@@ -2415,8 +2444,8 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
 
         let result = unsafe {
             mdb_result(ffi::mdb_del(
@@ -2505,10 +2534,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let key_bytes = KC::bytes_encode(key).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let data_bytes = DC::bytes_encode(data).map_err(|err| Error::Encoding(Box::new(err)))?;
+        let mut key_val = unsafe { crate::into_val(key_bytes.as_ref()) };
+        let mut data_val = unsafe { crate::into_val(data_bytes.as_ref()) };
 
         let result = unsafe {
             mdb_result(ffi::mdb_del(
