@@ -765,9 +765,9 @@ impl Env {
     ///
     /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
     /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
-    /// map must be resized
+    ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
-    /// full
+    ///   full
     pub fn read_txn(&self) -> Result<RoTxn> {
         RoTxn::new(self)
     }
@@ -794,9 +794,9 @@ impl Env {
     ///
     /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
     /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
-    /// map must be resized
+    ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
-    /// full
+    ///   full
     pub fn static_read_txn(self) -> Result<RoTxn<'static>> {
         RoTxn::static_read_txn(self)
     }

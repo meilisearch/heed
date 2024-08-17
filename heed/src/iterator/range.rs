@@ -235,7 +235,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
     /// while modifying it.
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn del_current(&mut self) -> Result<bool> {
@@ -262,7 +262,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
     /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn put_current<'a>(
@@ -321,7 +321,7 @@ impl<'txn, KC, DC, IM> RwRange<'txn, KC, DC, IM> {
     /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn put_current_with_options<'a, NDC>(
@@ -672,7 +672,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
     /// while modifying it.
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn del_current(&mut self) -> Result<bool> {
@@ -699,7 +699,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
     /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn put_current<'a>(
@@ -758,7 +758,7 @@ impl<'txn, KC, DC, IM> RwRevRange<'txn, KC, DC, IM> {
     /// version of them (e.g. `&str` into `String`).
     ///
     /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val).
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     pub unsafe fn put_current_with_options<'a, NDC>(
