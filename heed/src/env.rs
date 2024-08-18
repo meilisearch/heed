@@ -373,6 +373,12 @@ impl Drop for EnvInner {
 
 /// A helper function that transforms the LMDB types into Rust types (`MDB_val` into slices)
 /// and vice versa, the Rust types into C types (`Ordering` into an integer).
+///
+/// # Safety
+///
+/// `a` and `b` should both properly aligned, valid for reads and should point to a valid
+/// [`MDB_val`][ffi::MDB_val]. An [`MDB_val`][ffi::MDB_val] (consists of a pointer and size) is
+/// valid when its pointer (`mv_data`) is valid for reads of `mv_size` bytes and is not null.
 unsafe extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
     a: *const ffi::MDB_val,
     b: *const ffi::MDB_val,
