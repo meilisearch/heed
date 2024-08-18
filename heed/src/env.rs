@@ -9,7 +9,9 @@ use std::os::unix::{
     ffi::OsStrExt,
     io::{AsRawFd, BorrowedFd, RawFd},
 };
+use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
+use std::process::abort;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 #[cfg(windows)]
@@ -371,16 +373,17 @@ impl Drop for EnvInner {
 
 /// A helper function that transforms the LMDB types into Rust types (`MDB_val` into slices)
 /// and vice versa, the Rust types into C types (`Ordering` into an integer).
-extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
+unsafe extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
     a: *const ffi::MDB_val,
     b: *const ffi::MDB_val,
 ) -> i32 {
     let a = unsafe { ffi::from_val(*a) };
     let b = unsafe { ffi::from_val(*b) };
-    match C::compare(a, b) {
-        Ordering::Less => -1,
-        Ordering::Equal => 0,
-        Ordering::Greater => 1,
+    match catch_unwind(|| C::compare(a, b)) {
+        Ok(Ordering::Less) => -1,
+        Ok(Ordering::Equal) => 0,
+        Ok(Ordering::Greater) => 1,
+        Err(_) => abort(),
     }
 }
 
