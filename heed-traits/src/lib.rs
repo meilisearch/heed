@@ -42,11 +42,6 @@ pub trait BytesDecode<'a> {
 /// with shorter keys collating before longer keys.
 pub trait Comparator {
     /// Compares the raw bytes representation of two keys.
-    ///
-    /// # Safety
-    ///
-    /// This function must never crash, this is the reason why it takes raw bytes as parameter,
-    /// to let you define the recovery method you want in case of a decoding error.
     fn compare(a: &[u8], b: &[u8]) -> Ordering;
 }
 
@@ -61,10 +56,6 @@ pub trait Comparator {
 pub trait LexicographicComparator: Comparator {
     /// Compare a single byte; this function is used to implement [`Comparator::compare`]
     /// by definition of lexicographic ordering.
-    ///
-    /// # Safety
-    ///
-    /// This function must never crash.
     fn compare_elem(a: u8, b: u8) -> Ordering;
 
     /// Advances the given `elem` to its immediate lexicographic successor, if possible.
