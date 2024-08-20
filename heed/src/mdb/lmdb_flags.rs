@@ -1,4 +1,7 @@
 use bitflags::bitflags;
+#[cfg(master3)]
+use lmdb_master3_sys as ffi;
+#[cfg(not(master3))]
 use lmdb_master_sys as ffi;
 
 bitflags! {
