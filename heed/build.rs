@@ -11,7 +11,8 @@ fn main() {
     let pkgname = env::var("CARGO_PKG_NAME").expect("Cargo didn't set the CARGO_PKG_NAME env var!");
     match pkgname.as_str() {
         "heed3" => println!("cargo:rustc-cfg=master3"),
-        "heed" => (),
+        // Ignore the absence of the encryption feature when not using heed3
+        "heed" => println!("cargo::rustc-check-cfg=cfg(feature, values(\"encryption\"))"),
         _ => panic!("unexpected package name!"),
     }
 }
