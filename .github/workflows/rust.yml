@@ -28,6 +28,32 @@ jobs:
           cargo clean
           cargo test
 
+  check:
+    name: Check the heed3 project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo check
+        run: |
+          cargo clean
+          cp heed3/Cargo.toml heed/
+          cargo check -p heed3
+
   check_all_features:
     name: Check all the features of the heed project
     runs-on: ${{ matrix.os }}
