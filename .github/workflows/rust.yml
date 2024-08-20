@@ -107,6 +107,31 @@ jobs:
           cargo run --example 2>&1 | grep -E '^ ' | awk '!/rmp-serde/' | xargs -n1 cargo run --example
           cargo run --example rmp-serde --features serde-rmp
 
+  heed3-examples:
+    name: Run the heed3 examples
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run the examples
+        run: |
+          cargo clean
+          cp heed3/Cargo.toml heed/
+          cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
+
   fmt:
     name: Ensure the heed project is formatted
     runs-on: ubuntu-latest
