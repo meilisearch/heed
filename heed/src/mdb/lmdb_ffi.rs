@@ -1,5 +1,7 @@
 use std::ptr;
 
+#[cfg(master3)]
+pub use ffi::mdb_env_set_encrypt;
 pub use ffi::{
     mdb_cursor_close, mdb_cursor_del, mdb_cursor_get, mdb_cursor_open, mdb_cursor_put,
     mdb_dbi_open, mdb_del, mdb_drop, mdb_env_close, mdb_env_copyfd2, mdb_env_create,
@@ -10,8 +12,6 @@ pub use ffi::{
     MDB_cursor, MDB_dbi, MDB_env, MDB_stat, MDB_txn, MDB_val, MDB_CP_COMPACT, MDB_CURRENT,
     MDB_RDONLY, MDB_RESERVE,
 };
-#[cfg(master3)]
-pub use ffi::{mdb_env_set_checksum, mdb_env_set_encrypt};
 #[cfg(master3)]
 use lmdb_master3_sys as ffi;
 #[cfg(not(master3))]

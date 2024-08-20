@@ -22,10 +22,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We open the environment
     let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
-    let env = options
-        .map_size(10 * 1024 * 1024) // 10MB
-        .max_dbs(3)
-        .open(&env_path)?;
+    let env = unsafe {
+        options
+            .map_size(10 * 1024 * 1024) // 10MB
+            .max_dbs(3)
+            .open(&env_path)?
+    };
 
     let key1 = "first-key";
     let val1 = "this is a secret info";
@@ -41,12 +43,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     env.prepare_for_closing().wait();
 
     // We reopen the environment now
-    let env = options.open(&env_path)?;
+    let env = unsafe { options.open(&env_path)? };
 
     // We check that the secret entries are correctly decrypted
-    let rtxn = env.read_txn()?;
+    let mut rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env.open_database(&rtxn, Some("first"))?.unwrap();
-    let mut iter = db.iter(&rtxn)?;
+    let mut iter = db.iter(&mut rtxn)?;
     assert_eq!(iter.next().transpose()?, Some((key1, val1)));
     assert_eq!(iter.next().transpose()?, Some((key2, val2)));
     assert_eq!(iter.next().transpose()?, None);
