@@ -48,7 +48,10 @@ static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::
 struct EnvEntry {
     env: Option<Env>,
     signal_event: Arc<SignalEvent>,
+    #[cfg(master3)]
     options: SimplifiedOpenOptions,
+    #[cfg(not(master3))]
+    options: EnvOpenOptions,
 }
 
 /// A simplified version of the options that were used to open a given [`Env`].
@@ -397,8 +400,7 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
                 if options == original_options {
                     Ok(env)
                 } else {
-                    // Err(Error::BadOpenOptions { env, original_options })
-                    todo!()
+                    Err(Error::BadOpenOptions { env, original_options })
                 }
             }
             Entry::Vacant(entry) => {
@@ -599,16 +601,14 @@ impl EnvOpenOptions {
             Ok(path) => path,
         };
 
-        let original_options = SimplifiedOpenOptions::from(self);
         match lock.entry(path) {
             Entry::Occupied(entry) => {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
                 let options = entry.get().options.clone();
-                if options == original_options {
+                if &options == self {
                     Ok(env)
                 } else {
-                    // Err(Error::BadOpenOptions { env, original_options })
-                    todo!()
+                    Err(Error::BadOpenOptions { env, options })
                 }
             }
             Entry::Vacant(entry) => {
@@ -661,7 +661,7 @@ impl EnvOpenOptions {
                             let env = Env(Arc::new(inner));
                             let cache_entry = EnvEntry {
                                 env: Some(env.clone()),
-                                options: original_options,
+                                options: self.clone(),
                                 signal_event,
                             };
                             entry.insert(cache_entry);
