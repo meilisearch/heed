@@ -128,3 +128,8 @@ longer-keys = ["lmdb-master3-sys/longer-keys"]
 [[example]]
 name = "all-types-heed3"
 path = "../examples/all-types-heed3.rs"
+
+[[example]]
+name = "encrypt-heed3"
+path = "../examples/encrypt-heed3.rs"
+required-features = ["encryption"]
