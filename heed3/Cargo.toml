@@ -1,11 +1,11 @@
 [package]
-name = "heed"
+name = "heed3"
 version = "0.20.5"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
-description = "A fully typed LMDB wrapper with minimum overhead"
+description = "A fully typed LMDB wrapper with minimum overhead and optional support for encryption"
 license = "MIT"
 repository = "https://github.com/Kerollmops/heed"
-keywords = ["lmdb", "database", "storage", "typed"]
+keywords = ["lmdb", "database", "storage", "typed", "encryption"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
@@ -16,11 +16,16 @@ byteorder = { version = "1.5.0", default-features = false }
 heed-traits = { version = "0.20.0", path = "../heed-traits" }
 heed-types = { version = "0.20.1", default-features = false, path = "../heed-types" }
 libc = "0.2.155"
+# TODO depend on lmdb-master3-sys
 lmdb-master-sys = { version = "0.2.4", path = "../lmdb-master-sys" }
 once_cell = "1.19.0"
 page_size = "0.6.0"
 serde = { version = "1.0.203", features = ["derive"], optional = true }
 synchronoise = "1.0.1"
+# TODO find a better name, depend on that only with heed3
+#      move the proc macro directly in the heed3 crate (not possible?)
+#      Set a cfg to react on the crate name: https://github.com/bodil/im-rs/blob/master/build.rs
+heed-master3-proc-macro = { path = "../heed-master3-proc-macro", optional = true }
 
 [dev-dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
@@ -32,7 +37,13 @@ url = "2.5.2"
 [features]
 # The `serde` feature makes some types serializable,
 # like the `EnvOpenOptions` struct.
-default = ["serde", "serde-bincode", "serde-json"]
+# TODO remove encryption from defaults
+default = ["serde", "serde-bincode", "serde-json", "encryption"]
+
+# Enable the LMDB encryption feature
+# TODO add more information here
+encryption = ["dep:heed-master3-proc-macro"]
+
 serde = ["bitflags/serde", "dep:serde"]
 
 # The #MDB_NOTLS flag is automatically set on Env opening,
@@ -113,30 +124,5 @@ longer-keys = ["lmdb-master-sys/longer-keys"]
 # Examples are located outside the standard heed/examples directory to prevent
 # conflicts between heed3 and heed examples when working on both crates.
 [[example]]
-name = "all-types"
-path = "../examples/all-types.rs"
-
-[[example]]
-name = "clear-database"
-path = "../examples/clear-database.rs"
-
-[[example]]
-name = "cursor-append"
-path = "../examples/cursor-append.rs"
-
-[[example]]
-name = "custom-comparator"
-path = "../examples/custom-comparator.rs"
-
-[[example]]
-name = "multi-env"
-path = "../examples/multi-env.rs"
-
-[[example]]
-name = "nested"
-path = "../examples/nested.rs"
-
-[[example]]
-name = "rmp-serde"
-path = "../examples/rmp-serde.rs"
-required-features = ["serde-rmp"]
+name = "all-types-heed3"
+path = "../examples/all-types-heed3.rs"
