@@ -241,6 +241,8 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// weak RNGs. There is no need to use this kind of algorithm in LMDB since LMDB nonces aren't
     /// random and are guaranteed to be unique.
     ///
+    /// ## Basic Example
+    ///
     /// ```
     /// use std::fs;
     /// use std::path::Path;
@@ -262,10 +264,12 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     ///
     /// // We open the environment
     /// let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
-    /// let env = options
-    ///     .map_size(10 * 1024 * 1024) // 10MB
-    ///     .max_dbs(3)
-    ///     .open(&env_path)?;
+    /// let env = unsafe {
+    ///     options
+    ///         .map_size(10 * 1024 * 1024) // 10MB
+    ///         .max_dbs(3)
+    ///         .open(&env_path)?
+    /// };
     ///
     /// let key1 = "first-key";
     /// let val1 = "this is a secret info";
@@ -278,6 +282,50 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// db.put(&mut wtxn, key1, val1)?;
     /// db.put(&mut wtxn, key2, val2)?;
     /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// ## Example Showing limitations
+    ///
+    /// ```compile_fail
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use argon2::Argon2;
+    /// use chacha20poly1305::{ChaCha20Poly1305, Key};
+    /// use heed3::types::*;
+    /// use heed3::{EnvOpenOptions, Database};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let password = "This is the password that will be hashed by the argon2 algorithm";
+    /// let salt = "The salt added to the password hashes to add more security when stored";
+    ///
+    /// let _ = fs::remove_dir_all(&env_path);
+    /// fs::create_dir_all(&env_path)?;
+    ///
+    /// let mut key = Key::default();
+    /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
+    ///
+    /// // We open the environment
+    /// let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
+    /// let env = unsafe {
+    ///     options
+    ///         .map_size(10 * 1024 * 1024) // 10MB
+    ///         .max_dbs(3)
+    ///         .open(&env_path)?
+    /// };
+    ///
+    /// let key1 = "first-key";
+    /// let key2 = "second-key";
+    ///
+    /// // Declare the read transaction as mutable because LMDB, when using encryption,
+    /// // does not allow keeping keys between reads due to the use of an internal cache.
+    /// let mut rtxn = env.read_txn()?;
+    /// let val1 = db.get(&mut rtxn, key1)?;
+    /// let val2 = db.get(&mut rtxn, key2)?;
+    ///
+    /// // This example won't compile because val1 cannot be used for too long.
+    /// let _force_keep = val1;
     /// # Ok(()) }
     /// ```
     #[cfg(all(master3, feature = "encryption"))]
