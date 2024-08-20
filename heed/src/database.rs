@@ -2265,7 +2265,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut reserved = ffi::reserve_size_val(data_size);
-        let flags = (flags | PutFlags::NO_OVERWRITE).bits() | lmdb_master_sys::MDB_RESERVE;
+        let flags = (flags | PutFlags::NO_OVERWRITE).bits() | ffi::MDB_RESERVE;
         let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
