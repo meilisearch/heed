@@ -1,6 +1,6 @@
 [package]
 name = "heed3"
-version = "0.20.5"
+version = "0.20.5-beta.1"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB wrapper with minimum overhead and optional support for encryption"
 license = "MIT"
@@ -16,7 +16,7 @@ aead = { version = "0.5.1", default-features = false, optional = true }
 bitflags = { version = "2.6.0", features = ["serde"] }
 byteorder = { version = "1.5.0", default-features = false }
 generic-array = { version = "0.14.6", features = ["serde"], optional = true }
-heed-master3-proc-macro = { path = "../heed-master3-proc-macro", optional = true }
+heed-master3-proc-macro = { version = "0.1.0", path = "../heed-master3-proc-macro", optional = true }
 heed-traits = { version = "0.20.0", path = "../heed-traits" }
 heed-types = { version = "0.20.1", default-features = false, path = "../heed-types" }
 libc = "0.2.155"
