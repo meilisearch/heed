@@ -30,24 +30,28 @@ use crate::mdb::ffi;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::{Database, EnvFlags, Error, Result, RoCursor, RoTxn, RwTxn, Unspecified};
 
-#[cfg(not(master3))]
+#[cfg(not(all(master3, encryption)))]
 mod clear;
-#[cfg(not(master3))]
+#[cfg(not(all(master3, encryption)))]
 use clear as sub_env;
 
-#[cfg(master3)]
+#[cfg(all(master3, encryption))]
 mod encrypted;
-#[cfg(master3)]
+#[cfg(all(master3, encryption))]
 use encrypted as sub_env;
-#[cfg(master3)]
-pub use sub_env::SimplifiedOpenOptions;
 
 /// The list of opened environments, the value is an optional environment, it is None
 /// when someone asks to close the environment, closing is a two-phase step, to make sure
 /// no one tries to open the same environment between these two phases.
 ///
 /// Trying to open a None marked environment returns an error to the user trying to open it.
-static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, sub_env::EnvEntry>>> = Lazy::new(RwLock::default);
+static OPENED_ENV: Lazy<RwLock<HashMap<PathBuf, EnvEntry>>> = Lazy::new(RwLock::default);
+
+pub struct EnvEntry {
+    env: Option<Env>,
+    signal_event: Arc<SignalEvent>,
+    options: EnvOpenOptions,
+}
 
 // Thanks to the mozilla/rkv project
 // Workaround the UNC path on Windows, see https://github.com/rust-lang/rust/issues/42869.
@@ -136,7 +140,7 @@ impl Drop for EnvInner {
 
         match lock.remove(&self.path) {
             None => panic!("It seems another env closed this env before"),
-            Some(sub_env::EnvEntry { signal_event, .. }) => {
+            Some(EnvEntry { signal_event, .. }) => {
                 unsafe {
                     ffi::mdb_env_close(self.env);
                 }
@@ -687,7 +691,7 @@ impl Env {
         let mut lock = OPENED_ENV.write().unwrap();
         match lock.get_mut(self.path()) {
             None => panic!("cannot find the env that we are trying to close"),
-            Some(sub_env::EnvEntry { env, signal_event, .. }) => {
+            Some(EnvEntry { env, signal_event, .. }) => {
                 // We remove the env from the global list and replace it with a None.
                 let _env = env.take();
                 let signal_event = signal_event.clone();

@@ -209,7 +209,7 @@ impl<'p> Deref for RwTxn<'p> {
 }
 
 // TODO can't we just always implement it?
-#[cfg(all(master3, feature = "encryption"))]
+#[cfg(all(master3, encryption))]
 impl<'p> std::ops::DerefMut for RwTxn<'p> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.txn
