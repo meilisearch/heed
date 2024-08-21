@@ -154,10 +154,6 @@ pub enum Error {
     /// Attempt to open [`Env`] with different options.
     BadOpenOptions {
         /// The options that were used to originally open this env.
-        #[cfg(master3)]
-        options: env::SimplifiedOpenOptions,
-        /// The options that were used to originally open this env.
-        #[cfg(not(master3))]
         options: EnvOpenOptions,
         /// The env opened with the original options.
         env: Env,

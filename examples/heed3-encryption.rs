@@ -4,8 +4,8 @@ use std::path::Path;
 
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
-use heed3::types::*;
-use heed3::{Database, EnvOpenOptions};
+use heed3_encryption::types::*;
+use heed3_encryption::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("encrypt.mdb");

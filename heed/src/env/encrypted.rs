@@ -18,95 +18,25 @@ use synchronoise::SignalEvent;
 
 #[cfg(windows)]
 use crate::env::OsStrExtLmdb as _;
-use crate::env::{canonicalize_path, Env, EnvFlags, EnvInner, OPENED_ENV};
+use crate::env::{canonicalize_path, Env, EnvEntry, EnvFlags, EnvInner, OPENED_ENV};
 use crate::mdb::ffi;
 use crate::mdb::lmdb_error::mdb_result;
 use crate::{Error, Result};
 
-pub struct EnvEntry {
-    pub(super) env: Option<Env>,
-    pub(super) signal_event: Arc<SignalEvent>,
-    pub(super) options: SimplifiedOpenOptions,
-}
-
-/// A simplified version of the options that were used to open a given [`Env`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SimplifiedOpenOptions {
-    /// Weither this [`Env`] has been opened with an encryption/decryption algorithm.
-    pub use_encryption: bool,
-    /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
-    pub map_size: Option<usize>,
-    /// The maximum number of concurrent readers or [`None`] if it was not specified.
-    pub max_readers: Option<u32>,
-    /// The maximum number of opened database or [`None`] if it was not specified.
-    pub max_dbs: Option<u32>,
-    /// The raw flags enabled for this [`Env`] or [`None`] if it was not specified.
-    pub flags: u32,
-}
-
-impl<E: AeadMutInPlace + KeyInit> From<&EnvOpenOptions<E>> for SimplifiedOpenOptions {
-    fn from(eoo: &EnvOpenOptions<E>) -> SimplifiedOpenOptions {
-        let EnvOpenOptions { encrypt, map_size, max_readers, max_dbs, flags } = eoo;
-        SimplifiedOpenOptions {
-            use_encryption: encrypt.is_some(),
-            map_size: *map_size,
-            max_readers: *max_readers,
-            max_dbs: *max_dbs,
-            flags: flags.bits(),
-        }
-    }
-}
-
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit = DummyEncrypt> {
-    encrypt: Option<Key<E>>,
+pub struct EnvOpenOptions<E: AeadMutInPlace + KeyInit> {
+    encrypt: Key<E>,
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
     flags: EnvFlags,
 }
 
-impl Default for EnvOpenOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EnvOpenOptions {
-    /// Creates a blank new set of options ready for configuration.
-    pub fn new() -> EnvOpenOptions {
-        EnvOpenOptions {
-            encrypt: None,
-            map_size: None,
-            max_readers: None,
-            max_dbs: None,
-            flags: EnvFlags::empty(),
-        }
-    }
-}
-
 impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
-    /// Set the size of the memory map to use for this environment.
-    pub fn map_size(&mut self, size: usize) -> &mut Self {
-        self.map_size = Some(size);
-        self
-    }
-
-    /// Set the maximum number of threads/reader slots for the environment.
-    pub fn max_readers(&mut self, readers: u32) -> &mut Self {
-        self.max_readers = Some(readers);
-        self
-    }
-
-    /// Set the maximum number of named databases for the environment.
-    pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
-        self.max_dbs = Some(dbs);
-        self
-    }
-
-    /// Specifies that the [`Env`] will be encrypted using the `A` algorithm with the given `key`.
+    /// Creates a blank new set of options ready for configuration and specifies that
+    /// the [`Env`] will be encrypted using the `E` algorithm with the given `key`.
     ///
     /// You can find more compatible algorithms on [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
     ///
@@ -205,10 +135,32 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// let _force_keep = val1;
     /// # Ok(()) }
     /// ```
-    #[cfg(feature = "encryption")]
-    pub fn encrypt_with<A: AeadMutInPlace + KeyInit>(self, key: Key<A>) -> EnvOpenOptions<A> {
-        let EnvOpenOptions { encrypt: _, map_size, max_readers, max_dbs, flags } = self;
-        EnvOpenOptions { encrypt: Some(key), map_size, max_readers, max_dbs, flags }
+    pub fn new_encrypted_with(key: Key<E>) -> EnvOpenOptions<E> {
+        EnvOpenOptions {
+            encrypt: key,
+            map_size: None,
+            max_readers: None,
+            max_dbs: None,
+            flags: EnvFlags::empty(),
+        }
+    }
+
+    /// Set the size of the memory map to use for this environment.
+    pub fn map_size(&mut self, size: usize) -> &mut Self {
+        self.map_size = Some(size);
+        self
+    }
+
+    /// Set the maximum number of threads/reader slots for the environment.
+    pub fn max_readers(&mut self, readers: u32) -> &mut Self {
+        self.max_readers = Some(readers);
+        self
+    }
+
+    /// Set the maximum number of named databases for the environment.
+    pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
+        self.max_dbs = Some(dbs);
+        self
     }
 
     /// Set one or [more LMDB flags](http://www.lmdb.tech/doc/group__mdb__env.html).
@@ -330,16 +282,13 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
                     mdb_result(ffi::mdb_env_create(&mut env))?;
 
-                    // This block will only be executed if the "encryption" feature is enabled.
-                    if let Some(key) = &self.encrypt {
-                        let key = crate::into_val(key);
-                        mdb_result(ffi::mdb_env_set_encrypt(
-                            env,
-                            Some(encrypt_func_wrapper::<E>),
-                            &key,
-                            <E as AeadCore>::TagSize::U32,
-                        ))?;
-                    }
+                    let encrypt_key = crate::into_val(self.encrypt);
+                    mdb_result(ffi::mdb_env_set_encrypt(
+                        env,
+                        Some(encrypt_func_wrapper::<E>),
+                        &encrypt_key,
+                        <E as AeadCore>::TagSize::U32,
+                    ))?;
 
                     if let Some(size) = self.map_size {
                         if size % page_size::get() != 0 {
@@ -402,9 +351,8 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
 
 impl<E: AeadMutInPlace + KeyInit> fmt::Debug for EnvOpenOptions<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let EnvOpenOptions { encrypt, map_size, max_readers, max_dbs, flags } = self;
+        let EnvOpenOptions { encrypt: _, map_size, max_readers, max_dbs, flags } = self;
         f.debug_struct("EnvOpenOptions")
-            .field("encrypted", &encrypt.is_some())
             .field("map_size", &map_size)
             .field("max_readers", &max_readers)
             .field("max_dbs", &max_dbs)
@@ -489,46 +437,5 @@ unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
     match result {
         Ok(out) => out,
         Err(_) => 1,
-    }
-}
-
-/// A dummy encryption/decryption algorithm that must never be used.
-/// Only here for Rust API purposes.
-pub enum DummyEncrypt {}
-
-impl AeadMutInPlace for DummyEncrypt {
-    fn encrypt_in_place_detached(
-        &mut self,
-        _nonce: &Nonce<Self>,
-        _associated_data: &[u8],
-        _buffer: &mut [u8],
-    ) -> aead::Result<Tag<Self>> {
-        Err(aead::Error)
-    }
-
-    fn decrypt_in_place_detached(
-        &mut self,
-        _nonce: &Nonce<Self>,
-        _associated_data: &[u8],
-        _buffer: &mut [u8],
-        _tag: &Tag<Self>,
-    ) -> aead::Result<()> {
-        Err(aead::Error)
-    }
-}
-
-impl AeadCore for DummyEncrypt {
-    type NonceSize = U0;
-    type TagSize = U0;
-    type CiphertextOverhead = U0;
-}
-
-impl KeySizeUser for DummyEncrypt {
-    type KeySize = U0;
-}
-
-impl KeyInit for DummyEncrypt {
-    fn new(_key: &GenericArray<u8, Self::KeySize>) -> Self {
-        panic!("This DummyEncrypt type must not be used")
     }
 }

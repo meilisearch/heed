@@ -13,16 +13,10 @@ use synchronoise::SignalEvent;
 
 #[cfg(windows)]
 use crate::env::OsStrExtLmdb as _;
-use crate::env::{canonicalize_path, Env, EnvFlags, EnvInner, OPENED_ENV};
+use crate::env::{canonicalize_path, Env, EnvEntry, EnvFlags, EnvInner, OPENED_ENV};
 use crate::mdb::ffi;
 use crate::mdb::lmdb_error::mdb_result;
 use crate::{Error, Result};
-
-pub struct EnvEntry {
-    pub(super) env: Option<Env>,
-    pub(super) signal_event: Arc<SignalEvent>,
-    pub(super) options: EnvOpenOptions,
-}
 
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, Debug, PartialEq, Eq)]

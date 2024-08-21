@@ -339,7 +339,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get<'a, 'txn>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
@@ -419,7 +419,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get_duplicates<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -483,7 +483,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get_lower_than<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -553,7 +553,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get_lower_than_or_equal_to<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -627,7 +627,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get_greater_than<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -700,7 +700,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn get_greater_than_or_equal_to<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -760,7 +760,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
@@ -815,7 +815,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
@@ -873,7 +873,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn len(&self, txn: &RoTxn) -> Result<u64> {
         self.stat(txn).map(|stat| stat.entries as u64)
     }
@@ -917,7 +917,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         self.len(txn).map(|l| l == 0)
     }
@@ -960,7 +960,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn stat(&self, txn: &RoTxn) -> Result<DatabaseStat> {
         assert_eq_env_db_txn!(self, txn);
 
@@ -1023,7 +1023,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
@@ -1125,7 +1125,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
@@ -1232,7 +1232,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn range<'a, 'txn, R>(
         &self,
         txn: &'txn RoTxn,
@@ -1407,7 +1407,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn rev_range<'a, 'txn, R>(
         &self,
         txn: &'txn RoTxn,
@@ -1583,7 +1583,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn prefix_iter<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
@@ -1716,7 +1716,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    #[cfg_attr(all(master3, feature = "encryption"), heed_master3_proc_macro::mut_read_txn(txn))]
+    #[cfg_attr(all(master3, encryption), heed_master3_proc_macro::mut_read_txn(txn))]
     pub fn rev_prefix_iter<'a, 'txn>(
         &self,
         txn: &'txn RoTxn,
