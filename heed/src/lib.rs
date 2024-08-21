@@ -153,7 +153,11 @@ pub enum Error {
     DatabaseClosing,
     /// Attempt to open [`Env`] with different options.
     BadOpenOptions {
+        /// The simplified options that were used to originally open this env.
+        #[cfg(all(master3, encryption))]
+        options: env::SimplifiedEncryptedOpenOptions,
         /// The options that were used to originally open this env.
+        #[cfg(not(all(master3, encryption)))]
         options: EnvOpenOptions,
         /// The env opened with the original options.
         env: Env,
