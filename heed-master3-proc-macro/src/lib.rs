@@ -2,6 +2,17 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, parse_quote, FnArg, Ident, ItemFn, Pat, PatType, Type};
 
+/// By annotating all the heed methods that use a `&RoTxn` this way :
+///
+/// ```ignore
+/// #[uniq(rtxn)]
+/// fn get<'t>(&self, rtxn: &'t RoTxn, key: &[u8]) -> heed::Result<&'t [u8]>;
+/// ```
+///
+/// It transforms the function signature to use a `&mut RoTxn`:
+/// ```ignore
+/// fn get<'t>(&self, rtxn: &'t mut RoTxn, key: &[u8]) -> heed::Result<&'t [u8]>;
+/// ```
 #[proc_macro_attribute]
 pub fn mut_read_txn(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Parse the function
