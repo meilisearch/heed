@@ -11,6 +11,8 @@ use std::{io, ptr};
 
 use synchronoise::SignalEvent;
 
+#[cfg(windows)]
+use crate::env::OsStrExtLmdb as _;
 use crate::env::{canonicalize_path, Env, EnvFlags, EnvInner, OPENED_ENV};
 use crate::mdb::ffi;
 use crate::mdb::lmdb_error::mdb_result;
