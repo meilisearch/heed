@@ -10,18 +10,47 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{fmt, io, ptr};
 
-use aead::consts::U0;
 use aead::generic_array::typenum::Unsigned;
-use aead::generic_array::GenericArray;
-use aead::{AeadCore, AeadMutInPlace, Key, KeyInit, KeySizeUser, Nonce, Tag};
+use aead::{AeadCore, AeadMutInPlace, Key, KeyInit, Nonce, Tag};
 use synchronoise::SignalEvent;
 
 #[cfg(windows)]
 use crate::env::OsStrExtLmdb as _;
-use crate::env::{canonicalize_path, Env, EnvEntry, EnvFlags, EnvInner, OPENED_ENV};
+use crate::env::{canonicalize_path, Env, EnvFlags, EnvInner, OPENED_ENV};
 use crate::mdb::ffi;
 use crate::mdb::lmdb_error::mdb_result;
 use crate::{Error, Result};
+
+pub struct EnvEntry {
+    pub(super) env: Option<Env>,
+    pub(super) signal_event: Arc<SignalEvent>,
+    pub(super) options: SimplifiedEncryptedOpenOptions,
+}
+
+/// A simplified version of the options that were used to open a given [`Env`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimplifiedEncryptedOpenOptions {
+    /// The maximum size this [`Env`] with take in bytes or [`None`] if it was not specified.
+    pub map_size: Option<usize>,
+    /// The maximum number of concurrent readers or [`None`] if it was not specified.
+    pub max_readers: Option<u32>,
+    /// The maximum number of opened database or [`None`] if it was not specified.
+    pub max_dbs: Option<u32>,
+    /// The raw flags enabled for this [`Env`] or [`None`] if it was not specified.
+    pub flags: u32,
+}
+
+impl<E: AeadMutInPlace + KeyInit> From<&EnvOpenOptions<E>> for SimplifiedEncryptedOpenOptions {
+    fn from(eoo: &EnvOpenOptions<E>) -> SimplifiedEncryptedOpenOptions {
+        let EnvOpenOptions { encrypt: _, map_size, max_readers, max_dbs, flags } = eoo;
+        SimplifiedEncryptedOpenOptions {
+            map_size: *map_size,
+            max_readers: *max_readers,
+            max_dbs: *max_dbs,
+            flags: flags.bits(),
+        }
+    }
+}
 
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, PartialEq, Eq)]
@@ -55,8 +84,8 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, Database};
+    /// use heed3_encryption::types::*;
+    /// use heed3_encryption::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = Path::new("target").join("encrypt.mdb");
@@ -70,7 +99,7 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
     ///
     /// // We open the environment
-    /// let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
+    /// let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
     /// let env = unsafe {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
@@ -94,13 +123,13 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     ///
     /// ## Example Showing limitations
     ///
-    /// ```compile_fail
+    /// ```compile_fail,E0499
     /// use std::fs;
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, Database};
+    /// use heed3_encryption::types::*;
+    /// use heed3_encryption::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = Path::new("target").join("encrypt.mdb");
@@ -114,7 +143,7 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
     ///
     /// // We open the environment
-    /// let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
+    /// let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
     /// let env = unsafe {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
@@ -124,6 +153,11 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
     ///
     /// let key1 = "first-key";
     /// let key2 = "second-key";
+    ///
+    /// // We create the database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    /// wtxn.commit()?;
     ///
     /// // Declare the read transaction as mutable because LMDB, when using encryption,
     /// // does not allow keeping keys between reads due to the use of an internal cache.
@@ -263,7 +297,7 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
             Ok(path) => path,
         };
 
-        let original_options = SimplifiedOpenOptions::from(self);
+        let original_options = SimplifiedEncryptedOpenOptions::from(self);
         match lock.entry(path) {
             Entry::Occupied(entry) => {
                 let env = entry.get().env.clone().ok_or(Error::DatabaseClosing)?;
@@ -282,7 +316,7 @@ impl<E: AeadMutInPlace + KeyInit> EnvOpenOptions<E> {
                     let mut env: *mut ffi::MDB_env = ptr::null_mut();
                     mdb_result(ffi::mdb_env_create(&mut env))?;
 
-                    let encrypt_key = crate::into_val(self.encrypt);
+                    let encrypt_key = crate::into_val(&self.encrypt);
                     mdb_result(ffi::mdb_env_set_encrypt(
                         env,
                         Some(encrypt_func_wrapper::<E>),

@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
 
     // We open the environment
-    let mut options = EnvOpenOptions::new().encrypt_with::<ChaCha20Poly1305>(key);
+    let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
     let env = unsafe {
         options
             .map_size(10 * 1024 * 1024) // 10MB
