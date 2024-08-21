@@ -28,8 +28,34 @@ jobs:
           cargo clean
           cargo test
 
-  check:
-    name: Check the heed3 project
+  test-heed3:
+    name: Test the heed3 project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        run: |
+          cargo clean
+          cp heed3/Cargo.toml heed/
+          cargo test -p heed3
+
+  check-heed3-encryption:
+    name: Check the heed3-encryption project
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -51,8 +77,8 @@ jobs:
       - name: Run cargo check
         run: |
           cargo clean
-          cp heed3/Cargo.toml heed/
-          cargo check -p heed3
+          cp heed3-encryption/Cargo.toml heed/
+          cargo check -p heed3-encryption
 
   check_all_features:
     name: Check all the features of the heed project
@@ -80,6 +106,34 @@ jobs:
           cd heed
           cargo clean
           cargo check --all-features
+
+  check_all_features-heed3:
+    name: Check all the features of the heed3 project
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -D warnings
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        run: |
+          cd heed
+          cargo clean
+          cp heed3-encryption/Cargo.toml heed/
+          cargo check --all-features -p heed3
 
   examples:
     name: Run the heed examples
@@ -130,6 +184,31 @@ jobs:
         run: |
           cargo clean
           cp heed3/Cargo.toml heed/
+          cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
+
+  heed3-encryption-examples:
+    name: Run the heed3-encryption examples
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run the examples
+        run: |
+          cargo clean
+          cp heed3-encryption/Cargo.toml heed/
           cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
 
   fmt:
