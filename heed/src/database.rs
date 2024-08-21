@@ -2138,7 +2138,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// written to disk, or if a value already exists for the key, returns the previous value.
     ///
     /// The entry is always written with the [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and
-    /// [`MDB_RESERVE`](lmdb_master_sys::MDB_RESERVE) flags.
+    /// [`MDB_RESERVE`](ffi::MDB_RESERVE) flags.
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
@@ -2201,7 +2201,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// written to disk, or if a value already exists for the key, returns the previous value.
     ///
     /// The entry is written with the specified flags, in addition to
-    /// [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and [`MDB_RESERVE`](lmdb_master_sys::MDB_RESERVE)
+    /// [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and [`MDB_RESERVE`](ffi::MDB_RESERVE)
     /// which are always used.
     ///
     /// ```

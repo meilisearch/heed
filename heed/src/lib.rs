@@ -155,7 +155,7 @@ pub enum Error {
     BadOpenOptions {
         /// The options that were used to originally open this env.
         #[cfg(master3)]
-        original_options: env::SimplifiedOpenOptions,
+        options: env::SimplifiedOpenOptions,
         /// The options that were used to originally open this env.
         #[cfg(not(master3))]
         options: EnvOpenOptions,
