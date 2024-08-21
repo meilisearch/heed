@@ -11,6 +11,7 @@ pub struct RoCursor<'txn> {
 }
 
 impl<'txn> RoCursor<'txn> {
+    // TODO should I ask for a &mut RoTxn, here?
     pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.txn, dbi, &mut cursor))? }
