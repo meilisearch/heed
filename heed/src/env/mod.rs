@@ -5,14 +5,17 @@ use std::ffi::{c_void, CString};
 use std::fs::{File, Metadata};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, BorrowedFd, RawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, BorrowedHandle, RawHandle};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::abort;
 use std::ptr::NonNull;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+#[cfg(windows)]
+use std::{
+    ffi::OsStr,
+    os::windows::io::{AsRawHandle, BorrowedHandle, RawHandle},
+};
 use std::{fmt, io, mem, ptr};
 
 use heed_traits::{Comparator, LexicographicComparator};
