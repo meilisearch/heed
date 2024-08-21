@@ -5,7 +5,7 @@ use syn::{parse_macro_input, parse_quote, FnArg, Ident, ItemFn, Pat, PatType, Ty
 /// By annotating all the heed methods that use a `&RoTxn` this way :
 ///
 /// ```ignore
-/// #[uniq(rtxn)]
+/// #[heed_master3_proc_macro::mut_read_txn(rtxn)]
 /// fn get<'t>(&self, rtxn: &'t RoTxn, key: &[u8]) -> heed::Result<&'t [u8]>;
 /// ```
 ///
