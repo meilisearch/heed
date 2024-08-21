@@ -8,7 +8,7 @@ use heed3::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let path = Path::new("target").join("heed.mdb");
+    let path = Path::new("target").join("heed3.mdb");
 
     fs::create_dir_all(&path)?;
 
