@@ -103,9 +103,8 @@ jobs:
           override: true
       - name: Run cargo test
         run: |
-          cd heed
           cargo clean
-          cargo check --all-features
+          cargo check --all-features -p heed
 
   check_all_features-heed3:
     name: Check all the features of the heed3 project
@@ -130,10 +129,9 @@ jobs:
           override: true
       - name: Run cargo test
         run: |
-          cd heed
           cargo clean
           cp heed3-encryption/Cargo.toml heed/
-          cargo check --all-features -p heed3
+          cargo check --all-features -p heed3-encryption
 
   examples:
     name: Run the heed examples
