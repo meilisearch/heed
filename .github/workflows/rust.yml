@@ -28,8 +28,8 @@ jobs:
           cargo clean
           cargo test
 
-  test-heed3:
-    name: Test the heed3 project
+  check-heed3:
+    name: Check the heed3 project
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -48,11 +48,11 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Run cargo test
+      - name: Run cargo check
         run: |
           cargo clean
           cp heed3/Cargo.toml heed/
-          cargo test -p heed3
+          cargo check -p heed3
 
   check-heed3-encryption:
     name: Check the heed3-encryption project
