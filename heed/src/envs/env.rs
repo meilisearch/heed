@@ -168,7 +168,8 @@ impl<T> Env<T> {
 
         let rtxn = self.read_txn()?;
         // Open the main database
-        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), None, 0)?;
+        let dbi =
+            self.raw_open_dbi::<DefaultComparator, DefaultComparator>(rtxn.txn_ptr(), None, 0)?;
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -181,7 +182,11 @@ impl<T> Env<T> {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), Some(&key), 0) {
+            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator, DefaultComparator>(
+                rtxn.txn_ptr(),
+                Some(&key),
+                0,
+            ) {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe {
                     mdb_result(ffi::mdb_stat(rtxn.txn_ptr().as_mut(), dbi, stat.as_mut_ptr()))?
@@ -258,7 +263,7 @@ impl<T> Env<T> {
         options.create(wtxn)
     }
 
-    pub(crate) fn raw_init_database<C: Comparator + 'static>(
+    pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
         &self,
         raw_txn: NonNull<ffi::MDB_txn>,
         name: Option<&str>,
@@ -268,13 +273,17 @@ impl<T> Env<T> {
             flags.insert(AllDatabaseFlags::INTEGER_KEY);
         }
 
-        match self.raw_open_dbi::<C>(raw_txn, name, flags.bits()) {
+        if TypeId::of::<CDUP>() == TypeId::of::<IntegerComparator>() {
+            flags.insert(AllDatabaseFlags::INTEGER_DUP);
+        }
+
+        match self.raw_open_dbi::<C, CDUP>(raw_txn, name, flags.bits()) {
             Ok(dbi) => Ok(dbi),
             Err(e) => Err(e.into()),
         }
     }
 
-    fn raw_open_dbi<C: Comparator + 'static>(
+    fn raw_open_dbi<C: Comparator + 'static, CDUP: Comparator + 'static>(
         &self,
         mut raw_txn: NonNull<ffi::MDB_txn>,
         name: Option<&str>,
@@ -292,7 +301,6 @@ impl<T> Env<T> {
         unsafe {
             mdb_result(ffi::mdb_dbi_open(raw_txn.as_mut(), name_ptr, flags, &mut dbi))?;
             let cmp_type_id = TypeId::of::<C>();
-
             if cmp_type_id != TypeId::of::<DefaultComparator>()
                 && cmp_type_id != TypeId::of::<IntegerComparator>()
             {
@@ -300,6 +308,17 @@ impl<T> Env<T> {
                     raw_txn.as_mut(),
                     dbi,
                     Some(custom_key_cmp_wrapper::<C>),
+                ))?;
+            }
+
+            let cmp_dup_type_id = TypeId::of::<CDUP>();
+            if cmp_dup_type_id != TypeId::of::<DefaultComparator>()
+                && cmp_dup_type_id != TypeId::of::<IntegerComparator>()
+            {
+                mdb_result(ffi::mdb_set_dupsort(
+                    raw_txn.as_mut(),
+                    dbi,
+                    Some(custom_key_cmp_wrapper::<CDUP>),
                 ))?;
             }
         };
