@@ -55,9 +55,9 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
+pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
     env: &'e Env,
-    types: marker::PhantomData<(KC, DC, C)>,
+    types: marker::PhantomData<(KC, DC, C, CDUP)>,
     name: Option<&'n str>,
     flags: AllDatabaseFlags,
 }
@@ -74,7 +74,7 @@ impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified> {
     }
 }
 
-impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
+impl<'e, 'n, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, KC, DC, C, CDUP> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
@@ -90,7 +90,19 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, KC, DC, NC, CDUP> {
+        DatabaseOpenOptions {
+            env: self.env,
+            types: Default::default(),
+            name: self.name,
+            flags: self.flags,
+        }
+    }
+
+    /// Change the customized dup sort compare function of the database.
+    ///
+    /// By default no customized compare function will be set when opening a database.
+    pub fn dup_sort_comparator<NCDUP>(self) -> DatabaseOpenOptions<'e, 'n, KC, DC, C, NCDUP> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -136,10 +148,11 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
+        CDUP: Comparator + 'static,
     {
         assert_eq_env_txn!(self.env, rtxn);
 
-        match self.env.raw_init_database::<C>(rtxn.txn.unwrap(), self.name, self.flags) {
+        match self.env.raw_init_database::<C, CDUP>(rtxn.txn.unwrap(), self.name, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -160,24 +173,25 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
+        CDUP: Comparator + 'static,
     {
         assert_eq_env_txn!(self.env, wtxn);
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn.unwrap(), self.name, flags) {
+        match self.env.raw_init_database::<C, CDUP>(wtxn.txn.txn.unwrap(), self.name, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
 }
 
-impl<KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C> {
+impl<KC, DC, C, CDUP> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C, CDUP> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
+impl<KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C, CDUP> {}
 
 /// A typed database that accepts only the types it was created with.
 ///
