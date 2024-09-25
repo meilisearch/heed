@@ -605,7 +605,7 @@ impl Env {
 
         let rtxn = self.read_txn()?;
         // Open the main database
-        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, None, 0)?;
+        let dbi = self.raw_open_dbi::<DefaultComparator, DefaultComparator>(rtxn.txn, None, 0)?;
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -618,7 +618,9 @@ impl Env {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(rtxn.txn, Some(&key), 0) {
+            if let Ok(dbi) =
+                self.raw_open_dbi::<DefaultComparator, DefaultComparator>(rtxn.txn, Some(&key), 0)
+            {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe { mdb_result(ffi::mdb_stat(rtxn.txn, dbi, stat.as_mut_ptr()))? };
                 let stat = unsafe { stat.assume_init() };
@@ -693,19 +695,19 @@ impl Env {
         options.create(wtxn)
     }
 
-    pub(crate) fn raw_init_database<C: Comparator + 'static>(
+    pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
         flags: AllDatabaseFlags,
     ) -> Result<u32> {
-        match self.raw_open_dbi::<C>(raw_txn, name, flags.bits()) {
+        match self.raw_open_dbi::<C, CDUP>(raw_txn, name, flags.bits()) {
             Ok(dbi) => Ok(dbi),
             Err(e) => Err(e.into()),
         }
     }
 
-    fn raw_open_dbi<C: Comparator + 'static>(
+    fn raw_open_dbi<C: Comparator + 'static, CDUP: Comparator + 'static>(
         &self,
         raw_txn: *mut ffi::MDB_txn,
         name: Option<&str>,
@@ -724,6 +726,14 @@ impl Env {
             mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))?;
             if TypeId::of::<C>() != TypeId::of::<DefaultComparator>() {
                 mdb_result(ffi::mdb_set_compare(raw_txn, dbi, Some(custom_key_cmp_wrapper::<C>)))?;
+            }
+
+            if TypeId::of::<CDUP>() != TypeId::of::<DefaultComparator>() {
+                mdb_result(ffi::mdb_set_dupsort(
+                    raw_txn,
+                    dbi,
+                    Some(custom_key_cmp_wrapper::<CDUP>),
+                ))?;
             }
         };
 
