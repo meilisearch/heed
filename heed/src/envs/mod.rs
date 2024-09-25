@@ -222,13 +222,13 @@ impl LexicographicComparator for DefaultComparator {
     }
 }
 
-/// A representation of LMDB's `MDB_INTEGERKEY` comparator behavior.
+/// A representation of LMDB's `MDB_INTEGERKEY` and `MDB_INTEGERDUP` comparator behavior.
 ///
 /// This enum is used to indicate a table should be sorted by the keys numeric
 /// value in native byte order. When a [`Database`] is created or opened with
 /// [`IntegerComparator`], it signifies that the comparator should not be explicitly
 /// set via [`ffi::mdb_set_compare`], instead the flag [`DatabaseFlags::INTEGER_KEY`]
-/// is set on the table.
+/// or [`DatabaseFlags::INTEGER_DUP`] is set on the table.
 ///
 /// This can only be used on certain types: either `u32` or `usize`.
 /// The keys must all be of the same size.
