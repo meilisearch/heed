@@ -5,6 +5,8 @@
 //! - [Create Custom and Prefix Codecs](#create-custom-and-prefix-codecs)
 //! - [Change the Environment Size Dynamically](#change-the-environment-size-dynamically)
 //! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
+//! - [Custom Key Comparator](#custom-key-comparator)
+//! - [Custom Dupsort Comparator](#custom-dupsort-comparator)
 //!
 //! # Decode Values on Demand
 //!
@@ -445,8 +447,156 @@
 //! unsafe impl Sync for ImmutableMap<'_> {}
 //! ```
 //!
+//! # Custom Key Comparator
+//!
+//! LMDB keys are sorted in lexicographic order by default. To change this behavior you can implement a custom [`Comparator`]
+//! and provide it when creating the database.
+//!
+//! Under the hood this translates into a [`mdb_set_compare`] call.
+//!
+//! ```
+//! use std::cmp::Ordering;
+//! use std::error::Error;
+//! use std::path::Path;
+//! use std::{fs, str};
+//!
+//! use heed::EnvOpenOptions;
+//! use heed_traits::Comparator;
+//! use heed_types::{Str, Unit};
+//!
+//! enum StringAsIntCmp {}
+//!
+//! // This function takes two strings which represent positive numbers,
+//! // parses them into i32s and compare the parsed value.
+//! // Therefore "-1000" < "-100" must be true even without '0' padding.
+//! impl Comparator for StringAsIntCmp {
+//!     fn compare(a: &[u8], b: &[u8]) -> Ordering {
+//!         let a: i32 = str::from_utf8(a).unwrap().parse().unwrap();
+//!         let b: i32 = str::from_utf8(b).unwrap().parse().unwrap();
+//!         a.cmp(&b)
+//!     }
+//! }
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let env_path = Path::new("target").join("custom-key-cmp.mdb");
+//!
+//!     let _ = fs::remove_dir_all(&env_path);
+//!
+//!     fs::create_dir_all(&env_path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(10 * 1024 * 1024) // 10MB
+//!             .max_dbs(3)
+//!             .open(env_path)?
+//!     };
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db = env
+//!         .database_options()
+//!         .types::<Str, Unit>()
+//!         .key_comparator::<StringAsIntCmp>()
+//!         .create(&mut wtxn)?;
+//!     wtxn.commit()?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!
+//!     // We fill our database with entries.
+//!     db.put(&mut wtxn, "-100000", &())?;
+//!     db.put(&mut wtxn, "-10000", &())?;
+//!     db.put(&mut wtxn, "-1000", &())?;
+//!     db.put(&mut wtxn, "-100", &())?;
+//!     db.put(&mut wtxn, "100", &())?;
+//!
+//!     // We check that the key are in the right order ("-100" < "-1000" < "-10000"...)
+//!     let mut iter = db.iter(&wtxn)?;
+//!     assert_eq!(iter.next().transpose()?, Some(("-100000", ())));
+//!     assert_eq!(iter.next().transpose()?, Some(("-10000", ())));
+//!     assert_eq!(iter.next().transpose()?, Some(("-1000", ())));
+//!     assert_eq!(iter.next().transpose()?, Some(("-100", ())));
+//!     assert_eq!(iter.next().transpose()?, Some(("100", ())));
+//!     drop(iter);
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Custom Dupsort Comparator
+//!
+//! When using DUPSORT LMDB sorts values of the same key in lexicographic order by default. To change this behavior you can implement a custom [`Comparator`]
+//! and provide it when creating the database.
+//!
+//! Under the hood this translates into a [`mdb_set_dupsort`] call.
+//!
+//! ```
+//! use std::cmp::Ordering;
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
+//!
+//! use byteorder::BigEndian;
+//! use heed::{DatabaseFlags, EnvOpenOptions};
+//! use heed_traits::Comparator;
+//! use heed_types::{Str, U128};
+//!
+//! enum DescendingIntCmp {}
+//!
+//! impl Comparator for DescendingIntCmp {
+//!     fn compare(a: &[u8], b: &[u8]) -> Ordering {
+//!         b.cmp(&a)
+//!     }
+//! }
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let env_path = Path::new("target").join("custom-dupsort-cmp.mdb");
+//!
+//!     let _ = fs::remove_dir_all(&env_path);
+//!
+//!     fs::create_dir_all(&env_path)?;
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(10 * 1024 * 1024) // 10MB
+//!             .max_dbs(3)
+//!            .open(env_path)?
+//!     };
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!     let db = env
+//!         .database_options()
+//!         .types::<Str, U128<BigEndian>>()
+//!         .flags(DatabaseFlags::DUP_SORT)
+//!         .dup_sort_comparator::<DescendingIntCmp>()
+//!         .create(&mut wtxn)?;
+//!     wtxn.commit()?;
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!
+//!     // We fill our database with entries.
+//!     db.put(&mut wtxn, "1", &1)?;
+//!     db.put(&mut wtxn, "1", &2)?;
+//!     db.put(&mut wtxn, "1", &3)?;
+//!     db.put(&mut wtxn, "2", &4)?;
+//!     db.put(&mut wtxn, "1", &5)?;
+//!     db.put(&mut wtxn, "0", &0)?;
+//!
+//!     // We check that the keys are in lexicographic and values in descending order.
+//!     let mut iter = db.iter(&wtxn)?;
+//!     assert_eq!(iter.next().transpose()?, Some(("0", 0)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 5)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 3)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 2)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 1)));
+//!     assert_eq!(iter.next().transpose()?, Some(("2", 4)));
+//!     drop(iter);
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 
 // To let cargo generate doc links
 #![allow(unused_imports)]
 
-use crate::{BytesDecode, BytesEncode, Database, EnvOpenOptions};
+use crate::{
+    mdb::ffi::mdb_set_compare, mdb::ffi::mdb_set_dupsort, BytesDecode, BytesEncode, Comparator,
+    Database, EnvOpenOptions,
+};

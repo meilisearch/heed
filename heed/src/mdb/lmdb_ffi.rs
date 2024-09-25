@@ -6,9 +6,9 @@ pub use ffi::{
     mdb_env_get_fd, mdb_env_get_flags, mdb_env_get_maxkeysize, mdb_env_info, mdb_env_open,
     mdb_env_set_flags, mdb_env_set_mapsize, mdb_env_set_maxdbs, mdb_env_set_maxreaders,
     mdb_env_stat, mdb_env_sync, mdb_filehandle_t, mdb_get, mdb_put, mdb_reader_check,
-    mdb_set_compare, mdb_stat, mdb_txn_abort, mdb_txn_begin, mdb_txn_commit, mdb_version,
-    MDB_cursor, MDB_dbi, MDB_env, MDB_stat, MDB_txn, MDB_val, MDB_CP_COMPACT, MDB_CURRENT,
-    MDB_RDONLY, MDB_RESERVE,
+    mdb_set_compare, mdb_set_dupsort, mdb_stat, mdb_txn_abort, mdb_txn_begin, mdb_txn_commit,
+    mdb_version, MDB_cursor, MDB_dbi, MDB_env, MDB_stat, MDB_txn, MDB_val, MDB_CP_COMPACT,
+    MDB_CURRENT, MDB_RDONLY, MDB_RESERVE,
 };
 use lmdb_master_sys as ffi;
 
