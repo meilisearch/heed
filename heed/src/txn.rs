@@ -86,10 +86,11 @@ impl<'e> RoTxn<'e> {
 
 impl Drop for RoTxn<'_> {
     fn drop(&mut self) {
-        // Asserts that the transaction hasn't been already
-        // committed/aborter and ensure we cannot use it twice.
-        let mut txn = self.txn.take().unwrap();
-        unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
+        if let Some(mut txn) = self.txn.take() {
+            // Asserts that the transaction hasn't been already
+            // committed/aborter and ensure we cannot use it twice.
+            unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
+        }
     }
 }
 
