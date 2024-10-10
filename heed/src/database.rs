@@ -139,7 +139,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     {
         assert_eq_env_txn!(self.env, rtxn);
 
-        match self.env.raw_init_database::<C>(rtxn.txn, self.name, self.flags) {
+        match self.env.raw_init_database::<C>(rtxn.txn.unwrap(), self.name, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -164,7 +164,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
         assert_eq_env_txn!(self.env, wtxn);
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn, self.name, flags) {
+        match self.env.raw_init_database::<C>(wtxn.txn.txn.unwrap(), self.name, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
@@ -350,9 +350,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = mem::MaybeUninit::uninit();
+        let mut txn = txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_get(txn.txn, self.dbi, &mut key_val, data_val.as_mut_ptr()))
+            mdb_result(ffi::mdb_get(txn.as_mut(), self.dbi, &mut key_val, data_val.as_mut_ptr()))
         };
 
         match result {
@@ -954,7 +955,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
-        let result = unsafe { mdb_result(ffi::mdb_stat(txn.txn, self.dbi, db_stat.as_mut_ptr())) };
+        let mut txn = txn.txn.unwrap();
+        let result =
+            unsafe { mdb_result(ffi::mdb_stat(txn.as_mut(), self.dbi, db_stat.as_mut_ptr())) };
 
         match result {
             Ok(()) => {
@@ -1835,9 +1838,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = 0;
+        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
         }
 
         Ok(())
@@ -1896,9 +1900,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = ffi::MDB_RESERVE;
+        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))?
+            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))?
         }
 
         let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
@@ -1988,9 +1993,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = flags.bits();
+        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
         }
 
         Ok(())
@@ -2095,9 +2101,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = (flags | PutFlags::NO_OVERWRITE).bits();
+        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut data_val, flags))
+            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))
         };
 
         match result {
@@ -2245,9 +2252,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = (flags | PutFlags::NO_OVERWRITE).bits() | lmdb_master_sys::MDB_RESERVE;
+        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.txn.txn, self.dbi, &mut key_val, &mut reserved, flags))
+            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))
         };
 
         match result {
@@ -2322,9 +2330,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(txn.txn.txn, self.dbi, &mut key_val, ptr::null_mut()))
+            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, ptr::null_mut()))
         };
 
         match result {
@@ -2409,9 +2418,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
+        let mut txn = txn.txn.txn.unwrap();
 
-        let result =
-            unsafe { mdb_result(ffi::mdb_del(txn.txn.txn, self.dbi, &mut key_val, &mut data_val)) };
+        let result = unsafe {
+            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, &mut data_val))
+        };
 
         match result {
             Ok(()) => Ok(true),
@@ -2533,8 +2544,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// ```
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         assert_eq_env_db_txn!(self, txn);
+        let mut txn = txn.txn.txn.unwrap();
 
-        unsafe { mdb_result(ffi::mdb_drop(txn.txn.txn, self.dbi, 0)).map_err(Into::into) }
+        unsafe { mdb_result(ffi::mdb_drop(txn.as_mut(), self.dbi, 0)).map_err(Into::into) }
     }
 
     /// Change the codec types of this database, specifying the codecs.
