@@ -76,30 +76,25 @@ impl<'e> RoTxn<'e> {
     /// After the transaction opening, the database is dropped. The next transaction might return
     /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
     pub fn commit(mut self) -> Result<()> {
-        let mut txn = self.txn.unwrap();
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.take().unwrap();
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
-        self.txn = None;
         result.map_err(Into::into)
     }
 }
 
 impl Drop for RoTxn<'_> {
     fn drop(&mut self) {
-        if self.txn.is_some() {
-            abort_txn(self.txn);
-        }
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.take().unwrap();
+        unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
     }
 }
 
 #[cfg(feature = "read-txn-no-tls")]
 unsafe impl Send for RoTxn<'_> {}
-
-#[track_caller]
-fn abort_txn(txn: Option<NonNull<ffi::MDB_txn>>) {
-    // Asserts that the transaction hasn't been already committed.
-    let mut txn = txn.unwrap();
-    unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
-}
 
 /// A read-write transaction.
 ///
@@ -149,17 +144,20 @@ impl<'p> RwTxn<'p> {
     /// Commit all the operations of a transaction into the database.
     /// The transaction is reset.
     pub fn commit(mut self) -> Result<()> {
-        let mut txn = self.txn.txn.unwrap();
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it two times.
+        let mut txn = self.txn.txn.take().unwrap();
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
-        self.txn.txn = None;
         result.map_err(Into::into)
     }
 
     /// Abandon all the operations of the transaction instead of saving them.
     /// The transaction is reset.
     pub fn abort(mut self) {
-        abort_txn(self.txn.txn);
-        self.txn.txn = None;
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.txn.take().unwrap();
+        unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
     }
 }
 
