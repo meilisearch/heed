@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::ops::Deref;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -25,8 +25,28 @@ use crate::{Env, Result};
 /// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
 /// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+///
+/// ## This struct is covariant
+///
+/// ```rust
+/// #[allow(dead_code)]
+/// trait CovariantMarker<'a>: 'static {
+///     type T: 'a;
+///
+///     fn is_covariant(&'a self) -> &'a Self::T;
+/// }
+///
+/// impl<'a> CovariantMarker<'a> for heed::RoTxn<'static> {
+///     type T = heed::RoTxn<'a>;
+///
+///     fn is_covariant(&'a self) -> &'a heed::RoTxn<'a> {
+///         self
+///     }
+/// }
+/// ```
 pub struct RoTxn<'e> {
-    pub(crate) txn: *mut ffi::MDB_txn,
+    /// Makes the struct covariant and !Sync
+    pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
     env: Cow<'e, Env>,
 }
 
@@ -43,7 +63,7 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn, env: Cow::Borrowed(env) })
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) })
     }
 
     pub(crate) fn static_read_txn(env: Env) -> Result<RoTxn<'static>> {
@@ -58,7 +78,7 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn, env: Cow::Owned(env) })
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env) })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
@@ -75,28 +95,26 @@ impl<'e> RoTxn<'e> {
     /// After the transaction opening, the database is dropped. The next transaction might return
     /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
     pub fn commit(mut self) -> Result<()> {
-        let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn)) };
-        self.txn = ptr::null_mut();
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.take().unwrap();
+        let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
         result.map_err(Into::into)
     }
 }
 
 impl Drop for RoTxn<'_> {
     fn drop(&mut self) {
-        if !self.txn.is_null() {
-            abort_txn(self.txn);
+        if let Some(mut txn) = self.txn.take() {
+            // Asserts that the transaction hasn't been already
+            // committed/aborter and ensure we cannot use it twice.
+            unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
         }
     }
 }
 
 #[cfg(feature = "read-txn-no-tls")]
 unsafe impl Send for RoTxn<'_> {}
-
-fn abort_txn(txn: *mut ffi::MDB_txn) {
-    // Asserts that the transaction hasn't been already committed.
-    assert!(!txn.is_null());
-    unsafe { ffi::mdb_txn_abort(txn) }
-}
 
 /// A read-write transaction.
 ///
@@ -116,6 +134,25 @@ fn abort_txn(txn: *mut ffi::MDB_txn) {
 /// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
 /// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+///
+/// ## This struct is covariant
+///
+/// ```rust
+/// #[allow(dead_code)]
+/// trait CovariantMarker<'a>: 'static {
+///     type T: 'a;
+///
+///     fn is_covariant(&'a self) -> &'a Self::T;
+/// }
+///
+/// impl<'a> CovariantMarker<'a> for heed::RwTxn<'static> {
+///     type T = heed::RwTxn<'a>;
+///
+///     fn is_covariant(&'a self) -> &'a heed::RwTxn<'a> {
+///         self
+///     }
+/// }
+/// ```
 pub struct RwTxn<'p> {
     pub(crate) txn: RoTxn<'p>,
 }
@@ -126,16 +163,17 @@ impl<'p> RwTxn<'p> {
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), ptr::null_mut(), 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env: Cow::Borrowed(env) } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
+        let mut parent_txn = parent.txn.txn.unwrap();
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent_txn.as_mut() };
 
         unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
 
-        Ok(RwTxn { txn: RoTxn { txn, env: Cow::Borrowed(env) } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
@@ -145,16 +183,20 @@ impl<'p> RwTxn<'p> {
     /// Commit all the operations of a transaction into the database.
     /// The transaction is reset.
     pub fn commit(mut self) -> Result<()> {
-        let result = unsafe { mdb_result(ffi::mdb_txn_commit(self.txn.txn)) };
-        self.txn.txn = ptr::null_mut();
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it two times.
+        let mut txn = self.txn.txn.take().unwrap();
+        let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
         result.map_err(Into::into)
     }
 
     /// Abandon all the operations of the transaction instead of saving them.
     /// The transaction is reset.
     pub fn abort(mut self) {
-        abort_txn(self.txn.txn);
-        self.txn.txn = ptr::null_mut();
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.txn.take().unwrap();
+        unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
     }
 }
 
