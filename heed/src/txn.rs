@@ -25,6 +25,25 @@ use crate::{Env, Result};
 /// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
 /// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+///
+/// ## This struct is covariant
+///
+/// ```rust
+/// #[allow(dead_code)]
+/// trait CovariantMarker<'a>: 'static {
+///     type T: 'a;
+///
+///     fn is_covariant(&'a self) -> &'a Self::T;
+/// }
+///
+/// impl<'a> CovariantMarker<'a> for heed::RoTxn<'static> {
+///     type T = heed::RoTxn<'a>;
+///
+///     fn is_covariant(&'a self) -> &'a heed::RoTxn<'a> {
+///         self
+///     }
+/// }
+/// ```
 pub struct RoTxn<'e> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
@@ -115,6 +134,25 @@ unsafe impl Send for RoTxn<'_> {}
 /// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
 ///
 /// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+///
+/// ## This struct is covariant
+///
+/// ```rust
+/// #[allow(dead_code)]
+/// trait CovariantMarker<'a>: 'static {
+///     type T: 'a;
+///
+///     fn is_covariant(&'a self) -> &'a Self::T;
+/// }
+///
+/// impl<'a> CovariantMarker<'a> for heed::RwTxn<'static> {
+///     type T = heed::RwTxn<'a>;
+///
+///     fn is_covariant(&'a self) -> &'a heed::RwTxn<'a> {
+///         self
+///     }
+/// }
+/// ```
 pub struct RwTxn<'p> {
     pub(crate) txn: RoTxn<'p>,
 }
