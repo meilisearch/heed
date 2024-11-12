@@ -24,6 +24,7 @@ synchronoise = "1.0.1"
 
 [dev-dependencies]
 memchr = "2.7.4"
+rayon = "1.10.0"
 serde = { version = "1.0.218", features = ["derive"] }
 tempfile = "3.18.0"
 
@@ -127,6 +128,11 @@ name = "nested"
 
 [[example]]
 name = "prev-snapshot"
+
+[[example]]
+name = "nested-read-only"
+path = "../examples/nested-read-only.rs"
+required-features = ["read-txn-no-tls"]
 
 [[example]]
 name = "rmp-serde"

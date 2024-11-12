@@ -96,6 +96,21 @@ impl<'e, T> RoTxn<'e, T> {
         })
     }
 
+    pub(crate) fn nested(env: &'e Env, parent: &'e RwTxn) -> Result<RoTxn<'e>> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let parent_ptr: *mut ffi::MDB_txn = parent.txn.txn;
+
+        // Note that we fake a RoTxn here, Only heed knows about it, LMDB doesn't.
+        // we removed the limit of number of child write txn, but we are in Rust
+        // and the RoTxn disallow writing stuff, but not opening/creating dbi (to fix).
+        unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
+
+        Ok(RoTxn {
+            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Owned(env.inner) },
+            _tls_marker: PhantomData,
+        })
+    }
+
     pub(crate) fn txn_ptr(&self) -> NonNull<ffi::MDB_txn> {
         self.inner.txn.unwrap()
     }

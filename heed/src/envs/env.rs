@@ -346,6 +346,10 @@ impl<T> Env<T> {
         RwTxn::nested(self, parent)
     }
 
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p>> {
+        RoTxn::nested(self, parent)
+    }
+
     /// Create a transaction with read-only access for use with the environment.
     ///
     /// You can make this transaction `Send`able between threads by opening
