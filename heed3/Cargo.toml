@@ -1,8 +1,8 @@
 [package]
-name = "heed3"
+name = "heed3-encryption"
 version = "0.20.5-beta.1"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
-description = "A fully typed LMDB (mdb.master3) wrapper with minimum overhead"
+description = "A fully typed LMDB (mdb.master3) wrapper with minimum overhead with support for encryption"
 license = "MIT"
 repository = "https://github.com/Kerollmops/heed"
 keywords = ["lmdb", "database", "storage", "typed", "encryption"]
@@ -11,8 +11,11 @@ readme = "../README.md"
 edition = "2021"
 
 [dependencies]
+# TODO update dependencies
+aead = { version = "0.5.1", default-features = false }
 bitflags = { version = "2.6.0", features = ["serde"] }
 byteorder = { version = "1.5.0", default-features = false }
+generic-array = { version = "0.14.6", features = ["serde"] }
 heed-traits = { version = "0.20.0", path = "../heed-traits" }
 heed-types = { version = "0.20.1", default-features = false, path = "../heed-types" }
 libc = "0.2.155"
@@ -20,11 +23,12 @@ lmdb-master3-sys = { version = "0.2.4", path = "../lmdb-master3-sys" }
 once_cell = "1.19.0"
 page_size = "0.6.0"
 serde = { version = "1.0.203", features = ["derive"], optional = true }
-synchronoise = "1.0.1"
 
 [dev-dependencies]
 # TODO update dependencies
+argon2 = { version = "0.4.1", features = ["std"] }
 serde = { version = "1.0.203", features = ["derive"] }
+chacha20poly1305 = "0.10.1"
 tempfile = "3.10.1"
 
 [target.'cfg(windows)'.dependencies]
@@ -114,5 +118,5 @@ longer-keys = ["lmdb-master3-sys/longer-keys"]
 # Examples are located outside the standard heed/examples directory to prevent
 # conflicts between heed3 and heed examples when working on both crates.
 [[example]]
-name = "heed3-all-types"
-path = "../examples/heed3-all-types.rs"
+name = "heed3-encryption"
+path = "../examples/heed3-encryption.rs"

@@ -2,9 +2,10 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
+use crate::env2::Env;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{Env, Result};
+use crate::Result;
 
 /// A read-only transaction.
 ///
@@ -209,7 +210,7 @@ impl<'p> Deref for RwTxn<'p> {
 }
 
 // TODO can't we just always implement it?
-#[cfg(all(master3, encryption))]
+#[cfg(master3)]
 impl<'p> std::ops::DerefMut for RwTxn<'p> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.txn

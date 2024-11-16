@@ -149,33 +149,19 @@ pub enum Error {
     Encoding(BoxedError),
     /// Decoding error.
     Decoding(BoxedError),
-    /// Database closing in progress.
-    DatabaseClosing,
-    /// Attempt to open [`Env`] with different options.
-    BadOpenOptions {
-        /// The simplified options that were used to originally open this env.
-        #[cfg(all(master3, encryption))]
-        options: env::SimplifiedEncryptedOpenOptions,
-        /// The options that were used to originally open this env.
-        #[cfg(not(all(master3, encryption)))]
-        options: EnvOpenOptions,
-        /// The env opened with the original options.
-        env: Env,
-    },
+    /// The environment is already open; close it to be able to open it again.
+    EnvAlreadyOpened,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Io(error) => write!(f, "{}", error),
-            Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding(error) => write!(f, "error while encoding: {}", error),
-            Error::Decoding(error) => write!(f, "error while decoding: {}", error),
-            Error::DatabaseClosing => {
-                f.write_str("database is in a closing phase, you can't open it at the same time")
-            }
-            Error::BadOpenOptions { .. } => {
-                f.write_str("an environment is already opened with different options")
+            Error::Io(error) => write!(f, "{error}"),
+            Error::Mdb(error) => write!(f, "{error}"),
+            Error::Encoding(error) => write!(f, "error while encoding: {error}"),
+            Error::Decoding(error) => write!(f, "error while decoding: {error}"),
+            Error::EnvAlreadyOpened => {
+                f.write_str("environment already open; close it to be able to open it again")
             }
         }
     }

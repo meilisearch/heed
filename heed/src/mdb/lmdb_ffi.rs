@@ -1,6 +1,6 @@
 use std::ptr;
 
-#[cfg(all(master3, encryption))]
+#[cfg(master3)]
 pub use ffi::mdb_env_set_encrypt;
 pub use ffi::{
     mdb_cursor_close, mdb_cursor_del, mdb_cursor_get, mdb_cursor_open, mdb_cursor_put,
