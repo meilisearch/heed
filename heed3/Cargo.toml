@@ -1,5 +1,5 @@
 [package]
-name = "heed3-encryption"
+name = "heed3"
 version = "0.20.5-beta.1"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB (mdb.master3) wrapper with minimum overhead with support for encryption"
