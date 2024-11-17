@@ -26,6 +26,11 @@ mod encrypted_env;
 mod env;
 mod env_open_options;
 
+#[cfg(master3)]
+pub use env::EncryptedEnv;
+pub use env::Env;
+pub use env_open_options::EnvOpenOptions;
+
 /// Records the current list of opened environments for tracking purposes. The canonical
 /// path of an environment is removed when either an `Env` or `EncryptedEnv` is closed.
 static OPENED_ENV: LazyLock<RwLock<HashSet<PathBuf>>> = LazyLock::new(RwLock::default);
@@ -174,6 +179,19 @@ impl LexicographicComparator for DefaultComparator {
     fn min_elem() -> u8 {
         u8::MIN
     }
+}
+
+/// Whether to perform compaction while copying an environment.
+#[derive(Debug, Copy, Clone)]
+pub enum CompactionOption {
+    /// Omit free pages and sequentially renumber all pages in output.
+    ///
+    /// This option consumes more CPU and runs more slowly than the default.
+    /// Currently it fails if the environment has suffered a page leak.
+    Enabled,
+
+    /// Copy everything without taking any special action about free pages.
+    Disabled,
 }
 
 /// Whether to enable or disable flags in [`Env::set_flags`].

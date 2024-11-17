@@ -1,8 +1,7 @@
-use std::borrow::Cow;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
-use crate::env2::Env;
+use crate::envs::Env;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::Result;
@@ -57,32 +56,34 @@ impl<'e> RoTxn<'e> {
 
         unsafe {
             mdb_result(ffi::mdb_txn_begin(
-                env.env_mut_ptr(),
+                env.env_mut_ptr().as_mut(),
                 ptr::null_mut(),
                 ffi::MDB_RDONLY,
                 &mut txn,
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) })
+        Ok(RoTxn { txn: NonNull::new(txn), env })
     }
 
+    // TODO replace this by an ArcRoTxn
     pub(crate) fn static_read_txn(env: Env) -> Result<RoTxn<'static>> {
-        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        // let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        unsafe {
-            mdb_result(ffi::mdb_txn_begin(
-                env.env_mut_ptr(),
-                ptr::null_mut(),
-                ffi::MDB_RDONLY,
-                &mut txn,
-            ))?
-        };
+        // unsafe {
+        //     mdb_result(ffi::mdb_txn_begin(
+        //         env.env_mut_ptr(),
+        //         ptr::null_mut(),
+        //         ffi::MDB_RDONLY,
+        //         &mut txn,
+        //     ))?
+        // };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env) })
+        // Ok(RoTxn { txn, env: Cow::Owned(env) })
+        todo!()
     }
 
-    pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
+    pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
         self.env.env_mut_ptr()
     }
 
@@ -162,22 +163,30 @@ impl<'p> RwTxn<'p> {
     pub(crate) fn new(env: &'p Env) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), ptr::null_mut(), 0, &mut txn))? };
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr().as_mut(),
+                ptr::null_mut(),
+                0,
+                &mut txn,
+            ))?
+        };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env } })
     }
 
     pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let mut parent_txn = parent.txn.txn.unwrap();
-        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent_txn.as_mut() };
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.txn.unwrap().as_mut() };
 
-        unsafe { mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr(), parent_ptr, 0, &mut txn))? };
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
+        };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env } })
     }
 
-    pub(crate) fn env_mut_ptr(&self) -> *mut ffi::MDB_env {
+    pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
         self.txn.env.env_mut_ptr()
     }
 

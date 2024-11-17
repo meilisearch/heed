@@ -6,7 +6,7 @@ use heed_traits::{Comparator, LexicographicComparator};
 use types::{DecodeIgnore, LazyDecode};
 
 use crate::cursor::MoveOperation;
-use crate::env::DefaultComparator;
+use crate::envs::DefaultComparator;
 use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -139,8 +139,9 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     {
         assert_eq_env_txn!(self.env, rtxn);
 
-        match self.env.raw_init_database::<C>(rtxn.txn.unwrap(), self.name, self.flags) {
-            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
+        let raw_txn = unsafe { rtxn.txn.unwrap().as_mut() };
+        match self.env.raw_init_database::<C>(raw_txn, self.name, self.flags) {
+            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
         }
@@ -164,8 +165,9 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
         assert_eq_env_txn!(self.env, wtxn);
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn.unwrap(), self.name, flags) {
-            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
+        let raw_txn = unsafe { wtxn.txn.txn.unwrap().as_mut() };
+        match self.env.raw_init_database::<C>(raw_txn, self.name, flags) {
+            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
@@ -354,7 +356,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_get(txn.as_mut(), self.dbi, &mut key_val, data_val.as_mut_ptr()))
+            mdb_result(ffi::mdb_get(
+                txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                data_val.as_mut_ptr(),
+            ))
         };
 
         match result {
@@ -966,9 +973,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
-        let mut txn = txn.txn.unwrap();
-        let result =
-            unsafe { mdb_result(ffi::mdb_stat(txn.as_mut(), self.dbi, db_stat.as_mut_ptr())) };
+        let result = unsafe {
+            mdb_result(ffi::mdb_stat(txn.txn.unwrap().as_mut(), self.dbi, db_stat.as_mut_ptr()))
+        };
 
         match result {
             Ok(()) => {
@@ -1855,7 +1862,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
         }
 
         Ok(())
@@ -1917,7 +1930,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut reserved,
+                flags,
+            ))?
         }
 
         let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
@@ -2010,7 +2029,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
         }
 
         Ok(())
@@ -2118,7 +2143,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))
         };
 
         match result {
@@ -2269,7 +2300,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut reserved,
+                flags,
+            ))
         };
 
         match result {
@@ -2347,7 +2384,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, ptr::null_mut()))
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                ptr::null_mut(),
+            ))
         };
 
         match result {
@@ -2435,7 +2477,12 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, &mut data_val))
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+            ))
         };
 
         match result {
@@ -2561,7 +2608,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
         assert_eq_env_db_txn!(self, txn);
         let mut txn = txn.txn.txn.unwrap();
 
-        unsafe { mdb_result(ffi::mdb_drop(txn.as_mut(), self.dbi, 0)).map_err(Into::into) }
+        unsafe {
+            mdb_result(ffi::mdb_drop(txn.txn.txn.unwrap().as_mut(), self.dbi, 0))
+                .map_err(Into::into)
+        }
     }
 
     /// Change the codec types of this database, specifying the codecs.
@@ -2674,8 +2724,8 @@ mod tests {
     fn longer_keys() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let mut txn = envs.write_txn()?;
+        let db = envs.create_database::<Bytes, Bytes>(&mut txn, None)?;
 
         // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
         let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";

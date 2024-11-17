@@ -11,7 +11,7 @@ use std::{io, ptr};
 use super::env::Env;
 use super::{canonicalize_path, OPENED_ENV};
 #[cfg(windows)]
-use crate::env::OsStrExtLmdb as _;
+use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::{EnvFlags, Error, Result};

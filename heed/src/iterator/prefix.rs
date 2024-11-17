@@ -5,7 +5,7 @@ use heed_traits::LexicographicComparator;
 use types::LazyDecode;
 
 use crate::cursor::MoveOperation;
-use crate::env::DefaultComparator;
+use crate::envs::DefaultComparator;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
 

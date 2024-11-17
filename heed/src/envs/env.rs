@@ -54,7 +54,7 @@ impl Env {
     /// ```
     pub fn real_disk_size(&self) -> Result<u64> {
         let mut fd = mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr(), fd.as_mut_ptr()))? };
+        unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr().as_mut(), fd.as_mut_ptr()))? };
         let fd = unsafe { fd.assume_init() };
         let metadata = unsafe { metadata_from_fd(fd)? };
         Ok(metadata.len())
@@ -105,7 +105,7 @@ impl Env {
         // <http://www.lmdb.tech/doc/group__mdb.html#ga83f66cf02bfd42119451e9468dc58445>
         mdb_result(unsafe {
             ffi::mdb_env_set_flags(
-                self.env_mut_ptr(),
+                self.env_mut_ptr().as_mut(),
                 flags.bits(),
                 mode.as_mdb_env_set_flags_input(),
             )
@@ -116,7 +116,9 @@ impl Env {
     /// Return the raw flags the environment is currently set with.
     pub fn get_flags(&self) -> Result<u32> {
         let mut flags = mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr(), flags.as_mut_ptr()))? };
+        unsafe {
+            mdb_result(ffi::mdb_env_get_flags(self.env_mut_ptr().as_mut(), flags.as_mut_ptr()))?
+        };
         let flags = unsafe { flags.assume_init() };
         Ok(flags)
     }
@@ -124,7 +126,7 @@ impl Env {
     /// Returns some basic informations about this environment.
     pub fn info(&self) -> EnvInfo {
         let mut raw_info = mem::MaybeUninit::uninit();
-        unsafe { ffi::mdb_env_info(self.0.env, raw_info.as_mut_ptr()) };
+        unsafe { ffi::mdb_env_info(self.env_ptr.as_ptr(), raw_info.as_mut_ptr()) };
         let raw_info = unsafe { raw_info.assume_init() };
 
         EnvInfo {
@@ -151,13 +153,14 @@ impl Env {
         let mut size = 0;
 
         let mut stat = mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr(), stat.as_mut_ptr()))? };
+        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr().as_mut(), stat.as_mut_ptr()))? };
         let stat = unsafe { stat.assume_init() };
         size += compute_size(stat);
 
         let rtxn = self.read_txn()?;
         // Open the main database
-        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), None, 0)?;
+        let raw_txn = unsafe { rtxn.txn.unwrap().as_mut() };
+        let dbi = self.raw_open_dbi::<DefaultComparator>(raw_txn, None, 0)?;
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -170,12 +173,12 @@ impl Env {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) =
-                self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), Some(&key), 0)
-            {
+            let raw_txn = unsafe { rtxn.txn.unwrap().as_mut() };
+            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(raw_txn, Some(&key), 0) {
                 let mut stat = mem::MaybeUninit::uninit();
-                let mut txn = rtxn.txn.unwrap();
-                unsafe { mdb_result(ffi::mdb_stat(txn.as_mut(), dbi, stat.as_mut_ptr()))? };
+                unsafe {
+                    mdb_result(ffi::mdb_stat(rtxn.txn.unwrap().as_mut(), dbi, stat.as_mut_ptr()))?
+                };
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
             }
@@ -404,13 +407,13 @@ impl Env {
         option: CompactionOption,
     ) -> Result<()> {
         let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
-        mdb_result(ffi::mdb_env_copyfd2(self.0.env, fd, flags))?;
+        mdb_result(ffi::mdb_env_copyfd2(self.env_ptr.as_ptr(), fd, flags))?;
         Ok(())
     }
 
     /// Flush the data buffers to disk.
     pub fn force_sync(&self) -> Result<()> {
-        unsafe { mdb_result(ffi::mdb_env_sync(self.0.env, 1))? }
+        unsafe { mdb_result(ffi::mdb_env_sync(self.env_ptr.as_ptr(), 1))? }
         Ok(())
     }
 
@@ -424,7 +427,7 @@ impl Env {
     /// Returns the number of stale readers cleared.
     pub fn clear_stale_readers(&self) -> Result<usize> {
         let mut dead: i32 = 0;
-        unsafe { mdb_result(ffi::mdb_reader_check(self.0.env, &mut dead))? }
+        unsafe { mdb_result(ffi::mdb_reader_check(self.env_ptr.as_ptr(), &mut dead))? }
         // safety: The reader_check function asks for an i32, initialize it to zero
         //         and never decrements it. It is safe to use either an u32 or u64 (usize).
         Ok(dead as usize)
@@ -446,7 +449,7 @@ impl Env {
             );
             return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
         }
-        mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr(), new_size) })
+        mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size) })
             .map_err(Into::into)
     }
 
@@ -454,7 +457,7 @@ impl Env {
     ///
     /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
     pub fn max_key_size(&self) -> usize {
-        let maxsize: i32 = unsafe { ffi::mdb_env_get_maxkeysize(self.env_mut_ptr()) };
+        let maxsize: i32 = unsafe { ffi::mdb_env_get_maxkeysize(self.env_mut_ptr().as_mut()) };
         maxsize as usize
     }
 }

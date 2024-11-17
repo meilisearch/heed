@@ -64,8 +64,8 @@
 
 pub mod cookbook;
 mod cursor;
-mod database;
-mod env;
+mod databases;
+mod envs;
 pub mod iteration_method;
 mod iterator;
 mod mdb;
@@ -79,10 +79,10 @@ use heed_traits as traits;
 pub use {byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::database::{Database, DatabaseOpenOptions, DatabaseStat};
-pub use self::env::{
-    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions, FlagSetMode, IntegerComparator,
+pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
+pub use self::envs::{
+    CompactionOption, DefaultComparator, Env, EnvInfo, EnvOpenOptions, FlagSetMode,
+    IntegerComparator,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
@@ -198,7 +198,7 @@ pub enum Unspecified {}
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
-            $database.env_ident == $txn.env_mut_ptr() as usize,
+            $database.env_ident == unsafe { $txn.env_mut_ptr().as_mut() as *mut _ as usize },
             "The database environment doesn't match the transaction's environment"
         );
     };

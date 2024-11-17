@@ -449,4 +449,5 @@
 // To let cargo generate doc links
 #![allow(unused_imports)]
 
-use crate::{BytesDecode, BytesEncode, Database, EnvOpenOptions};
+use crate::envs::EnvOpenOptions;
+use crate::{BytesDecode, BytesEncode, Database};
