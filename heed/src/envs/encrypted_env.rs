@@ -1,40 +1,22 @@
-use std::any::TypeId;
-use std::ffi::CString;
+use std::fmt;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::ptr::{self, NonNull};
-use std::{fmt, io, mem};
+use std::panic::catch_unwind;
+use std::path::Path;
 
-use heed_traits::Comparator;
-use lmdb_master_sys::mdb_env_close;
+use aead::generic_array::typenum::Unsigned;
+use aead::{AeadMutInPlace, Key, KeyInit, Nonce, Tag};
 
-use super::{
-    custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvInfo, FlagSetMode,
-    OPENED_ENV,
-};
-use crate::cursor::{MoveOperation, RoCursor};
-use crate::mdb::ffi::{self, MDB_env};
-use crate::mdb::lmdb_error::mdb_result;
-use crate::mdb::lmdb_flags::AllDatabaseFlags;
-use crate::{
-    CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
-};
+use super::{Env, EnvInfo, FlagSetMode};
+use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
+use crate::mdb::ffi::{self};
+use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
 pub struct EncryptedEnv {
-    inner: Env,
+    pub(crate) inner: Env,
 }
 
-impl Env {
-    pub(crate) fn new(env_ptr: NonNull<MDB_env>, path: PathBuf) -> Env {
-        Env { env_ptr, path }
-    }
-
-    pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.inner.env_mut_ptr()
-    }
-
+impl EncryptedEnv {
     /// The size of the data file on disk.
     ///
     /// # Example
@@ -180,24 +162,6 @@ impl Env {
             options.name(name);
         }
         options.create(wtxn)
-    }
-
-    pub(crate) fn raw_init_database<C: Comparator + 'static>(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        flags: AllDatabaseFlags,
-    ) -> Result<u32> {
-        self.inner.raw_init_database(raw_txn, name, flags)
-    }
-
-    fn raw_open_dbi<C: Comparator + 'static>(
-        &self,
-        raw_txn: *mut ffi::MDB_txn,
-        name: Option<&str>,
-        flags: u32,
-    ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
-        self.inner.raw_open_dbi(raw_txn, name, flags)
     }
 
     /// Create a transaction with read and write access for use with the environment.
@@ -346,7 +310,9 @@ unsafe impl Sync for EncryptedEnv {}
 
 impl fmt::Debug for EncryptedEnv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("EncryptedEnv").field("path", &self.path.display()).finish_non_exhaustive()
+        f.debug_struct("EncryptedEnv")
+            .field("path", &self.inner.path.display())
+            .finish_non_exhaustive()
     }
 }
 
@@ -359,7 +325,7 @@ fn encrypt<A: AeadMutInPlace + KeyInit>(
     auth_out: &mut [u8],
 ) -> aead::Result<()> {
     chipertext_out.copy_from_slice(plaintext);
-    let key: &Key<A> = key.try_into().unwrap();
+    let key: &Key<A> = key.into();
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
         nonce[..A::NonceSize::USIZE].into()
     } else {
@@ -380,20 +346,20 @@ fn decrypt<A: AeadMutInPlace + KeyInit>(
     auth_in: &[u8],
 ) -> aead::Result<()> {
     output.copy_from_slice(chipher_text);
-    let key: &Key<A> = key.try_into().unwrap();
+    let key: &Key<A> = key.into();
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
         nonce[..A::NonceSize::USIZE].into()
     } else {
         return Err(aead::Error);
     };
-    let tag: &Tag<A> = auth_in.try_into().unwrap();
+    let tag: &Tag<A> = auth_in.into();
     let mut aead = A::new(key);
     aead.decrypt_in_place_detached(nonce, aad, output, tag)
 }
 
 /// The wrapper function that is called by LMDB that directly calls
 /// the Rust idiomatic function internally.
-unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
+pub(crate) unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
     src: *const ffi::MDB_val,
     dst: *mut ffi::MDB_val,
     key_ptr: *const ffi::MDB_val,
@@ -415,16 +381,13 @@ unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
         let aad = [];
         let nonce = iv;
         let result = if encdec == 1 {
-            encrypt::<E>(&key, nonce, &aad, input, output, auth)
+            encrypt::<E>(key, nonce, &aad, input, output, auth)
         } else {
-            decrypt::<E>(&key, nonce, &aad, input, output, auth)
+            decrypt::<E>(key, nonce, &aad, input, output, auth)
         };
 
         result.is_err() as i32
     });
 
-    match result {
-        Ok(out) => out,
-        Err(_) => 1,
-    }
+    result.unwrap_or(1)
 }

@@ -6,7 +6,6 @@ use std::ptr::{self, NonNull};
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
-use lmdb_master_sys::mdb_env_close;
 
 use super::{
     custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvInfo, FlagSetMode,
@@ -24,7 +23,7 @@ use crate::{
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
 pub struct Env {
     env_ptr: NonNull<MDB_env>,
-    path: PathBuf,
+    pub(crate) path: PathBuf,
 }
 
 impl Env {
@@ -474,7 +473,7 @@ impl fmt::Debug for Env {
 
 impl Drop for Env {
     fn drop(&mut self) {
-        unsafe { mdb_env_close(self.env_ptr.as_mut()) };
+        unsafe { ffi::mdb_env_close(self.env_ptr.as_mut()) };
         let mut lock = OPENED_ENV.write().unwrap();
         debug_assert!(lock.remove(&self.path));
     }

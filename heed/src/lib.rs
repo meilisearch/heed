@@ -80,6 +80,10 @@ pub use {byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
+#[cfg(master3)]
+pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
+#[cfg(master3)]
+pub use self::envs::EncryptedEnv;
 pub use self::envs::{
     CompactionOption, DefaultComparator, Env, EnvInfo, EnvOpenOptions, FlagSetMode,
     IntegerComparator,

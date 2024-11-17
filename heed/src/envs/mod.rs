@@ -27,7 +27,7 @@ mod env;
 mod env_open_options;
 
 #[cfg(master3)]
-pub use env::EncryptedEnv;
+pub use encrypted_env::EncryptedEnv;
 pub use env::Env;
 pub use env_open_options::EnvOpenOptions;
 

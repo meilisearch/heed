@@ -8,6 +8,11 @@ use std::path::Path;
 use std::ptr::NonNull;
 use std::{io, ptr};
 
+#[cfg(master3)]
+use aead::{generic_array::typenum::Unsigned, AeadCore, AeadMutInPlace, Key, KeyInit};
+
+#[cfg(master3)]
+use super::encrypted_env::encrypt_func_wrapper;
 use super::env::Env;
 use super::{canonicalize_path, OPENED_ENV};
 #[cfg(windows)]
@@ -357,7 +362,7 @@ impl EnvOpenOptions {
                 let mut env: *mut ffi::MDB_env = ptr::null_mut();
                 mdb_result(ffi::mdb_env_create(&mut env))?;
 
-                let encrypt_key = crate::into_val(&self.encrypt);
+                let encrypt_key = crate::into_val(&key);
                 mdb_result(ffi::mdb_env_set_encrypt(
                     env,
                     Some(encrypt_func_wrapper::<E>),

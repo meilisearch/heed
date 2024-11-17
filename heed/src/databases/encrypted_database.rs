@@ -1,16 +1,12 @@
-use std::borrow::Cow;
-use std::ops::{Bound, RangeBounds};
-use std::{any, fmt, marker, mem, ptr};
+use std::ops::RangeBounds;
+use std::{any, fmt};
 
 use heed_traits::{Comparator, LexicographicComparator};
-use types::{DecodeIgnore, LazyDecode};
+use types::LazyDecode;
 
-use crate::cursor::MoveOperation;
-use crate::env::DefaultComparator;
+use crate::envs::DefaultComparator;
 use crate::iteration_method::MoveOnCurrentKeyDuplicates;
-use crate::mdb::error::mdb_result;
-use crate::mdb::ffi;
-use crate::mdb::lmdb_flags::{AllDatabaseFlags, DatabaseFlags};
+use crate::mdb::lmdb_flags::DatabaseFlags;
 use crate::*;
 
 /// Options and flags which can be used to configure how a [`Database`] is opened.
@@ -61,8 +57,8 @@ pub struct EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
 
 impl<'e> EncryptedDatabaseOpenOptions<'e, 'static, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
-    pub fn new(env: &'e Env) -> Self {
-        EncryptedDatabaseOpenOptions { inner: DatabaseOpenOptions::new(env) }
+    pub fn new(env: &'e EncryptedEnv) -> Self {
+        EncryptedDatabaseOpenOptions { inner: DatabaseOpenOptions::new(&env.inner) }
     }
 }
 
@@ -119,7 +115,7 @@ impl<'e, 'n, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C> {
         DC: 'static,
         C: Comparator + 'static,
     {
-        self.inner.open(rtxn)
+        self.inner.open(rtxn).map(|opt| opt.map(EncryptedDatabase::new))
     }
 
     /// Creates a typed database that can already exist in this environment.
@@ -137,7 +133,7 @@ impl<'e, 'n, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C> {
         DC: 'static,
         C: Comparator + 'static,
     {
-        self.inner.create(wtxn)
+        self.inner.create(wtxn).map(EncryptedDatabase::new)
     }
 }
 
@@ -266,8 +262,8 @@ pub struct EncryptedDatabase<KC, DC, C = DefaultComparator> {
 }
 
 impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC, C> {
-        EncryptedDatabase { inner: Database::mew(env_ident, dbi) }
+    pub(crate) fn new(inner: Database<KC, DC, C>) -> EncryptedDatabase<KC, DC, C> {
+        EncryptedDatabase { inner }
     }
 
     /// Retrieves the value associated with a key.
@@ -2074,7 +2070,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         KC: BytesEncode<'a> + BytesDecode<'txn>,
         R: RangeBounds<KC::EItem>,
     {
-        self.inner.delete_range(range)
+        self.inner.delete_range(txn, range)
     }
 
     /// Deletes all key/value pairs in this database.
@@ -2119,7 +2115,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// # Ok(()) }
     /// ```
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
-        self.inner.clear()
+        self.inner.clear(txn)
     }
 
     /// Change the codec types of this database, specifying the codecs.
@@ -2164,7 +2160,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// # Ok(()) }
     /// ```
     pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<KC2, DC2, C> {
-        EncryptedDatabase::new(self.inner.env_ident, self.inner.dbi)
+        EncryptedDatabase::new(self.inner.remap_types::<KC2, DC2>())
     }
 
     /// Change the key codec type of this database, specifying the new codec.
