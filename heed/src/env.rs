@@ -446,6 +446,37 @@ impl LexicographicComparator for DefaultComparator {
     }
 }
 
+/// A representation of LMDB's `MDB_INTEGERKEY` comparator behavior.
+///
+/// This enum is used to indicate a table should be sorted by the keys numeric
+/// value in native byte order. When a [`Database`] is created or opened with
+/// [`IntegerComparator`], it signifies that the comparator should not be explicitly
+/// set via [`ffi::mdb_set_compare`], instead the flag [`AllDatabaseFlags::INTEGER_KEY`]
+/// is set on the table.
+///
+/// This can only be used on certain types: either `u32` or `usize`. The keys must all be of the same size.
+pub enum IntegerComparator {}
+impl Comparator for IntegerComparator {
+    fn compare(a: &[u8], b: &[u8]) -> Ordering {
+        #[cfg(target_endian = "big")]
+        return a.cmp(b);
+
+        #[cfg(target_endian = "little")]
+        {
+            let len = a.len();
+
+            for i in (0..len).rev() {
+                match a[i].cmp(&b[i]) {
+                    Ordering::Equal => continue,
+                    other => return other,
+                }
+            }
+
+            Ordering::Equal
+        }
+    }
+}
+
 /// Whether to perform compaction while copying an environment.
 #[derive(Debug, Copy, Clone)]
 pub enum CompactionOption {
@@ -701,8 +732,12 @@ impl Env {
         &self,
         raw_txn: NonNull<ffi::MDB_txn>,
         name: Option<&str>,
-        flags: AllDatabaseFlags,
+        mut flags: AllDatabaseFlags,
     ) -> Result<u32> {
+        if TypeId::of::<C>() == TypeId::of::<IntegerComparator>() {
+            flags.insert(AllDatabaseFlags::INTEGER_KEY);
+        }
+
         match self.raw_open_dbi::<C>(raw_txn, name, flags.bits()) {
             Ok(dbi) => Ok(dbi),
             Err(e) => Err(e.into()),
@@ -726,7 +761,11 @@ impl Env {
         //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
         unsafe {
             mdb_result(ffi::mdb_dbi_open(raw_txn.as_mut(), name_ptr, flags, &mut dbi))?;
-            if TypeId::of::<C>() != TypeId::of::<DefaultComparator>() {
+            let cmp_type_id = TypeId::of::<C>();
+
+            if cmp_type_id != TypeId::of::<DefaultComparator>()
+                && cmp_type_id != TypeId::of::<IntegerComparator>()
+            {
                 mdb_result(ffi::mdb_set_compare(
                     raw_txn.as_mut(),
                     dbi,

@@ -975,7 +975,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         }
     }
 
-    /// Return a lexicographically ordered iterator of all key-value pairs in this database.
+    /// Return an ordered iterator of all key-value pairs in this database.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1020,7 +1020,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
-    /// Return a mutable lexicographically ordered iterator of all key-value pairs in this database.
+    /// Return a mutable ordered iterator of all key-value pairs in this database.
     ///
     /// ```
     /// # use std::fs;
@@ -1076,7 +1076,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
-    /// Return a reversed lexicographically ordered iterator of all key-value pairs in this database.
+    /// Return a reverse ordered iterator of all key-value pairs in this database.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1179,9 +1179,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
-    /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
+    /// Return an ordered iterator of a range of key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1226,7 +1226,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn,
         range: &'a R,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    ) -> Result<RoRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1260,10 +1260,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
-    /// Return a mutable lexicographically ordered iterator of a range of
-    /// key-value pairs in this database.
+    /// Return a mutable ordered iterator of a range of key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// ```
     /// # use std::fs;
@@ -1318,7 +1317,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn mut RwTxn,
         range: &'a R,
-    ) -> Result<RwRange<'txn, KC, DC>>
+    ) -> Result<RwRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1352,10 +1351,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
-    /// Return a reversed lexicographically ordered iterator of a range of key-value
-    /// pairs in this database.
+    /// Return a reverse ordered iterator of a range of key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1400,7 +1398,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, KC, DC>>
+    ) -> Result<RoRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1434,10 +1432,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
-    /// Return a mutable reversed lexicographically ordered iterator of a range of
-    /// key-value pairs in this database.
+    /// Return a mutable reverse ordered iterator of a range of key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// ```
     /// # use std::fs;
@@ -1492,7 +1489,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn mut RwTxn,
         range: &'a R,
-    ) -> Result<RwRevRange<'txn, KC, DC>>
+    ) -> Result<RwRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -2435,7 +2432,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Prefer using [`clear`] instead of a call to this method with a full range ([`..`]).
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// [`clear`]: crate::Database::clear
     /// [`..`]: std::ops::RangeFull
@@ -2483,6 +2480,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     pub fn delete_range<'a, 'txn, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
+        C: Comparator,
         R: RangeBounds<KC::EItem>,
     {
         assert_eq_env_db_txn!(self, txn);
@@ -2648,9 +2646,11 @@ pub struct DatabaseStat {
 
 #[cfg(test)]
 mod tests {
+    use byteorder::*;
     use heed_types::*;
 
     use super::*;
+    use crate::env::IntegerComparator;
 
     #[test]
     fn put_overwrite() -> Result<()> {
@@ -2689,6 +2689,35 @@ mod tests {
         db.put(&mut txn, long_key, b"bye").unwrap();
         assert_eq!(db.get(&txn, long_key).unwrap(), Some(&b"bye"[..]));
 
+        Ok(())
+    }
+
+    #[test]
+    fn integer_keys() -> Result<()> {
+        type NEU32 = U32<NativeEndian>;
+
+        let dir = tempfile::tempdir()?;
+        let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
+        let mut txn = env.write_txn()?;
+        let db = env
+            .database_options()
+            .types::<NEU32, NEU32>()
+            .key_comparator::<IntegerComparator>()
+            .create(&mut txn)?;
+
+        let range = 1000..2000;
+
+        for i in range.clone() {
+            db.put(&mut txn, &i, &i)?;
+        }
+
+        let mut i = 0;
+        for (val, expected) in db.range(&txn, &(0..10_000))?.zip(range.clone()) {
+            assert_eq!(val?.0, expected);
+            i += 1;
+        }
+
+        assert_eq!(i, range.end - range.start);
         Ok(())
     }
 }
