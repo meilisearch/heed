@@ -43,6 +43,9 @@ bitflags! {
         const DUP_SORT = ffi::MDB_DUPSORT;
         /// Numeric keys in native byte order: either `u32` or `usize`.
         /// The keys must all be of the same size.
+        ///
+        /// It is recommended to set the comparator to [`IntegerComparator`](crate::IntegerComparator),
+        /// rather than setting this flag manually.
         const INTEGER_KEY = ffi::MDB_INTEGERKEY;
         /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
         const DUP_FIXED = ffi::MDB_DUPFIXED;
