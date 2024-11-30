@@ -18,7 +18,6 @@ use super::{canonicalize_path, OPENED_ENV};
 #[cfg(windows)]
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
-#[cfg(master3)]
 use crate::mdb::ffi;
 use crate::{EnvFlags, Error, Result};
 
