@@ -18,6 +18,7 @@ use super::{canonicalize_path, OPENED_ENV};
 #[cfg(windows)]
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
+#[cfg(master3)]
 use crate::mdb::ffi;
 use crate::{EnvFlags, Error, Result};
 
@@ -151,79 +152,11 @@ impl EnvOpenOptions {
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
-        /// TODO change the function description
-        ///      and deduplicate the code
-        let mut lock = OPENED_ENV.write().unwrap();
-
-        let path = match canonicalize_path(path.as_ref()) {
-            Err(err) => {
-                if err.kind() == NotFound && self.flags.contains(EnvFlags::NO_SUB_DIR) {
-                    let path = path.as_ref();
-                    match path.parent().zip(path.file_name()) {
-                        Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
-                        None => return Err(err.into()),
-                    }
-                } else {
-                    return Err(err.into());
-                }
-            }
-            Ok(path) => path,
-        };
-
-        if lock.contains(&path) {
-            Err(Error::EnvAlreadyOpened)
-        } else {
-            let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
-
-            unsafe {
-                let mut env: *mut ffi::MDB_env = ptr::null_mut();
-                mdb_result(ffi::mdb_env_create(&mut env))?;
-
-                if let Some(size) = self.map_size {
-                    if size % page_size::get() != 0 {
-                        let msg = format!(
-                            "map size ({}) must be a multiple of the system page size ({})",
-                            size,
-                            page_size::get()
-                        );
-                        return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
-                    }
-                    mdb_result(ffi::mdb_env_set_mapsize(env, size))?;
-                }
-
-                if let Some(readers) = self.max_readers {
-                    mdb_result(ffi::mdb_env_set_maxreaders(env, readers))?;
-                }
-
-                if let Some(dbs) = self.max_dbs {
-                    mdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
-                }
-
-                // When the `read-txn-no-tls` feature is enabled, we must force LMDB
-                // to avoid using the thread local storage, this way we allow users
-                // to use references of RoTxn between threads safely.
-                let flags = if cfg!(feature = "read-txn-no-tls") {
-                    // TODO make this a ZST flag on the Env and on RoTxn (make them Send when we can)
-                    self.flags | EnvFlags::NO_TLS
-                } else {
-                    self.flags
-                };
-
-                let result = ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600);
-                match mdb_result(result) {
-                    Ok(()) => {
-                        let env_ptr = NonNull::new(env).unwrap();
-                        let inserted = lock.insert(path.clone());
-                        debug_assert!(inserted);
-                        Ok(Env::new(env_ptr, path))
-                    }
-                    Err(e) => {
-                        ffi::mdb_env_close(env);
-                        Err(e.into())
-                    }
-                }
-            }
-        }
+        self.raw_open_with_encryption(
+            path.as_ref(),
+            #[cfg(master3)]
+            None,
+        )
     }
 
     /// Creates a blank new set of options ready for configuration and specifies that
@@ -337,12 +270,23 @@ impl EnvOpenOptions {
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,
     {
+        self.raw_open_with_encryption(
+            path.as_ref(),
+            Some((Some(encrypt_func_wrapper::<E>), &key, <E as AeadCore>::TagSize::U32)),
+        )
+        .map(|inner| EncryptedEnv { inner })
+    }
+
+    fn raw_open_with_encryption(
+        &self,
+        path: &Path,
+        #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
+    ) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();
 
-        let path = match canonicalize_path(path.as_ref()) {
+        let path = match canonicalize_path(path) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags.contains(EnvFlags::NO_SUB_DIR) {
-                    let path = path.as_ref();
                     match path.parent().zip(path.file_name()) {
                         Some((dir, file_name)) => canonicalize_path(dir)?.join(file_name),
                         None => return Err(err.into()),
@@ -363,13 +307,15 @@ impl EnvOpenOptions {
                 let mut env: *mut ffi::MDB_env = ptr::null_mut();
                 mdb_result(ffi::mdb_env_create(&mut env))?;
 
-                let encrypt_key = crate::into_val(&key);
-                mdb_result(ffi::mdb_env_set_encrypt(
-                    env,
-                    Some(encrypt_func_wrapper::<E>),
-                    &encrypt_key,
-                    <E as AeadCore>::TagSize::U32,
-                ))?;
+                #[cfg(master3)]
+                if let Some((encrypt_func, key, tag_size)) = enc {
+                    mdb_result(ffi::mdb_env_set_encrypt(
+                        env,
+                        encrypt_func,
+                        &crate::into_val(key),
+                        tag_size,
+                    ))?;
+                }
 
                 if let Some(size) = self.map_size {
                     if size % page_size::get() != 0 {
@@ -407,7 +353,7 @@ impl EnvOpenOptions {
                         let env_ptr = NonNull::new(env).unwrap();
                         let inserted = lock.insert(path.clone());
                         debug_assert!(inserted);
-                        Ok(EncryptedEnv { inner: Env::new(env_ptr, path) })
+                        Ok(Env::new(env_ptr, path))
                     }
                     Err(e) => {
                         ffi::mdb_env_close(env);
