@@ -5,7 +5,7 @@ use std::path::Path;
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
 use heed3::types::*;
-use heed3::{Database, EnvOpenOptions};
+use heed3::EnvOpenOptions;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("encrypt.mdb");
@@ -40,14 +40,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     db.put(&mut wtxn, key1, val1)?;
     db.put(&mut wtxn, key2, val2)?;
     wtxn.commit()?;
-    // env.prepare_for_closing().wait();
+    env.prepare_for_closing().wait();
 
     // We reopen the environment now
-    let env = unsafe { options.open(&env_path)? };
+    let env = unsafe { options.open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)? };
 
     // We check that the secret entries are correctly decrypted
     let mut rtxn = env.read_txn()?;
-    let db: Database<Str, Str> = env.open_database(&rtxn, Some("first"))?.unwrap();
+    let db = env.open_database::<Str, Str>(&rtxn, Some("first"))?.unwrap();
     let mut iter = db.iter(&mut rtxn)?;
     assert_eq!(iter.next().transpose()?, Some((key1, val1)));
     assert_eq!(iter.next().transpose()?, Some((key2, val2)));

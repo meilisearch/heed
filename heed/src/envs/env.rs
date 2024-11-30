@@ -3,13 +3,15 @@ use std::ffi::CString;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
+use std::sync::Arc;
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
+use synchronoise::SignalEvent;
 
 use super::{
-    custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvInfo, FlagSetMode,
-    IntegerComparator, OPENED_ENV,
+    custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvClosingEvent,
+    EnvInfo, FlagSetMode, IntegerComparator, OPENED_ENV,
 };
 use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
@@ -21,18 +23,24 @@ use crate::{
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
+#[derive(Clone)]
 pub struct Env {
-    env_ptr: NonNull<MDB_env>,
-    pub(crate) path: PathBuf,
+    inner: Arc<EnvInner>,
 }
 
 impl Env {
     pub(crate) fn new(env_ptr: NonNull<MDB_env>, path: PathBuf) -> Env {
-        Env { env_ptr, path }
+        Env {
+            inner: Arc::new(EnvInner {
+                env_ptr,
+                path,
+                signal_event: Arc::new(SignalEvent::manual(false)),
+            }),
+        }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.env_ptr
+        self.inner.env_ptr
     }
 
     /// The size of the data file on disk.
@@ -125,7 +133,7 @@ impl Env {
     /// Returns some basic informations about this environment.
     pub fn info(&self) -> EnvInfo {
         let mut raw_info = mem::MaybeUninit::uninit();
-        unsafe { ffi::mdb_env_info(self.env_ptr.as_ptr(), raw_info.as_mut_ptr()) };
+        unsafe { ffi::mdb_env_info(self.inner.env_ptr.as_ptr(), raw_info.as_mut_ptr()) };
         let raw_info = unsafe { raw_info.assume_init() };
 
         EnvInfo {
@@ -410,19 +418,28 @@ impl Env {
         option: CompactionOption,
     ) -> Result<()> {
         let flags = if let CompactionOption::Enabled = option { ffi::MDB_CP_COMPACT } else { 0 };
-        mdb_result(ffi::mdb_env_copyfd2(self.env_ptr.as_ptr(), fd, flags))?;
+        mdb_result(ffi::mdb_env_copyfd2(self.inner.env_ptr.as_ptr(), fd, flags))?;
         Ok(())
     }
 
     /// Flush the data buffers to disk.
     pub fn force_sync(&self) -> Result<()> {
-        unsafe { mdb_result(ffi::mdb_env_sync(self.env_ptr.as_ptr(), 1))? }
+        unsafe { mdb_result(ffi::mdb_env_sync(self.inner.env_ptr.as_ptr(), 1))? }
         Ok(())
     }
 
     /// Returns the canonicalized path where this env lives.
     pub fn path(&self) -> &Path {
-        &self.path
+        &self.inner.path
+    }
+
+    /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
+    /// multiple threads can wait on this event.
+    ///
+    /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
+    /// when all references are dropped, the last one will eventually close the environment.
+    pub fn prepare_for_closing(self) -> EnvClosingEvent {
+        EnvClosingEvent(self.inner.signal_event.clone())
     }
 
     /// Check for stale entries in the reader lock table and clear them.
@@ -430,7 +447,7 @@ impl Env {
     /// Returns the number of stale readers cleared.
     pub fn clear_stale_readers(&self) -> Result<usize> {
         let mut dead: i32 = 0;
-        unsafe { mdb_result(ffi::mdb_reader_check(self.env_ptr.as_ptr(), &mut dead))? }
+        unsafe { mdb_result(ffi::mdb_reader_check(self.inner.env_ptr.as_ptr(), &mut dead))? }
         // safety: The reader_check function asks for an i32, initialize it to zero
         //         and never decrements it. It is safe to use either an u32 or u64 (usize).
         Ok(dead as usize)
@@ -471,14 +488,22 @@ unsafe impl Sync for Env {}
 
 impl fmt::Debug for Env {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Env").field("path", &self.path.display()).finish_non_exhaustive()
+        f.debug_struct("Env").field("path", &self.inner.path.display()).finish_non_exhaustive()
     }
 }
 
-impl Drop for Env {
+#[derive(Clone)]
+pub(crate) struct EnvInner {
+    env_ptr: NonNull<MDB_env>,
+    signal_event: Arc<SignalEvent>,
+    pub(crate) path: PathBuf,
+}
+
+impl Drop for EnvInner {
     fn drop(&mut self) {
         unsafe { ffi::mdb_env_close(self.env_ptr.as_mut()) };
         let mut lock = OPENED_ENV.write().unwrap();
-        debug_assert!(lock.remove(&self.path));
+        let removed = lock.remove(&self.path);
+        debug_assert!(removed);
     }
 }

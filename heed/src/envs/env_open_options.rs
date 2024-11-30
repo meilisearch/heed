@@ -213,7 +213,8 @@ impl EnvOpenOptions {
                 match mdb_result(result) {
                     Ok(()) => {
                         let env_ptr = NonNull::new(env).unwrap();
-                        debug_assert!(lock.insert(path.clone()));
+                        let inserted = lock.insert(path.clone());
+                        debug_assert!(inserted);
                         Ok(Env::new(env_ptr, path))
                     }
                     Err(e) => {
@@ -404,7 +405,8 @@ impl EnvOpenOptions {
                 match mdb_result(result) {
                     Ok(()) => {
                         let env_ptr = NonNull::new(env).unwrap();
-                        debug_assert!(lock.insert(path.clone()));
+                        let inserted = lock.insert(path.clone());
+                        debug_assert!(inserted);
                         Ok(EncryptedEnv { inner: Env::new(env_ptr, path) })
                     }
                     Err(e) => {

@@ -2,20 +2,22 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::fs::{File, Metadata};
-use std::io;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, BorrowedFd, RawFd};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::abort;
-use std::sync::{LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
+use std::time::Duration;
 #[cfg(windows)]
 use std::{
     ffi::OsStr,
     os::windows::io::{AsRawHandle as _, BorrowedHandle, RawHandle},
 };
+use std::{fmt, io};
 
 use heed_traits::{Comparator, LexicographicComparator};
+use synchronoise::event::SignalEvent;
 
 use crate::mdb::ffi;
 
@@ -48,6 +50,36 @@ pub struct EnvInfo {
     pub maximum_number_of_readers: u32,
     /// Number of reader slots used in the environment.
     pub number_of_readers: u32,
+}
+
+/// A structure that can be used to wait for the closing event.
+/// Multiple threads can wait on this event.
+#[derive(Clone)]
+pub struct EnvClosingEvent(Arc<SignalEvent>);
+
+impl EnvClosingEvent {
+    /// Blocks this thread until the environment is effectively closed.
+    ///
+    /// # Safety
+    ///
+    /// Make sure that you don't have any copy of the environment in the thread
+    /// that is waiting for a close event. If you do, you will have a deadlock.
+    pub fn wait(&self) {
+        self.0.wait()
+    }
+
+    /// Blocks this thread until either the environment has been closed
+    /// or until the timeout elapses. Returns `true` if the environment
+    /// has been effectively closed.
+    pub fn wait_timeout(&self, timeout: Duration) -> bool {
+        self.0.wait_timeout(timeout)
+    }
+}
+
+impl fmt::Debug for EnvClosingEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("EnvClosingEvent").finish()
+    }
 }
 
 // Thanks to the mozilla/rkv project

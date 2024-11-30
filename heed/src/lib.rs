@@ -85,8 +85,8 @@ pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 #[cfg(master3)]
 pub use self::envs::EncryptedEnv;
 pub use self::envs::{
-    CompactionOption, DefaultComparator, Env, EnvInfo, EnvOpenOptions, FlagSetMode,
-    IntegerComparator,
+    CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions,
+    FlagSetMode, IntegerComparator,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,

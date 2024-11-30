@@ -6,12 +6,13 @@ use std::path::Path;
 use aead::generic_array::typenum::Unsigned;
 use aead::{AeadMutInPlace, Key, KeyInit, Nonce, Tag};
 
-use super::{Env, EnvInfo, FlagSetMode};
+use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::mdb::ffi::{self};
 use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
+#[derive(Clone)]
 pub struct EncryptedEnv {
     pub(crate) inner: Env,
 }
@@ -278,6 +279,15 @@ impl EncryptedEnv {
         self.inner.path()
     }
 
+    /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
+    /// multiple threads can wait on this event.
+    ///
+    /// Make sure that you drop all the copies of `Env`s you have, env closing are triggered
+    /// when all references are dropped, the last one will eventually close the environment.
+    pub fn prepare_for_closing(self) -> EnvClosingEvent {
+        self.inner.prepare_for_closing()
+    }
+
     /// Check for stale entries in the reader lock table and clear them.
     ///
     /// Returns the number of stale readers cleared.
@@ -311,7 +321,7 @@ unsafe impl Sync for EncryptedEnv {}
 impl fmt::Debug for EncryptedEnv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EncryptedEnv")
-            .field("path", &self.inner.path.display())
+            .field("path", &self.inner.path().display())
             .finish_non_exhaustive()
     }
 }

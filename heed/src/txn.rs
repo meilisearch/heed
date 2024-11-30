@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
@@ -47,7 +48,7 @@ use crate::Result;
 pub struct RoTxn<'e> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
-    env: &'e Env,
+    env: Cow<'e, Env>,
 }
 
 impl<'e> RoTxn<'e> {
@@ -63,24 +64,22 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env })
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) })
     }
 
-    // TODO replace this by an ArcRoTxn
     pub(crate) fn static_read_txn(env: Env) -> Result<RoTxn<'static>> {
-        // let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
-        // unsafe {
-        //     mdb_result(ffi::mdb_txn_begin(
-        //         env.env_mut_ptr(),
-        //         ptr::null_mut(),
-        //         ffi::MDB_RDONLY,
-        //         &mut txn,
-        //     ))?
-        // };
+        unsafe {
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr().as_mut(),
+                ptr::null_mut(),
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
+        };
 
-        // Ok(RoTxn { txn, env: Cow::Owned(env) })
-        todo!()
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env) })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -172,7 +171,7 @@ impl<'p> RwTxn<'p> {
             ))?
         };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
@@ -183,7 +182,7 @@ impl<'p> RwTxn<'p> {
             mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
         };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env } })
+        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
