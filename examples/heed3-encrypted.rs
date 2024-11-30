@@ -4,8 +4,8 @@ use std::path::Path;
 
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
-use heed3_encryption::types::*;
-use heed3_encryption::{Database, EnvOpenOptions};
+use heed3::types::*;
+use heed3::{Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = Path::new("target").join("encrypt.mdb");
@@ -21,12 +21,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
 
     // We open the environment
-    let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
+    let mut options = EnvOpenOptions::new();
     let env = unsafe {
         options
             .map_size(10 * 1024 * 1024) // 10MB
             .max_dbs(3)
-            .open(&env_path)?
+            .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
     };
 
     let key1 = "first-key";
@@ -36,11 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We create database and write secret values in it
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    let db = env.create_database::<Str, Str>(&mut wtxn, Some("first"))?;
     db.put(&mut wtxn, key1, val1)?;
     db.put(&mut wtxn, key2, val2)?;
     wtxn.commit()?;
-    env.prepare_for_closing().wait();
+    // env.prepare_for_closing().wait();
 
     // We reopen the environment now
     let env = unsafe { options.open(&env_path)? };

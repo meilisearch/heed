@@ -47,7 +47,7 @@ use crate::Result;
 pub struct RoTxn<'e> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
-    env: Cow<'e, Env>,
+    env: &'e Env,
 }
 
 impl<'e> RoTxn<'e> {

@@ -9,7 +9,7 @@ use heed_traits::Comparator;
 
 use super::{
     custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvInfo, FlagSetMode,
-    OPENED_ENV,
+    IntegerComparator, OPENED_ENV,
 };
 use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
@@ -158,8 +158,7 @@ impl Env {
 
         let rtxn = self.read_txn()?;
         // Open the main database
-        let raw_txn = unsafe { rtxn.txn.unwrap().as_mut() };
-        let dbi = self.raw_open_dbi::<DefaultComparator>(raw_txn, None, 0)?;
+        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), None, 0)?;
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -172,8 +171,9 @@ impl Env {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            let raw_txn = unsafe { rtxn.txn.unwrap().as_mut() };
-            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(raw_txn, Some(&key), 0) {
+            if let Ok(dbi) =
+                self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), Some(&key), 0)
+            {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe {
                     mdb_result(ffi::mdb_stat(rtxn.txn.unwrap().as_mut(), dbi, stat.as_mut_ptr()))?
@@ -268,7 +268,7 @@ impl Env {
 
     fn raw_open_dbi<C: Comparator + 'static>(
         &self,
-        raw_txn: NonNull<ffi::MDB_txn>,
+        mut raw_txn: NonNull<ffi::MDB_txn>,
         name: Option<&str>,
         flags: u32,
     ) -> std::result::Result<u32, crate::mdb::lmdb_error::Error> {
@@ -282,13 +282,17 @@ impl Env {
         // safety: The name cstring is cloned by LMDB, we can drop it after.
         //         If a read-only is used with the MDB_CREATE flag, LMDB will throw an error.
         unsafe {
-            mdb_result(ffi::mdb_dbi_open(raw_txn, name_ptr, flags, &mut dbi))?;
+            mdb_result(ffi::mdb_dbi_open(raw_txn.as_mut(), name_ptr, flags, &mut dbi))?;
             let cmp_type_id = TypeId::of::<C>();
 
             if cmp_type_id != TypeId::of::<DefaultComparator>()
                 && cmp_type_id != TypeId::of::<IntegerComparator>()
             {
-                mdb_result(ffi::mdb_set_compare(raw_txn, dbi, Some(custom_key_cmp_wrapper::<C>)))?;
+                mdb_result(ffi::mdb_set_compare(
+                    raw_txn.as_mut(),
+                    dbi,
+                    Some(custom_key_cmp_wrapper::<C>),
+                ))?;
             }
         };
 

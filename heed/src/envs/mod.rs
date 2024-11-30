@@ -8,9 +8,7 @@ use std::os::unix::io::{AsRawFd, BorrowedFd, RawFd};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::abort;
-use std::ptr::NonNull;
 use std::sync::{LazyLock, RwLock};
-use std::time::Duration;
 #[cfg(windows)]
 use std::{
     ffi::OsStr,
@@ -178,6 +176,39 @@ impl LexicographicComparator for DefaultComparator {
     #[inline]
     fn min_elem() -> u8 {
         u8::MIN
+    }
+}
+
+/// A representation of LMDB's `MDB_INTEGERKEY` comparator behavior.
+///
+/// This enum is used to indicate a table should be sorted by the keys numeric
+/// value in native byte order. When a [`Database`] is created or opened with
+/// [`IntegerComparator`], it signifies that the comparator should not be explicitly
+/// set via [`ffi::mdb_set_compare`], instead the flag [`AllDatabaseFlags::INTEGER_KEY`]
+/// is set on the table.
+///
+/// This can only be used on certain types: either `u32` or `usize`.
+/// The keys must all be of the same size.
+pub enum IntegerComparator {}
+
+impl Comparator for IntegerComparator {
+    fn compare(a: &[u8], b: &[u8]) -> Ordering {
+        #[cfg(target_endian = "big")]
+        return a.cmp(b);
+
+        #[cfg(target_endian = "little")]
+        {
+            let len = a.len();
+
+            for i in (0..len).rev() {
+                match a[i].cmp(&b[i]) {
+                    Ordering::Equal => continue,
+                    other => return other,
+                }
+            }
+
+            Ordering::Equal
+        }
     }
 }
 

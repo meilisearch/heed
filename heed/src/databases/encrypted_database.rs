@@ -1015,9 +1015,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         self.inner.rev_iter_mut(txn)
     }
 
-    /// Return a lexicographically ordered iterator of a range of key-value pairs in this database.
+    /// Return an ordered iterator of a range of key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1062,7 +1062,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn,
         range: &'a R,
-    ) -> Result<RoRange<'txn, KC, DC>>
+    ) -> Result<RoRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1070,10 +1070,10 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         self.inner.range(txn, range)
     }
 
-    /// Return a mutable lexicographically ordered iterator of a range of
+    /// Return a mutable ordered iterator of a range of
     /// key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// ```
     /// # use std::fs;
@@ -1128,7 +1128,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RwTxn,
         range: &'a R,
-    ) -> Result<RwRange<'txn, KC, DC>>
+    ) -> Result<RwRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1136,10 +1136,10 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         self.inner.range_mut(txn, range)
     }
 
-    /// Return a reversed lexicographically ordered iterator of a range of key-value
+    /// Return a reverse ordered iterator of a range of key-value
     /// pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// You can make this iterator `Send`able between threads by
     /// using the `read-txn-no-tls` crate feature.
@@ -1184,7 +1184,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, KC, DC>>
+    ) -> Result<RoRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1192,10 +1192,10 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         self.inner.rev_range(txn, range)
     }
 
-    /// Return a mutable reversed lexicographically ordered iterator of a range of
+    /// Return a mutable reverse ordered iterator of a range of
     /// key-value pairs in this database.
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// ```
     /// # use std::fs;
@@ -1250,7 +1250,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RwTxn,
         range: &'a R,
-    ) -> Result<RwRevRange<'txn, KC, DC>>
+    ) -> Result<RwRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -2020,7 +2020,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     ///
     /// Prefer using [`clear`] instead of a call to this method with a full range ([`..`]).
     ///
-    /// Comparisons are made by using the bytes representation of the key.
+    /// Comparisons are made by using the comparator `C`.
     ///
     /// [`clear`]: crate::Database::clear
     /// [`..`]: std::ops::RangeFull
@@ -2068,6 +2068,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     pub fn delete_range<'a, 'txn, R>(&self, txn: &'txn mut RwTxn, range: &'a R) -> Result<usize>
     where
         KC: BytesEncode<'a> + BytesDecode<'txn>,
+        C: Comparator,
         R: RangeBounds<KC::EItem>,
     {
         self.inner.delete_range(txn, range)
