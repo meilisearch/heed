@@ -11,7 +11,7 @@ pub enum Bytes {}
 impl<'a> BytesEncode<'a> for Bytes {
     type EItem = [u8];
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError> {
         Ok(Cow::Borrowed(item))
     }
 }
