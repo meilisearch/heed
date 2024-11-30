@@ -12,7 +12,7 @@ use std::{io, ptr};
 use aead::{generic_array::typenum::Unsigned, AeadCore, AeadMutInPlace, Key, KeyInit};
 
 #[cfg(master3)]
-use super::encrypted_env::encrypt_func_wrapper;
+use super::encrypted_env::{encrypt_func_wrapper, EncryptedEnv};
 use super::env::Env;
 use super::{canonicalize_path, OPENED_ENV};
 #[cfg(windows)]
@@ -331,7 +331,7 @@ impl EnvOpenOptions {
     /// # Ok(()) }
     /// ```
     #[cfg(master3)]
-    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<Env>
+    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv>
     where
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,
@@ -405,7 +405,7 @@ impl EnvOpenOptions {
                     Ok(()) => {
                         let env_ptr = NonNull::new(env).unwrap();
                         debug_assert!(lock.insert(path.clone()));
-                        Ok(Env::new(env_ptr, path))
+                        Ok(EncryptedEnv { inner: Env::new(env_ptr, path) })
                     }
                     Err(e) => {
                         ffi::mdb_env_close(env);
