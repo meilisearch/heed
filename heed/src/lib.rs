@@ -153,7 +153,8 @@ pub enum Error {
     Encoding(BoxedError),
     /// Decoding error.
     Decoding(BoxedError),
-    /// The environment is already open; close it to be able to open it again.
+    /// The environment is already open in this program;
+    /// close it to be able to open it again with different options.
     EnvAlreadyOpened,
 }
 
@@ -164,9 +165,10 @@ impl fmt::Display for Error {
             Error::Mdb(error) => write!(f, "{error}"),
             Error::Encoding(error) => write!(f, "error while encoding: {error}"),
             Error::Decoding(error) => write!(f, "error while decoding: {error}"),
-            Error::EnvAlreadyOpened => {
-                f.write_str("environment already open; close it to be able to open it again")
-            }
+            Error::EnvAlreadyOpened => f.write_str(
+                "environment already open in this program; \
+                close it to be able to open it again with different options",
+            ),
         }
     }
 }
