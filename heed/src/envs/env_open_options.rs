@@ -6,10 +6,12 @@ use std::io::ErrorKind::NotFound;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::NonNull;
+use std::sync::Arc;
 use std::{io, ptr};
 
 #[cfg(master3)]
 use aead::{generic_array::typenum::Unsigned, AeadCore, AeadMutInPlace, Key, KeyInit};
+use synchronoise::SignalEvent;
 
 #[cfg(master3)]
 use super::encrypted_env::{encrypt_func_wrapper, EncryptedEnv};
@@ -297,7 +299,7 @@ impl EnvOpenOptions {
             Ok(path) => path,
         };
 
-        if lock.contains(&path) {
+        if lock.contains_key(&path) {
             Err(Error::EnvAlreadyOpened)
         } else {
             let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -350,9 +352,10 @@ impl EnvOpenOptions {
                 match mdb_result(result) {
                     Ok(()) => {
                         let env_ptr = NonNull::new(env).unwrap();
-                        let inserted = lock.insert(path.clone());
-                        debug_assert!(inserted);
-                        Ok(Env::new(env_ptr, path))
+                        let signal_event = Arc::new(SignalEvent::manual(false));
+                        let inserted = lock.insert(path.clone(), signal_event.clone());
+                        debug_assert!(inserted.is_none());
+                        Ok(Env::new(env_ptr, path, signal_event))
                     }
                     Err(e) => {
                         ffi::mdb_env_close(env);

@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::fs::{File, Metadata};
 #[cfg(unix)]
@@ -33,7 +33,14 @@ pub use env_open_options::EnvOpenOptions;
 
 /// Records the current list of opened environments for tracking purposes. The canonical
 /// path of an environment is removed when either an `Env` or `EncryptedEnv` is closed.
-static OPENED_ENV: LazyLock<RwLock<HashSet<PathBuf>>> = LazyLock::new(RwLock::default);
+static OPENED_ENV: LazyLock<RwLock<HashMap<PathBuf, Arc<SignalEvent>>>> =
+    LazyLock::new(RwLock::default);
+
+/// Returns a struct that allows to wait for the effective closing of an environment.
+pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
+    let lock = OPENED_ENV.read().unwrap();
+    lock.get(path.as_ref()).map(|signal_event| EnvClosingEvent(signal_event.clone()))
+}
 
 /// Contains information about the environment.
 #[derive(Debug, Clone, Copy)]
