@@ -1,3 +1,3 @@
-# lmdb-master-sys
+# lmdb-master3-sys
 
-Rust bindings for liblmdb on the mdb.master branch.
+Rust bindings for liblmdb on the mdb.master3 branch.

@@ -5,9 +5,16 @@
     html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
-//! `heed` is a high-level wrapper of [LMDB].
+//! `heed` and `heed3` are high-level wrappers of [LMDB].
 //!
-//! The [cookbook] will give you a variety of complete Rust programs to use with heed.
+//! - `heed` is a wrapper around LMDB on the `mdb.master` branch,
+//! - `heed3` derives from the `heed` wrapper but on the `mdb.master3` branch.
+//!
+//! The `heed3` crate will be stable once the LMDB version on the `mdb.master3` branch
+//! will be officially released. It features encryption-at-rest and checksumming features
+//! that the `heed` crate doesn't.
+//!
+//! The [cookbook] will give you a variety of complete Rust programs to use with `heed`.
 //!
 //! ----
 //!

@@ -1,5 +1,5 @@
 <p align="center"><img width="280px" src="https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png"></a></p>
-<h1 align="center" >heed</h1>
+<h1 align="center" >heed & heed3</h1>
 
 [![License](https://img.shields.io/badge/license-MIT-green)](#LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/heed)](https://crates.io/crates/heed)
@@ -7,11 +7,11 @@
 [![dependency status](https://deps.rs/repo/github/meilisearch/heed/status.svg)](https://deps.rs/repo/github/meilisearch/heed)
 [![Build](https://github.com/meilisearch/heed/actions/workflows/rust.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/rust.yml)
 
-A Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) abstraction with minimal overhead. This library enables the storage of various Rust types within LMDB, extending support to include Serde-compatible types.
+A Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) abstraction with minimal overhead. This library enables the storage of various Rust types within LMDB, extending support to include Serde-compatible types. It not only supports the LMDB `mdb.master` branch but also the `mdb.master3` branch which features encryption-at-rest and checksumming.
 
 ## Simple Example Usage
 
-Here is an example on how to store and read entries into LMDB in a safe and ACID way. For usage examples, see [heed/examples/](heed/examples/). To see more advanced usage techniques go check our [Cookbook](https://docs.rs/heed/latest/heed/cookbook/index.html).
+Here is an example on how to store and read entries into LMDB in a safe and ACID way. For usage examples, see [examples/](examples/). To see more advanced usage techniques go check our [Cookbook](https://docs.rs/heed/latest/heed/cookbook/index.html).
 
 ```rust
 use std::fs;

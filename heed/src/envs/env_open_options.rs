@@ -161,7 +161,7 @@ impl EnvOpenOptions {
     }
 
     /// Creates a blank new set of options ready for configuration and specifies that
-    /// the [`Env`] will be encrypted using the `E` algorithm with the given `key`.
+    /// the [`Env`] will be encrypted-at-rest using the `E` algorithm with the given `key`.
     ///
     /// You can find more compatible algorithms on [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
     ///
