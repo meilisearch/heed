@@ -51,7 +51,7 @@ jobs:
       - name: Run cargo check
         run: |
           cargo clean
-          ./convert-to-heed3.sh
+          bash convert-to-heed3.sh
           cargo check -p heed3
 
   check_all_features:
@@ -104,7 +104,7 @@ jobs:
       - name: Run cargo test
         run: |
           cargo clean
-          ./convert-to-heed3.sh
+          bash convert-to-heed3.sh
           cargo check --all-features -p heed3
 
   examples:
@@ -155,7 +155,7 @@ jobs:
       - name: Run the examples
         run: |
           cargo clean
-          ./convert-to-heed3.sh
+          bash convert-to-heed3.sh
           cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
 
   fmt:
