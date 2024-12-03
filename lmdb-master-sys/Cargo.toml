@@ -27,7 +27,7 @@ doctest = false
 libc = "0.2.167"
 
 [build-dependencies]
-bindgen = { version = "0.69.5", default-features = false, optional = true, features = ["runtime"] }
+bindgen = { version = "0.70.1", default-features = false, optional = true, features = ["runtime"] }
 cc = "1.2.2"
 doxygen-rs = "0.4.2"
 
