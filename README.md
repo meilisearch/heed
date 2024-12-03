@@ -46,6 +46,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Working with two Crates: heed and heed3
+
+The heed and heed3 crates manage a shared codebase. Within the heed3 folder, you can find the Cargo.toml specific to the heed3 crate.
+To facilitate work on heed3, utilize the `convert-to-heed3.sh` script.
+
+This script conveniently moves the `heed3/Cargo.toml` file to the `heed/` folder, updates the `heed::` references to `heed3::`, and generates a commit for easy rollback if needed.
+
 ## Building from Source
 
 You can use this command to clone the repository:
