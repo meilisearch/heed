@@ -54,7 +54,7 @@ jobs:
           bash convert-to-heed3.sh
           cargo check -p heed3
 
-  check_all_features:
+  check-all-features:
     name: Check all the features of the heed project
     runs-on: ${{ matrix.os }}
     env:
@@ -80,7 +80,7 @@ jobs:
           cargo clean
           cargo check --all-features -p heed
 
-  check_all_features-heed3:
+  check-all-features-heed3:
     name: Check all the features of the heed3 project
     runs-on: ${{ matrix.os }}
     env:
@@ -171,3 +171,11 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: cargo fmt --check
+
+  no-heed3-in-heed-folder:
+    name: Ensure heed3 is not erasing heed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check name is heed with grep
+        run: grep -q 'name = "heed"' heed/Cargo.toml
