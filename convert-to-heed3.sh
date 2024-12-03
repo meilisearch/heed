@@ -28,8 +28,8 @@ for file in $(find heed/src -type f -name "*.rs"); do
 done
 
 # Make it easier to rollback by doing a commit
-git config --global user.email "ci@github.com"
-git config --global user.name "The CI"
+git config --local user.email "ci@github.com"
+git config --local user.name "The CI"
 git commit -am 'remove-me: heed3 changes generate by the convert-to-heed3.sh script'
 
 echo "Heed3 crate setup completed successfully. Configurations for the heed crate have been copied and modified."
