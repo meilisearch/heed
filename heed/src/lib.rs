@@ -5,9 +5,16 @@
     html_logo_url = "https://raw.githubusercontent.com/meilisearch/heed/main/assets/heed-pigeon-logo.png?raw=true"
 )]
 
-//! `heed` is a high-level wrapper of [LMDB].
+//! `heed` and `heed3` are high-level wrappers of [LMDB].
 //!
-//! The [cookbook] will give you a variety of complete Rust programs to use with heed.
+//! - `heed` is a wrapper around LMDB on the `mdb.master` branch,
+//! - `heed3` derives from the `heed` wrapper but on the `mdb.master3` branch.
+//!
+//! The `heed3` crate will be stable once the LMDB version on the `mdb.master3` branch
+//! will be officially released. It features encryption-at-rest and checksumming features
+//! that the `heed` crate doesn't.
+//!
+//! The [cookbook] will give you a variety of complete Rust programs to use with `heed`.
 //!
 //! ----
 //!
@@ -64,8 +71,8 @@
 
 pub mod cookbook;
 mod cursor;
-mod database;
-mod env;
+mod databases;
+mod envs;
 pub mod iteration_method;
 mod iterator;
 mod mdb;
@@ -79,8 +86,12 @@ use heed_traits as traits;
 pub use {byteorder, heed_types as types};
 
 use self::cursor::{RoCursor, RwCursor};
-pub use self::database::{Database, DatabaseOpenOptions, DatabaseStat};
-pub use self::env::{
+pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
+#[cfg(master3)]
+pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
+#[cfg(master3)]
+pub use self::envs::EncryptedEnv;
+pub use self::envs::{
     env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
     EnvOpenOptions, FlagSetMode, IntegerComparator,
 };
@@ -149,30 +160,22 @@ pub enum Error {
     Encoding(BoxedError),
     /// Decoding error.
     Decoding(BoxedError),
-    /// Database closing in progress.
-    DatabaseClosing,
-    /// Attempt to open [`Env`] with different options.
-    BadOpenOptions {
-        /// The options that were used to originally open this env.
-        options: EnvOpenOptions,
-        /// The env opened with the original options.
-        env: Env,
-    },
+    /// The environment is already open in this program;
+    /// close it to be able to open it again with different options.
+    EnvAlreadyOpened,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Io(error) => write!(f, "{}", error),
-            Error::Mdb(error) => write!(f, "{}", error),
-            Error::Encoding(error) => write!(f, "error while encoding: {}", error),
-            Error::Decoding(error) => write!(f, "error while decoding: {}", error),
-            Error::DatabaseClosing => {
-                f.write_str("database is in a closing phase, you can't open it at the same time")
-            }
-            Error::BadOpenOptions { .. } => {
-                f.write_str("an environment is already opened with different options")
-            }
+            Error::Io(error) => write!(f, "{error}"),
+            Error::Mdb(error) => write!(f, "{error}"),
+            Error::Encoding(error) => write!(f, "error while encoding: {error}"),
+            Error::Decoding(error) => write!(f, "error while decoding: {error}"),
+            Error::EnvAlreadyOpened => f.write_str(
+                "environment already open in this program; \
+                close it to be able to open it again with different options",
+            ),
         }
     }
 }
@@ -208,7 +211,7 @@ pub enum Unspecified {}
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
-            $database.env_ident == $txn.env_mut_ptr() as usize,
+            $database.env_ident == unsafe { $txn.env_mut_ptr().as_mut() as *mut _ as usize },
             "The database environment doesn't match the transaction's environment"
         );
     };

@@ -14,7 +14,7 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError> {
         bincode::serialize(item).map(Cow::Owned).map_err(Into::into)
     }
 }

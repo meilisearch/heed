@@ -10,6 +10,11 @@ pub use ffi::{
     MDB_cursor, MDB_dbi, MDB_env, MDB_stat, MDB_txn, MDB_val, MDB_CP_COMPACT, MDB_CURRENT,
     MDB_RDONLY, MDB_RESERVE,
 };
+#[cfg(master3)]
+pub use ffi::{mdb_env_set_encrypt, MDB_enc_func};
+#[cfg(master3)]
+use lmdb_master3_sys as ffi;
+#[cfg(not(master3))]
 use lmdb_master_sys as ffi;
 
 pub mod cursor_op {

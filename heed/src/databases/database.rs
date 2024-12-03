@@ -6,7 +6,7 @@ use heed_traits::{Comparator, LexicographicComparator};
 use types::{DecodeIgnore, LazyDecode};
 
 use crate::cursor::MoveOperation;
-use crate::env::DefaultComparator;
+use crate::envs::DefaultComparator;
 use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
@@ -140,7 +140,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
         assert_eq_env_txn!(self.env, rtxn);
 
         match self.env.raw_init_database::<C>(rtxn.txn.unwrap(), self.name, self.flags) {
-            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr() as _, dbi))),
+            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
         }
@@ -165,7 +165,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
         match self.env.raw_init_database::<C>(wtxn.txn.txn.unwrap(), self.name, flags) {
-            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr() as _, dbi)),
+            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
     }
@@ -350,10 +350,14 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = mem::MaybeUninit::uninit();
-        let mut txn = txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_get(txn.as_mut(), self.dbi, &mut key_val, data_val.as_mut_ptr()))
+            mdb_result(ffi::mdb_get(
+                txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                data_val.as_mut_ptr(),
+            ))
         };
 
         match result {
@@ -955,9 +959,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
-        let mut txn = txn.txn.unwrap();
-        let result =
-            unsafe { mdb_result(ffi::mdb_stat(txn.as_mut(), self.dbi, db_stat.as_mut_ptr())) };
+        let result = unsafe {
+            mdb_result(ffi::mdb_stat(txn.txn.unwrap().as_mut(), self.dbi, db_stat.as_mut_ptr()))
+        };
 
         match result {
             Ok(()) => {
@@ -1122,7 +1126,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
-    /// Return a mutable reversed lexicographically ordered iterator of all key-value\
+    /// Return a mutable reverse ordered iterator of all key-value\
     /// pairs in this database.
     ///
     /// ```
@@ -1835,10 +1839,15 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = 0;
-        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
         }
 
         Ok(())
@@ -1897,10 +1906,15 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut reserved = ffi::reserve_size_val(data_size);
         let flags = ffi::MDB_RESERVE;
-        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut reserved,
+                flags,
+            ))?
         }
 
         let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
@@ -1990,10 +2004,15 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = flags.bits();
-        let mut txn = txn.txn.txn.unwrap();
 
         unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))?
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))?
         }
 
         Ok(())
@@ -2098,10 +2117,15 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
         let flags = (flags | PutFlags::NO_OVERWRITE).bits();
-        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut data_val, flags))
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+                flags,
+            ))
         };
 
         match result {
@@ -2121,7 +2145,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// written to disk, or if a value already exists for the key, returns the previous value.
     ///
     /// The entry is always written with the [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and
-    /// [`MDB_RESERVE`](lmdb_master_sys::MDB_RESERVE) flags.
+    /// [`MDB_RESERVE`](ffi::MDB_RESERVE) flags.
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
@@ -2184,7 +2208,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// written to disk, or if a value already exists for the key, returns the previous value.
     ///
     /// The entry is written with the specified flags, in addition to
-    /// [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and [`MDB_RESERVE`](lmdb_master_sys::MDB_RESERVE)
+    /// [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and [`MDB_RESERVE`](ffi::MDB_RESERVE)
     /// which are always used.
     ///
     /// ```
@@ -2248,11 +2272,16 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut reserved = ffi::reserve_size_val(data_size);
-        let flags = (flags | PutFlags::NO_OVERWRITE).bits() | lmdb_master_sys::MDB_RESERVE;
-        let mut txn = txn.txn.txn.unwrap();
+        let flags = (flags | PutFlags::NO_OVERWRITE).bits() | ffi::MDB_RESERVE;
 
         let result = unsafe {
-            mdb_result(ffi::mdb_put(txn.as_mut(), self.dbi, &mut key_val, &mut reserved, flags))
+            mdb_result(ffi::mdb_put(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut reserved,
+                flags,
+            ))
         };
 
         match result {
@@ -2327,10 +2356,14 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, ptr::null_mut()))
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                ptr::null_mut(),
+            ))
         };
 
         match result {
@@ -2415,10 +2448,14 @@ impl<KC, DC, C> Database<KC, DC, C> {
         let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
         let mut key_val = unsafe { crate::into_val(&key_bytes) };
         let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let mut txn = txn.txn.txn.unwrap();
 
         let result = unsafe {
-            mdb_result(ffi::mdb_del(txn.as_mut(), self.dbi, &mut key_val, &mut data_val))
+            mdb_result(ffi::mdb_del(
+                txn.txn.txn.unwrap().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut data_val,
+            ))
         };
 
         match result {
@@ -2542,9 +2579,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// ```
     pub fn clear(&self, txn: &mut RwTxn) -> Result<()> {
         assert_eq_env_db_txn!(self, txn);
-        let mut txn = txn.txn.txn.unwrap();
 
-        unsafe { mdb_result(ffi::mdb_drop(txn.as_mut(), self.dbi, 0)).map_err(Into::into) }
+        unsafe {
+            mdb_result(ffi::mdb_drop(txn.txn.txn.unwrap().as_mut(), self.dbi, 0))
+                .map_err(Into::into)
+        }
     }
 
     /// Change the codec types of this database, specifying the codecs.
@@ -2626,31 +2665,13 @@ impl<KC, DC, C> fmt::Debug for Database<KC, DC, C> {
     }
 }
 
-/// Statistics for a database in the environment.
-#[derive(Debug, Clone, Copy)]
-pub struct DatabaseStat {
-    /// Size of a database page.
-    /// This is currently the same for all databases.
-    pub page_size: u32,
-    /// Depth (height) of the B-tree.
-    pub depth: u32,
-    /// Number of internal (non-leaf) pages
-    pub branch_pages: usize,
-    /// Number of leaf pages.
-    pub leaf_pages: usize,
-    /// Number of overflow pages.
-    pub overflow_pages: usize,
-    /// Number of data items.
-    pub entries: usize,
-}
-
 #[cfg(test)]
 mod tests {
     use byteorder::*;
     use heed_types::*;
 
     use super::*;
-    use crate::env::IntegerComparator;
+    use crate::IntegerComparator;
 
     #[test]
     fn put_overwrite() -> Result<()> {
@@ -2675,8 +2696,8 @@ mod tests {
     fn longer_keys() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let mut txn = envs.write_txn()?;
+        let db = envs.create_database::<Bytes, Bytes>(&mut txn, None)?;
 
         // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
         let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";

@@ -28,7 +28,33 @@ jobs:
           cargo clean
           cargo test
 
-  check_all_features:
+  check-heed3:
+    name: Check the heed3 project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo check
+        run: |
+          cargo clean
+          bash convert-to-heed3.sh
+          cargo check -p heed3
+
+  check-all-features:
     name: Check all the features of the heed project
     runs-on: ${{ matrix.os }}
     env:
@@ -51,9 +77,35 @@ jobs:
           override: true
       - name: Run cargo test
         run: |
-          cd heed
           cargo clean
-          cargo check --all-features
+          cargo check --all-features -p heed
+
+  check-all-features-heed3:
+    name: Check all the features of the heed3 project
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -D warnings
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        run: |
+          cargo clean
+          bash convert-to-heed3.sh
+          cargo check --all-features -p heed3
 
   examples:
     name: Run the heed examples
@@ -81,6 +133,31 @@ jobs:
           cargo run --example 2>&1 | grep -E '^ ' | awk '!/rmp-serde/' | xargs -n1 cargo run --example
           cargo run --example rmp-serde --features serde-rmp
 
+  heed3-examples:
+    name: Run the heed3 examples
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run the examples
+        run: |
+          cargo clean
+          bash convert-to-heed3.sh
+          cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
+
   fmt:
     name: Ensure the heed project is formatted
     runs-on: ubuntu-latest
@@ -94,3 +171,11 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: cargo fmt --check
+
+  no-heed3-in-heed-folder:
+    name: Ensure heed3 is not erasing heed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check name is heed with grep
+        run: grep -q 'name = "heed"' heed/Cargo.toml
