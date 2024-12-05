@@ -19,6 +19,8 @@ bitflags! {
         const NO_SUB_DIR = ffi::MDB_NOSUBDIR;
         /// Don't fsync after commit.
         const NO_SYNC = ffi::MDB_NOSYNC;
+        /// Open the previous transaction.
+        const PREVSNAPSHOT = ffi::MDB_PREVSNAPSHOT;
         /// Read only.
         const READ_ONLY = ffi::MDB_RDONLY;
         /// Don't fsync metapage after commit.
