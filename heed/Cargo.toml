@@ -9,6 +9,15 @@ keywords = ["lmdb", "database", "storage", "typed"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
+include = [
+  "../examples/all-types.rs",
+  "../examples/clear-database.rs",
+  "../examples/cursor-append.rs",
+  "../examples/custom-comparator.rs",
+  "../examples/multi-env.rs",
+  "../examples/nested.rs",
+  "../examples/rmp-serde.rs"
+]
 
 [dependencies]
 bitflags = { version = "2.6.0", features = ["serde"] }

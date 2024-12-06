@@ -9,6 +9,10 @@ keywords = ["lmdb", "database", "storage", "typed", "encryption"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
+include = [
+  "../examples/heed3-encrypted.rs",
+  "../examples/heed3-all-types.rs"
+]
 
 [dependencies]
 # TODO update dependencies
@@ -121,3 +125,7 @@ longer-keys = ["lmdb-master3-sys/longer-keys"]
 [[example]]
 name = "heed3-encrypted"
 path = "../examples/heed3-encrypted.rs"
+
+[[example]]
+name = "heed3-all-types"
+path = "../examples/heed3-all-types.rs"
