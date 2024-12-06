@@ -124,13 +124,22 @@ pub struct LmdbVersion {
 /// ```
 /// use heed::{lmdb_version, LmdbVersion};
 ///
-/// let expected = LmdbVersion {
+/// let expected_master = LmdbVersion {
 ///     string: "LMDB 0.9.70: (December 19, 2015)",
 ///     major: 0,
 ///     minor: 9,
 ///     patch: 70,
 /// };
-/// assert_eq!(lmdb_version(), expected);
+///
+/// let expected_master3 = LmdbVersion {
+///     string: "LMDB 0.9.90: (May 1, 2017)",
+///     major: 0,
+///     minor: 9,
+///     patch: 90,
+/// };
+///
+/// let actual = lmdb_version();
+/// assert!(actual == expected_master || actual == expected_master3);
 /// ```
 pub fn lmdb_version() -> LmdbVersion {
     let mut major = mem::MaybeUninit::uninit();
