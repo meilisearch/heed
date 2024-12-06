@@ -219,7 +219,7 @@ impl<'p> Deref for RwTxn<'p> {
 
 // TODO can't we just always implement it?
 #[cfg(master3)]
-impl<'p> std::ops::DerefMut for RwTxn<'p> {
+impl std::ops::DerefMut for RwTxn<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.txn
     }

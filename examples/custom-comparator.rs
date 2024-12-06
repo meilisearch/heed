@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::error::Error;
-use std::path::Path;
-use std::{fs, str};
+use std::str;
 
 use heed::EnvOpenOptions;
 use heed_traits::Comparator;
@@ -21,11 +20,8 @@ impl Comparator for StringAsIntCmp {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let env_path = Path::new("target").join("custom-key-cmp.mdb");
+    let env_path = tempfile::tempdir()?;
 
-    let _ = fs::remove_dir_all(&env_path);
-
-    fs::create_dir_all(&env_path)?;
     let env = unsafe {
         EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB

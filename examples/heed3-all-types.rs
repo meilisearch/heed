@@ -1,6 +1,4 @@
 use std::error::Error;
-use std::fs;
-use std::path::Path;
 
 use heed3::byteorder::BE;
 use heed3::types::*;
@@ -8,9 +6,7 @@ use heed3::{Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let path = Path::new("target").join("heed3.mdb");
-
-    fs::create_dir_all(&path)?;
+    let path = tempfile::tempdir()?;
 
     let env = unsafe {
         EnvOpenOptions::new()

@@ -17,6 +17,8 @@ use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
+#[allow(unused)] // for cargo auto doc links
+use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
     Unspecified,
@@ -81,7 +83,6 @@ impl Env {
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = unsafe { env_builder.open(dir.path())? };
@@ -495,6 +496,9 @@ pub(crate) struct EnvInner {
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
 }
+
+unsafe impl Send for EnvInner {}
+unsafe impl Sync for EnvInner {}
 
 impl Drop for EnvInner {
     fn drop(&mut self) {

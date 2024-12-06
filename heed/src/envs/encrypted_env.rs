@@ -10,6 +10,8 @@ use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::mdb::ffi::{self};
 use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified};
+#[allow(unused)] // fro cargo auto doc links
+use crate::{Database, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
 #[derive(Clone)]
@@ -54,7 +56,6 @@ impl EncryptedEnv {
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = unsafe { env_builder.open(dir.path())? };

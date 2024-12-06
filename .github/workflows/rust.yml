@@ -3,7 +3,7 @@ on: [pull_request]
 
 name: Rust
 jobs:
-  test:
+  heed-test:
     name: Test the heed project
     runs-on: ${{ matrix.os }}
     strategy:
@@ -13,7 +13,6 @@ jobs:
           - os: ubuntu-latest
           - os: windows-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -28,6 +27,31 @@ jobs:
           cargo clean
           cargo test
 
+  heed3-test:
+    name: Test the heed3 project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run cargo test
+        run: |
+          cargo clean
+          bash convert-to-heed3.sh
+          cargo test
+
   check-heed3:
     name: Check the heed3 project
     runs-on: ${{ matrix.os }}
@@ -38,7 +62,6 @@ jobs:
           - os: ubuntu-latest
           - os: windows-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -65,7 +88,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -75,7 +97,16 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - id: check_toml
+        run: |
+          if grep -q 'name = "heed3"' heed/Cargo.toml; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Run cargo test
+        # Skip it if the CI is running with the heed3 Cargo.toml
+        if: ${{ steps.check_toml.outputs.should_skip == 'false' }}
         run: |
           cargo clean
           cargo check --all-features -p heed
@@ -91,7 +122,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -116,7 +146,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -126,7 +155,16 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - id: check_toml
+        run: |
+          if grep -q 'name = "heed3"' heed/Cargo.toml; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Run the examples
+        # Skip it if the CI is running with the heed3 Cargo.toml
+        if: ${{ steps.check_toml.outputs.should_skip == 'false' }}
         run: |
           cargo clean
           # rmp-serde needs a feature activated, so we'll just run it separately.
@@ -142,7 +180,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -158,8 +195,26 @@ jobs:
           bash convert-to-heed3.sh
           cargo run --example 2>&1 | grep -E '^ '| xargs -n1 cargo run --example
 
+  clippy:
+    name: Ensure clippy is happy on heed and heed3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run the examples
+        run: |
+          cargo clippy --all-targets -- --deny warnings
+          bash convert-to-heed3.sh
+          cargo clippy --all-targets -- --deny warnings
+
   fmt:
-    name: Ensure the heed project is formatted
+    name: Ensure the heed and heed3 project are formatted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -170,7 +225,10 @@ jobs:
           override: true
           components: rustfmt
       - name: Run cargo fmt
-        run: cargo fmt --check
+        run: |
+          cargo fmt --check
+          bash convert-to-heed3.sh
+          cargo fmt --check
 
   no-heed3-in-heed-folder:
     name: Ensure heed3 is not erasing heed

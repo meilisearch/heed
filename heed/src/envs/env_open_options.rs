@@ -79,7 +79,6 @@ impl EnvOpenOptions {
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
@@ -160,12 +159,38 @@ impl EnvOpenOptions {
         )
     }
 
-    /// Creates a blank new set of options ready for configuration and specifies that
-    /// the [`Env`] will be encrypted-at-rest using the `E` algorithm with the given `key`.
+    /// Open an encrypted-at-rest environment that will be located at the specified path.
     ///
-    /// You can find more compatible algorithms on [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
+    /// # Safety
+    /// LMDB is backed by a memory map [^1] which comes with some safety precautions.
     ///
-    /// Note that you cannot use any type of encryption algorithm as LMDB exposes a nonce of 16 bytes.
+    /// Memory map constructors are marked `unsafe` because of the potential
+    /// for Undefined Behavior (UB) using the map if the underlying file is
+    /// subsequently modified, in or out of process.
+    ///
+    /// LMDB itself has a locking system that solves this problem,
+    /// but it will not save you from making mistakes yourself.
+    ///
+    /// These are some things to take note of:
+    ///
+    /// - Avoid long-lived transactions, they will cause the database to grow quickly [^2]
+    /// - Avoid aborting your process with an active transaction [^3]
+    /// - Do not use LMDB on remote filesystems, even between processes on the same host [^4]
+    /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^5]
+    /// - Anything that causes LMDB's lock file to be broken will cause synchronization issues and may introduce UB [^6]
+    ///
+    /// `heed` itself upholds some safety invariants, including but not limited to:
+    /// - Calling [`EnvOpenOptions::open`] twice in the same process, at the same time is OK [^7]
+    ///
+    /// For more details, it is highly recommended to read LMDB's official documentation. [^8]
+    ///
+    /// # Basic Example
+    ///
+    /// Creates and open a database. The [`Env`] is encrypted-at-rest using the `E` algorithm with the
+    /// given `key`. You can find more compatible algorithms on
+    /// [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
+    ///
+    /// Note that you cannot use **any** type of encryption algorithm as LMDB exposes a nonce of 16 bytes.
     /// Heed makes sure to truncate it if necessary.
     ///
     /// As an example, XChaCha20 requires a 20 bytes long nonce. However, XChaCha20 is used to protect
@@ -173,34 +198,31 @@ impl EnvOpenOptions {
     /// weak RNGs. There is no need to use this kind of algorithm in LMDB since LMDB nonces aren't
     /// random and are guaranteed to be unique.
     ///
-    /// ## Basic Example
-    ///
     /// ```
     /// use std::fs;
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3_encryption::types::*;
-    /// use heed3_encryption::{EnvOpenOptions, Database};
+    /// use heed3::types::*;
+    /// use heed3::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let env_path = tempfile::tempdir()?;
     /// let password = "This is the password that will be hashed by the argon2 algorithm";
     /// let salt = "The salt added to the password hashes to add more security when stored";
     ///
-    /// let _ = fs::remove_dir_all(&env_path);
     /// fs::create_dir_all(&env_path)?;
     ///
     /// let mut key = Key::default();
     /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
     ///
     /// // We open the environment
-    /// let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
+    /// let mut options = EnvOpenOptions::new();
     /// let env = unsafe {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
     ///         .max_dbs(3)
-    ///         .open(&env_path)?
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
     /// };
     ///
     /// let key1 = "first-key";
@@ -210,14 +232,21 @@ impl EnvOpenOptions {
     ///
     /// // We create database and write secret values in it
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    /// let db = env.create_database::<Str, Str>(&mut wtxn, Some("first"))?;
     /// db.put(&mut wtxn, key1, val1)?;
     /// db.put(&mut wtxn, key2, val2)?;
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
     ///
-    /// ## Example Showing limitations
+    /// # Example Showing limitations
+    ///
+    /// At the end of this example file you can see that we can not longer use the `val1`
+    /// variable as we performed a read in the database just after fetching it and keeping
+    /// a reference to it.
+    ///
+    /// That's the main limitation of LMDB with the encryption-at-rest feature: entries cannot
+    /// be kept for too long as they are kept in a cycling buffer when decrypting them on the fly.
     ///
     /// ```compile_fail,E0499
     /// use std::fs;
@@ -228,11 +257,10 @@ impl EnvOpenOptions {
     /// use heed3_encryption::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let env_path = tempfile::tempdir()?;
     /// let password = "This is the password that will be hashed by the argon2 algorithm";
     /// let salt = "The salt added to the password hashes to add more security when stored";
     ///
-    /// let _ = fs::remove_dir_all(&env_path);
     /// fs::create_dir_all(&env_path)?;
     ///
     /// let mut key = Key::default();
@@ -261,10 +289,20 @@ impl EnvOpenOptions {
     /// let val1 = db.get(&mut rtxn, key1)?;
     /// let val2 = db.get(&mut rtxn, key2)?;
     ///
-    /// // This example won't compile because val1 cannot be used for too long.
+    /// // This example won't compile because val1 cannot be used
+    /// // after we performed another read in the database (val2).
     /// let _force_keep = val1;
     /// # Ok(()) }
     /// ```
+    ///
+    /// [^1]: <https://en.wikipedia.org/wiki/Memory_map>
+    /// [^2]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L107-L114>
+    /// [^3]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L118-L121>
+    /// [^4]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    /// [^5]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
+    /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
+    /// [^8]: <http://www.lmdb.tech/doc/index.html>
     #[cfg(master3)]
     pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv>
     where

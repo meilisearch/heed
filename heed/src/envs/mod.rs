@@ -20,6 +20,8 @@ use heed_traits::{Comparator, LexicographicComparator};
 use synchronoise::event::SignalEvent;
 
 use crate::mdb::ffi;
+#[allow(unused)] // for cargo auto doc links
+use crate::{Database, DatabaseFlags};
 
 #[cfg(master3)]
 mod encrypted_env;
@@ -183,6 +185,7 @@ unsafe extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
 /// When a custom comparator is provided, the wrapper is responsible for setting
 /// it with the [`ffi::mdb_set_compare`] function, which overrides the default comparison
 /// behavior of LMDB with the user-defined logic.
+#[derive(Debug)]
 pub enum DefaultComparator {}
 
 impl LexicographicComparator for DefaultComparator {
@@ -223,11 +226,12 @@ impl LexicographicComparator for DefaultComparator {
 /// This enum is used to indicate a table should be sorted by the keys numeric
 /// value in native byte order. When a [`Database`] is created or opened with
 /// [`IntegerComparator`], it signifies that the comparator should not be explicitly
-/// set via [`ffi::mdb_set_compare`], instead the flag [`AllDatabaseFlags::INTEGER_KEY`]
+/// set via [`ffi::mdb_set_compare`], instead the flag [`DatabaseFlags::INTEGER_KEY`]
 /// is set on the table.
 ///
 /// This can only be used on certain types: either `u32` or `usize`.
 /// The keys must all be of the same size.
+#[derive(Debug)]
 pub enum IntegerComparator {}
 
 impl Comparator for IntegerComparator {

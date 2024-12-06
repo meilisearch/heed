@@ -24,9 +24,7 @@
 //! pub type StringMap = HashMap<String, String>;
 //!
 //! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-//!     let path = Path::new("target").join("heed.mdb");
-//!
-//!     fs::create_dir_all(&path)?;
+//!     let path = tempfile::tempdir()?;
 //!
 //!     let env = unsafe {
 //!         EnvOpenOptions::new()
@@ -92,9 +90,7 @@
 //! use heed::{Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
-//!     let env_path = Path::new("target").join("heed.mdb");
-//!
-//!     fs::create_dir_all(&env_path)?;
+//!     let env_path = tempfile::tempdir()?;
 //!
 //!     let env = unsafe {
 //!         EnvOpenOptions::new()
@@ -233,9 +229,7 @@
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
-//!     let path = Path::new("target").join("heed.mdb");
-//!
-//!     fs::create_dir_all(&path)?;
+//!     let path = tempfile::tempdir()?;
 //!
 //!     let env = unsafe {
 //!         EnvOpenOptions::new()
@@ -298,9 +292,7 @@
 //! use heed::{Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
-//!     let path = Path::new("target").join("small-space.mdb");
-//!
-//!     fs::create_dir_all(&path)?;
+//!     let path = tempfile::tempdir()?;
 //!
 //!     let env = unsafe {
 //!         EnvOpenOptions::new()
@@ -352,6 +344,11 @@
 //! LMDB disallow sharing cursors amongs threads. It is only possible to send
 //! them between threads when the heed `read-txn-no-tls` feature is enabled.
 //!
+//! Please note that this should not be utilized with an encrypted heed3 database. These
+//! types of databases employ an internal cycling buffer for decrypting entries, which
+//! may result in reading keys that invalidate previous ones. In essence, the use of
+//! the `EncryptedDatabase` signature prevents this scenario.
+//!
 //! This limits some usecases that require a parallel access to the content of the databases
 //! to process stuff faster. This is the case of arroy, a multithreads fast approximate
 //! neighbors search library. I wrote [an article explaining how
@@ -377,9 +374,7 @@
 //! use heed::{Database, EnvOpenOptions, RoTxn};
 //!
 //! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-//!     let path = Path::new("target").join("heed.mdb");
-//!
-//!     fs::create_dir_all(&path)?;
+//!     let path = tempfile::tempdir()?;
 //!
 //!     let env = unsafe {
 //!         EnvOpenOptions::new()
