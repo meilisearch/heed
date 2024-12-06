@@ -185,6 +185,7 @@ unsafe extern "C" fn custom_key_cmp_wrapper<C: Comparator>(
 /// When a custom comparator is provided, the wrapper is responsible for setting
 /// it with the [`ffi::mdb_set_compare`] function, which overrides the default comparison
 /// behavior of LMDB with the user-defined logic.
+#[derive(Debug)]
 pub enum DefaultComparator {}
 
 impl LexicographicComparator for DefaultComparator {
@@ -230,6 +231,7 @@ impl LexicographicComparator for DefaultComparator {
 ///
 /// This can only be used on certain types: either `u32` or `usize`.
 /// The keys must all be of the same size.
+#[derive(Debug)]
 pub enum IntegerComparator {}
 
 impl Comparator for IntegerComparator {
