@@ -497,6 +497,9 @@ pub(crate) struct EnvInner {
     pub(crate) path: PathBuf,
 }
 
+unsafe impl Send for EnvInner {}
+unsafe impl Sync for EnvInner {}
+
 impl Drop for EnvInner {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.write().unwrap();
