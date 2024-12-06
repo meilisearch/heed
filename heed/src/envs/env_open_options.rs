@@ -79,7 +79,6 @@ impl EnvOpenOptions {
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// fs::create_dir_all(Path::new("target").join("database.mdb"))?;
     /// let mut env_builder = EnvOpenOptions::new();
     /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
@@ -208,11 +207,10 @@ impl EnvOpenOptions {
     /// use heed3::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let env_path = tempfile::tempdir()?;
     /// let password = "This is the password that will be hashed by the argon2 algorithm";
     /// let salt = "The salt added to the password hashes to add more security when stored";
     ///
-    /// let _ = fs::remove_dir_all(&env_path);
     /// fs::create_dir_all(&env_path)?;
     ///
     /// let mut key = Key::default();
@@ -259,11 +257,10 @@ impl EnvOpenOptions {
     /// use heed3_encryption::{EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let env_path = Path::new("target").join("encrypt.mdb");
+    /// let env_path = tempfile::tempdir()?;
     /// let password = "This is the password that will be hashed by the argon2 algorithm";
     /// let salt = "The salt added to the password hashes to add more security when stored";
     ///
-    /// let _ = fs::remove_dir_all(&env_path);
     /// fs::create_dir_all(&env_path)?;
     ///
     /// let mut key = Key::default();

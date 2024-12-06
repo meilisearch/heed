@@ -1,6 +1,4 @@
 use std::error::Error;
-use std::fs;
-use std::path::Path;
 
 use heed::types::*;
 use heed::{Database, EnvOpenOptions};
@@ -8,11 +6,8 @@ use heed::{Database, EnvOpenOptions};
 // In this test we are checking that we can clear database entries and
 // write just after in the same transaction without loosing the writes.
 fn main() -> Result<(), Box<dyn Error>> {
-    let env_path = Path::new("target").join("clear-database.mdb");
+    let env_path = tempfile::tempdir()?;
 
-    let _ = fs::remove_dir_all(&env_path);
-
-    fs::create_dir_all(&env_path)?;
     let env = unsafe {
         EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB

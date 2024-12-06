@@ -1,6 +1,4 @@
 use std::error::Error;
-use std::fs;
-use std::path::Path;
 
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
@@ -8,12 +6,9 @@ use heed3::types::*;
 use heed3::EnvOpenOptions;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let env_path = Path::new("target").join("encrypt.mdb");
+    let env_path = tempfile::tempdir()?;
     let password = "This is the password that will be hashed by the argon2 algorithm";
     let salt = "The salt added to the password hashes to add more security when stored";
-
-    let _ = fs::remove_dir_all(&env_path);
-    fs::create_dir_all(&env_path)?;
 
     // We choose to use argon2 as our Key Derivation Function, but you can choose whatever you want.
     // <https://github.com/RustCrypto/traits/tree/master/password-hash#supported-crates>

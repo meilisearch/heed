@@ -1,6 +1,4 @@
 use std::error::Error;
-use std::fs;
-use std::path::Path;
 
 use byteorder::BE;
 use heed::types::*;
@@ -9,10 +7,8 @@ use heed::{Database, EnvOpenOptions};
 type BEU32 = U32<BE>;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let env1_path = Path::new("target").join("env1.mdb");
-    let env2_path = Path::new("target").join("env2.mdb");
-
-    fs::create_dir_all(&env1_path)?;
+    let env1_path = tempfile::tempdir()?;
+    let env2_path = tempfile::tempdir()?;
     let env1 = unsafe {
         EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
@@ -20,7 +16,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env1_path)?
     };
 
-    fs::create_dir_all(&env2_path)?;
     let env2 = unsafe {
         EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
