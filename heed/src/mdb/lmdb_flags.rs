@@ -181,6 +181,11 @@ bitflags! {
         /// Numeric keys in native byte order: either `u32` or `usize`.
         /// The keys must all be of the same size.
         ///
+        /// It is recommended to use the [`IntegerComparator`] when
+        /// opening the [`Database`] instead. This comparator provides
+        /// better support for ranges and does not allow for prefix
+        /// iteration, as it is not applicable in this context.
+        ///
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
@@ -223,6 +228,7 @@ bitflags! {
         /// wtxn.commit()?;
         /// # Ok(()) }
         /// ```
+        #[deprecated(since="0.21.0", note="please use `IntegerComparator` instead")]
         const INTEGER_KEY = ffi::MDB_INTEGERKEY;
         /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
         ///
