@@ -17,6 +17,8 @@ use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
+#[allow(unused)] // for cargo auto doc links
+use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
     Unspecified,
