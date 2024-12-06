@@ -75,7 +75,16 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - id: check_toml
+        run: |
+          if grep -q 'name = "heed3"' heed/Cargo.toml; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Run cargo test
+        # Skip it if the CI is running with the heed3 Cargo.toml
+        if: ${{ steps.check_toml.outputs.should_skip == 'false' }}
         run: |
           cargo clean
           cargo check --all-features -p heed
@@ -126,7 +135,16 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - id: check_toml
+        run: |
+          if grep -q 'name = "heed3"' heed/Cargo.toml; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Run the examples
+        # Skip it if the CI is running with the heed3 Cargo.toml
+        if: ${{ steps.check_toml.outputs.should_skip == 'false' }}
         run: |
           cargo clean
           # rmp-serde needs a feature activated, so we'll just run it separately.
