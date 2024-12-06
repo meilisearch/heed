@@ -10,6 +10,8 @@ use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::mdb::ffi::{self};
 use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified};
+#[allow(unused)] // fro cargo auto doc links
+use crate::{Database, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
 #[derive(Clone)]

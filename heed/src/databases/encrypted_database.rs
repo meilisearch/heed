@@ -6,6 +6,8 @@ use types::LazyDecode;
 
 use crate::envs::DefaultComparator;
 use crate::iteration_method::MoveOnCurrentKeyDuplicates;
+#[allow(unused)] // for cargo auto doc links
+use crate::mdb::ffi;
 use crate::mdb::lmdb_flags::DatabaseFlags;
 use crate::*;
 

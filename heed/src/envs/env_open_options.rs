@@ -160,20 +160,44 @@ impl EnvOpenOptions {
         )
     }
 
-    /// Creates a blank new set of options ready for configuration and specifies that
-    /// the [`Env`] will be encrypted-at-rest using the `E` algorithm with the given `key`.
+    /// Open an encrypted-at-rest environment that will be located at the specified path.
     ///
-    /// You can find more compatible algorithms on [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
+    /// # Safety
+    /// LMDB is backed by a memory map [^1] which comes with some safety precautions.
     ///
-    /// Note that you cannot use any type of encryption algorithm as LMDB exposes a nonce of 16 bytes.
+    /// Memory map constructors are marked `unsafe` because of the potential
+    /// for Undefined Behavior (UB) using the map if the underlying file is
+    /// subsequently modified, in or out of process.
+    ///
+    /// LMDB itself has a locking system that solves this problem,
+    /// but it will not save you from making mistakes yourself.
+    ///
+    /// These are some things to take note of:
+    ///
+    /// - Avoid long-lived transactions, they will cause the database to grow quickly [^2]
+    /// - Avoid aborting your process with an active transaction [^3]
+    /// - Do not use LMDB on remote filesystems, even between processes on the same host [^4]
+    /// - You must manage concurrent accesses yourself if using [`EnvFlags::NO_LOCK`] [^5]
+    /// - Anything that causes LMDB's lock file to be broken will cause synchronization issues and may introduce UB [^6]
+    ///
+    /// `heed` itself upholds some safety invariants, including but not limited to:
+    /// - Calling [`EnvOpenOptions::open`] twice in the same process, at the same time is OK [^7]
+    ///
+    /// For more details, it is highly recommended to read LMDB's official documentation. [^8]
+    ///
+    /// # Basic Example
+    ///
+    /// Creates and open a database. The [`Env`] is encrypted-at-rest using the `E` algorithm with the
+    /// given `key`. You can find more compatible algorithms on
+    /// [the RustCrypto/AEADs page](https://github.com/RustCrypto/AEADs#crates).
+    ///
+    /// Note that you cannot use **any** type of encryption algorithm as LMDB exposes a nonce of 16 bytes.
     /// Heed makes sure to truncate it if necessary.
     ///
     /// As an example, XChaCha20 requires a 20 bytes long nonce. However, XChaCha20 is used to protect
     /// against nonce misuse in systems that use randomly generated nonces i.e., to protect against
     /// weak RNGs. There is no need to use this kind of algorithm in LMDB since LMDB nonces aren't
     /// random and are guaranteed to be unique.
-    ///
-    /// ## Basic Example
     ///
     /// ```
     /// use std::fs;
@@ -217,7 +241,14 @@ impl EnvOpenOptions {
     /// # Ok(()) }
     /// ```
     ///
-    /// ## Example Showing limitations
+    /// # Example Showing limitations
+    ///
+    /// At the end of this example file you can see that we can not longer use the `val1`
+    /// variable as we performed a read in the database just after fetching it and keeping
+    /// a reference to it.
+    ///
+    /// That's the main limitation of LMDB with the encryption-at-rest feature: entries cannot
+    /// be kept for too long as they are kept in a cycling buffer when decrypting them on the fly.
     ///
     /// ```compile_fail,E0499
     /// use std::fs;
@@ -261,10 +292,20 @@ impl EnvOpenOptions {
     /// let val1 = db.get(&mut rtxn, key1)?;
     /// let val2 = db.get(&mut rtxn, key2)?;
     ///
-    /// // This example won't compile because val1 cannot be used for too long.
+    /// // This example won't compile because val1 cannot be used
+    /// // after we performed another read in the database (val2).
     /// let _force_keep = val1;
     /// # Ok(()) }
     /// ```
+    ///
+    /// [^1]: <https://en.wikipedia.org/wiki/Memory_map>
+    /// [^2]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L107-L114>
+    /// [^3]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L118-L121>
+    /// [^4]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    /// [^5]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L129>
+    /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
+    /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
+    /// [^8]: <http://www.lmdb.tech/doc/index.html>
     #[cfg(master3)]
     pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv>
     where
