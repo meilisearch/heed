@@ -75,8 +75,8 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags};
-    /// use heed::types::*;
+    /// use heed3::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed3::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();

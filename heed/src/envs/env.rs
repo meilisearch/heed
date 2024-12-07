@@ -48,7 +48,7 @@ impl Env {
     /// # Example
     ///
     /// ```
-    /// use heed::EnvOpenOptions;
+    /// use heed3::EnvOpenOptions;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let dir = tempfile::tempdir()?;
@@ -79,8 +79,8 @@ impl Env {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode};
-    /// use heed::types::*;
+    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode};
+    /// use heed3::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();

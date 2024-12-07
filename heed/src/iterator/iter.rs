@@ -23,9 +23,9 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
-    /// use heed::types::*;
-    /// use heed::byteorder::BigEndian;
+    /// # use heed3::{DatabaseFlags, EnvOpenOptions};
+    /// use heed3::types::*;
+    /// use heed3::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;
@@ -76,9 +76,9 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
-    /// use heed::types::*;
-    /// use heed::byteorder::BigEndian;
+    /// # use heed3::{DatabaseFlags, EnvOpenOptions};
+    /// use heed3::types::*;
+    /// use heed3::byteorder::BigEndian;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let dir = tempfile::tempdir()?;

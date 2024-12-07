@@ -38,8 +38,8 @@
 //! ```
 //! use std::fs;
 //! use std::path::Path;
-//! use heed::{EnvOpenOptions, Database};
-//! use heed::types::*;
+//! use heed3::{EnvOpenOptions, Database};
+//! use heed3::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let dir = tempfile::tempdir()?;
@@ -122,7 +122,7 @@ pub struct LmdbVersion {
 /// Return the LMDB library version information.
 ///
 /// ```
-/// use heed::{lmdb_version, LmdbVersion};
+/// use heed3::{lmdb_version, LmdbVersion};
 ///
 /// let expected_master = LmdbVersion {
 ///     string: "LMDB 0.9.70: (December 19, 2015)",
