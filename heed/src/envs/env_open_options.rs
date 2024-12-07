@@ -2,6 +2,7 @@ use std::ffi::CString;
 #[cfg(windows)]
 use std::ffi::OsStr;
 use std::io::ErrorKind::NotFound;
+use std::marker::PhantomData;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -21,37 +22,54 @@ use super::{canonicalize_path, OPENED_ENV};
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::{EnvFlags, Error, Result};
+use crate::txn::{TlsUsage, WithoutTls};
+use crate::{EnvFlags, Error, Result, WithTls};
 
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions {
+pub struct EnvOpenOptions<T: TlsUsage> {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
     flags: EnvFlags,
+    _tls_marker: PhantomData<T>,
 }
 
-impl Default for EnvOpenOptions {
+impl Default for EnvOpenOptions<WithoutTls> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl EnvOpenOptions {
+impl EnvOpenOptions<WithoutTls> {
     /// Creates a blank new set of options ready for configuration.
-    pub fn new() -> EnvOpenOptions {
+    pub fn new() -> EnvOpenOptions<WithoutTls> {
         EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
             flags: EnvFlags::empty(),
+            _tls_marker: PhantomData,
         }
     }
 }
 
-impl EnvOpenOptions {
+impl<T: TlsUsage> EnvOpenOptions<T> {
+    /// Make the read transactions `!Send` by specifying they will use Thread Local Storage (TLS).
+    pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    }
+
+    /// Make the read transactions `Send` by specifying they will not use Thread Local Storage (TLS).
+    pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    }
+}
+
+impl<T: TlsUsage> EnvOpenOptions<T> {
     /// Set the size of the memory map to use for this environment.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
@@ -151,7 +169,7 @@ impl EnvOpenOptions {
     /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
-    pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+    pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env<T>> {
         self.raw_open_with_encryption(
             path.as_ref(),
             #[cfg(master3)]
@@ -320,7 +338,7 @@ impl EnvOpenOptions {
         &self,
         path: &Path,
         #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
-    ) -> Result<Env> {
+    ) -> Result<Env<T>> {
         let mut lock = OPENED_ENV.write().unwrap();
 
         let path = match canonicalize_path(path) {
@@ -379,7 +397,8 @@ impl EnvOpenOptions {
                 // When the `read-txn-no-tls` feature is enabled, we must force LMDB
                 // to avoid using the thread local storage, this way we allow users
                 // to use references of RoTxn between threads safely.
-                let flags = if cfg!(feature = "read-txn-no-tls") {
+                #[allow(deprecated)] // NO_TLS is inside of the crate
+                let flags = if T::ENABLED {
                     // TODO make this a ZST flag on the Env and on RoTxn (make them Send when we can)
                     self.flags | EnvFlags::NO_TLS
                 } else {
