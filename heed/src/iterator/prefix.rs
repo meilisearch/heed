@@ -47,8 +47,8 @@ fn retreat_prefix<C: LexicographicComparator>(bytes: &mut [u8]) -> bool {
     true
 }
 
-fn move_on_prefix_end<'txn, C: LexicographicComparator>(
-    cursor: &mut RoCursor<'txn>,
+fn move_on_prefix_end<'txn, T, C: LexicographicComparator>(
+    cursor: &mut RoCursor<'txn, T>,
     prefix: &mut [u8],
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     if advance_prefix::<C>(prefix) {
@@ -64,22 +64,25 @@ fn move_on_prefix_end<'txn, C: LexicographicComparator>(
 }
 
 /// A read-only prefix iterator structure.
-pub struct RoPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
-    cursor: RoCursor<'txn>,
+pub struct RoPrefix<'txn, T, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
+    cursor: RoCursor<'txn, T>,
     prefix: Vec<u8>,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoPrefix<'txn, KC, DC, C, IM> {
+impl<'txn, T, KC, DC, C, IM> RoPrefix<'txn, T, KC, DC, C, IM> {
+    pub(crate) fn new(
+        cursor: RoCursor<'txn, T>,
+        prefix: Vec<u8>,
+    ) -> RoPrefix<'txn, T, KC, DC, C, IM> {
         RoPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
     }
 
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RoPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RoPrefix<'txn, T, KC, DC, C, MoveBetweenKeys> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -93,7 +96,7 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RoPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
+    ) -> RoPrefix<'txn, T, KC, DC, C, MoveThroughDuplicateValues> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -103,7 +106,7 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, KC2, DC2, C, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RoPrefix<'txn, T, KC2, DC2, C, IM> {
         RoPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -113,22 +116,22 @@ impl<'txn, KC, DC, C, IM> RoPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoPrefix<'txn, KC2, DC, C, IM> {
+    pub fn remap_key_type<KC2>(self) -> RoPrefix<'txn, T, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, KC, DC2, C, IM> {
+    pub fn remap_data_type<DC2>(self) -> RoPrefix<'txn, T, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
+    pub fn lazily_decode_data(self) -> RoPrefix<'txn, T, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, C, IM> Iterator for RoPrefix<'txn, KC, DC, C, IM>
+impl<'txn, T, KC, DC, C, IM> Iterator for RoPrefix<'txn, T, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -163,11 +166,11 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<T, C>(&mut self.cursor, &mut self.prefix)
         } else {
             match (
                 self.cursor.current(),
-                move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix),
+                move_on_prefix_end::<T, C>(&mut self.cursor, &mut self.prefix),
             ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
@@ -200,8 +203,7 @@ impl<KC, DC, C, IM> fmt::Debug for RoPrefix<'_, KC, DC, C, IM> {
     }
 }
 
-#[cfg(feature = "read-txn-no-tls")]
-unsafe impl<KC, DC, IM> Send for RoPrefix<'_, KC, DC, IM> {}
+unsafe impl<KC, DC, IM> Send for RoPrefix<'_, WithoutTls, KC, DC, IM> {}
 
 /// A read-write prefix iterator structure.
 pub struct RwPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
@@ -417,11 +419,11 @@ where
 
     fn last(mut self) -> Option<Self::Item> {
         let result = if self.move_on_first {
-            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<WithoutTls, C>(&mut self.cursor, &mut self.prefix)
         } else {
             match (
                 self.cursor.current(),
-                move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix),
+                move_on_prefix_end::<WithoutTls, C>(&mut self.cursor, &mut self.prefix),
             ) {
                 (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
                     Ok(Some((key, data)))
@@ -455,22 +457,25 @@ impl<KC, DC, C, IM> fmt::Debug for RwPrefix<'_, KC, DC, C, IM> {
 }
 
 /// A reverse read-only prefix iterator structure.
-pub struct RoRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
-    cursor: RoCursor<'txn>,
+pub struct RoRevPrefix<'txn, T, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
+    cursor: RoCursor<'txn, T>,
     prefix: Vec<u8>,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
-    pub(crate) fn new(cursor: RoCursor<'txn>, prefix: Vec<u8>) -> RoRevPrefix<'txn, KC, DC, C, IM> {
+impl<'txn, T, KC, DC, C, IM> RoRevPrefix<'txn, T, KC, DC, C, IM> {
+    pub(crate) fn new(
+        cursor: RoCursor<'txn, T>,
+        prefix: Vec<u8>,
+    ) -> RoRevPrefix<'txn, T, KC, DC, C, IM> {
         RoRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
     }
 
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RoRevPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RoRevPrefix<'txn, T, KC, DC, C, MoveBetweenKeys> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -484,7 +489,7 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RoRevPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
+    ) -> RoRevPrefix<'txn, T, KC, DC, C, MoveThroughDuplicateValues> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -494,7 +499,7 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RoRevPrefix<'txn, KC2, DC2, C, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RoRevPrefix<'txn, T, KC2, DC2, C, IM> {
         RoRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -504,22 +509,22 @@ impl<'txn, KC, DC, C, IM> RoRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RoRevPrefix<'txn, KC2, DC, C, IM> {
+    pub fn remap_key_type<KC2>(self) -> RoRevPrefix<'txn, T, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RoRevPrefix<'txn, KC, DC2, C, IM> {
+    pub fn remap_data_type<DC2>(self) -> RoRevPrefix<'txn, T, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RoRevPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
+    pub fn lazily_decode_data(self) -> RoRevPrefix<'txn, T, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, C, IM> Iterator for RoRevPrefix<'txn, KC, DC, C, IM>
+impl<'txn, T, KC, DC, C, IM> Iterator for RoRevPrefix<'txn, T, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -531,7 +536,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<T, C>(&mut self.cursor, &mut self.prefix)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
@@ -590,8 +595,7 @@ impl<KC, DC, C, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, C, IM> {
     }
 }
 
-#[cfg(feature = "read-txn-no-tls")]
-unsafe impl<KC, DC, IM> Send for RoRevPrefix<'_, KC, DC, IM> {}
+unsafe impl<KC, DC, IM> Send for RoRevPrefix<'_, WithoutTls, KC, DC, IM> {}
 
 /// A reverse read-write prefix iterator structure.
 pub struct RwRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
@@ -784,7 +788,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = if self.move_on_last {
             self.move_on_last = false;
-            move_on_prefix_end::<C>(&mut self.cursor, &mut self.prefix)
+            move_on_prefix_end::<WithoutTls, C>(&mut self.cursor, &mut self.prefix)
         } else {
             self.cursor.move_on_prev(IM::MOVE_OPERATION)
         };
