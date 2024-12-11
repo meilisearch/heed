@@ -37,10 +37,10 @@ use crate::Result;
 ///     fn is_covariant(&'a self) -> &'a Self::T;
 /// }
 ///
-/// impl<'a> CovariantMarker<'a> for heed::RoTxn<'static> {
-///     type T = heed::RoTxn<'a>;
+/// impl<'a> CovariantMarker<'a> for heed3::RoTxn<'static> {
+///     type T = heed3::RoTxn<'a>;
 ///
-///     fn is_covariant(&'a self) -> &'a heed::RoTxn<'a> {
+///     fn is_covariant(&'a self) -> &'a heed3::RoTxn<'a> {
 ///         self
 ///     }
 /// }
@@ -146,10 +146,10 @@ unsafe impl Send for RoTxn<'_> {}
 ///     fn is_covariant(&'a self) -> &'a Self::T;
 /// }
 ///
-/// impl<'a> CovariantMarker<'a> for heed::RwTxn<'static> {
-///     type T = heed::RwTxn<'a>;
+/// impl<'a> CovariantMarker<'a> for heed3::RwTxn<'static> {
+///     type T = heed3::RwTxn<'a>;
 ///
-///     fn is_covariant(&'a self) -> &'a heed::RwTxn<'a> {
+///     fn is_covariant(&'a self) -> &'a heed3::RwTxn<'a> {
 ///         self
 ///     }
 /// }

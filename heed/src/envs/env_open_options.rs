@@ -75,8 +75,8 @@ impl EnvOpenOptions {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags};
-    /// use heed::types::*;
+    /// use heed3::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed3::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();
@@ -152,8 +152,20 @@ impl EnvOpenOptions {
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
-        self.raw_open_with_encryption(
+        self.raw_open_with_checksum_and_encryption(
             path.as_ref(),
+            #[cfg(master3)]
+            None,
+            #[cfg(master3)]
+            None,
+        )
+    }
+
+    pub unsafe fn open_checksummed<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+        self.raw_open_with_checksum_and_encryption(
+            path.as_ref(),
+            #[cfg(master3)]
+            None,
             #[cfg(master3)]
             None,
         )
@@ -309,16 +321,18 @@ impl EnvOpenOptions {
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,
     {
-        self.raw_open_with_encryption(
+        self.raw_open_with_checksum_and_encryption(
             path.as_ref(),
+            None,
             Some((Some(encrypt_func_wrapper::<E>), &key, <E as AeadCore>::TagSize::U32)),
         )
         .map(|inner| EncryptedEnv { inner })
     }
 
-    fn raw_open_with_encryption(
+    fn raw_open_with_checksum_and_encryption(
         &self,
         path: &Path,
+        #[cfg(master3)] sum: Option<(ffi::MDB_sum_func, u32)>,
         #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
     ) -> Result<Env> {
         let mut lock = OPENED_ENV.write().unwrap();

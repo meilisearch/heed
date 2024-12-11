@@ -18,8 +18,8 @@
 //! use std::fs;
 //! use std::path::Path;
 //!
-//! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed3::types::*;
+//! use heed3::{Database, EnvOpenOptions};
 //!
 //! pub type StringMap = HashMap<String, String>;
 //!
@@ -55,9 +55,9 @@
 //! }
 //!
 //! fn fill_with_data(
-//!     wtxn: &mut heed::RwTxn,
+//!     wtxn: &mut heed3::RwTxn,
 //!     db: Database<Str, SerdeJson<StringMap>>,
-//! ) -> heed::Result<()> {
+//! ) -> heed3::Result<()> {
 //!     // This represents a very big value that we only want to decode when necessary.
 //!     let mut big_string_map = HashMap::new();
 //!     big_string_map.insert("key1".into(), "I am a very long string".into());
@@ -86,8 +86,8 @@
 //! use std::fs;
 //! use std::path::Path;
 //!
-//! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed3::types::*;
+//! use heed3::{Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let env_path = tempfile::tempdir()?;
@@ -147,8 +147,8 @@
 //! use std::fs;
 //! use std::path::Path;
 //!
-//! use heed::types::*;
-//! use heed::{BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
+//! use heed3::types::*;
+//! use heed3::{BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
 //!
 //! #[derive(Debug, PartialEq, Eq)]
 //! pub enum Level {
@@ -288,8 +288,8 @@
 //! use std::fs;
 //! use std::path::Path;
 //!
-//! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed3::types::*;
+//! use heed3::{Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -306,7 +306,7 @@
 //!     // Ho! Crap! We don't have enough space in this environment...
 //!     assert!(matches!(
 //!         fill_with_data(&mut wtxn, db),
-//!         Err(heed::Error::Mdb(heed::MdbError::MapFull))
+//!         Err(heed3::Error::Mdb(heed3::MdbError::MapFull))
 //!     ));
 //!
 //!     drop(wtxn);
@@ -330,7 +330,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn fill_with_data(wtxn: &mut heed::RwTxn, db: Database<Str, Str>) -> heed::Result<()> {
+//! fn fill_with_data(wtxn: &mut heed3::RwTxn, db: Database<Str, Str>) -> heed3::Result<()> {
 //!     for i in 0..1000 {
 //!         let key = i.to_string();
 //!         db.put(wtxn, &key, "I am a very long string")?;
@@ -370,8 +370,8 @@
 //! use std::fs;
 //! use std::path::Path;
 //!
-//! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions, RoTxn};
+//! use heed3::types::*;
+//! use heed3::{Database, EnvOpenOptions, RoTxn};
 //!
 //! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 //!     let path = tempfile::tempdir()?;
@@ -410,7 +410,7 @@
 //!     Ok(())
 //! }
 //!
-//! fn fill_with_data(wtxn: &mut heed::RwTxn, db: Database<Str, Str>) -> heed::Result<()> {
+//! fn fill_with_data(wtxn: &mut heed3::RwTxn, db: Database<Str, Str>) -> heed3::Result<()> {
 //!     for i in 0..100 {
 //!         let key = i.to_string();
 //!         db.put(wtxn, &key, "I am a very long string")?;
@@ -423,7 +423,7 @@
 //! }
 //!
 //! impl<'t> ImmutableMap<'t> {
-//!     fn from_db(rtxn: &'t RoTxn, db: Database<Str, Str>) -> heed::Result<Self> {
+//!     fn from_db(rtxn: &'t RoTxn, db: Database<Str, Str>) -> heed3::Result<Self> {
 //!         let mut map = HashMap::new();
 //!         for result in db.iter(rtxn)? {
 //!             let (k, v) = result?;
