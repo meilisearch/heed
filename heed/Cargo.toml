@@ -57,7 +57,7 @@ serde = ["bitflags/serde", "dep:serde"]
 #
 # And a #MDB_BAD_RSLOT error will be thrown when multiple read
 # transactions exists on the same thread
-read-txn-no-tls = []
+# read-txn-no-tls = []
 
 # Enable the serde en/decoders for bincode, serde_json, or rmp_serde
 serde-bincode = ["heed-types/serde-bincode"]

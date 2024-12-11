@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
 
@@ -45,14 +46,15 @@ use crate::Result;
 ///     }
 /// }
 /// ```
-pub struct RoTxn<'e> {
+pub struct RoTxn<'e, T> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
-    env: Cow<'e, Env>,
+    env: Cow<'e, Env<T>>,
+    _tls_marker: PhantomData<T>,
 }
 
-impl<'e> RoTxn<'e> {
-    pub(crate) fn new(env: &'e Env) -> Result<RoTxn<'e>> {
+impl<'e, T> RoTxn<'e, T> {
+    pub(crate) fn new(env: &'e Env<T>) -> Result<RoTxn<'e, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -64,10 +66,10 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) })
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env), _tls_marker: PhantomData })
     }
 
-    pub(crate) fn static_read_txn(env: Env) -> Result<RoTxn<'static>> {
+    pub(crate) fn static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -79,7 +81,7 @@ impl<'e> RoTxn<'e> {
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env) })
+        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env), _tls_marker: PhantomData })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -104,7 +106,7 @@ impl<'e> RoTxn<'e> {
     }
 }
 
-impl Drop for RoTxn<'_> {
+impl<T> Drop for RoTxn<'_, T> {
     fn drop(&mut self) {
         if let Some(mut txn) = self.txn.take() {
             // Asserts that the transaction hasn't been already
@@ -114,8 +116,28 @@ impl Drop for RoTxn<'_> {
     }
 }
 
-#[cfg(feature = "read-txn-no-tls")]
-unsafe impl Send for RoTxn<'_> {}
+/// Parameter defining that read transactions are opened with
+/// Thread Local Storage (TLS) and cannot be sent between threads `!Send`.
+pub enum WithTls {}
+
+/// Parameter defining that read transactions are opened without
+/// Thread Local Storage (TLS) and are therefore `Send`.
+pub enum WithoutTls {}
+
+pub trait TlsUsage {
+    const ENABLED: bool;
+}
+
+impl TlsUsage for WithTls {
+    const ENABLED: bool = true;
+}
+
+impl TlsUsage for WithoutTls {
+    const ENABLED: bool = false;
+}
+
+/// Is sendable only if `MDB_NOTLS` has been used to open this transaction.
+unsafe impl Send for RoTxn<'_, WithoutTls> {}
 
 /// A read-write transaction.
 ///
@@ -155,11 +177,11 @@ unsafe impl Send for RoTxn<'_> {}
 /// }
 /// ```
 pub struct RwTxn<'p> {
-    pub(crate) txn: RoTxn<'p>,
+    pub(crate) txn: RoTxn<'p, WithoutTls>,
 }
 
 impl<'p> RwTxn<'p> {
-    pub(crate) fn new(env: &'p Env) -> Result<RwTxn<'p>> {
+    pub(crate) fn new<T>(env: &'p Env<T>) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -171,10 +193,16 @@ impl<'p> RwTxn<'p> {
             ))?
         };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
+        Ok(RwTxn {
+            txn: RoTxn {
+                txn: NonNull::new(txn),
+                env: Cow::Borrowed(env),
+                _tls_marker: PhantomData,
+            },
+        })
     }
 
-    pub(crate) fn nested(env: &'p Env, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+    pub(crate) fn nested<T>(env: &'p Env<T>, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.txn.unwrap().as_mut() };
 
@@ -182,7 +210,13 @@ impl<'p> RwTxn<'p> {
             mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
         };
 
-        Ok(RwTxn { txn: RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env) } })
+        Ok(RwTxn {
+            txn: RoTxn {
+                txn: NonNull::new(txn),
+                env: Cow::Borrowed(env),
+                _tls_marker: PhantomData,
+            },
+        })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -210,7 +244,7 @@ impl<'p> RwTxn<'p> {
 }
 
 impl<'p> Deref for RwTxn<'p> {
-    type Target = RoTxn<'p>;
+    type Target = RoTxn<'p, WithoutTls>;
 
     fn deref(&self) -> &Self::Target {
         &self.txn
