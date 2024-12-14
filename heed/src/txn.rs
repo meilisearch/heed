@@ -33,15 +33,15 @@ use crate::Result;
 /// ```rust
 /// #[allow(dead_code)]
 /// trait CovariantMarker<'a>: 'static {
-///     type T: 'a;
+///     type R: 'a;
 ///
-///     fn is_covariant(&'a self) -> &'a Self::T;
+///     fn is_covariant(&'a self) -> &'a Self::R;
 /// }
 ///
-/// impl<'a> CovariantMarker<'a> for heed::RoTxn<'static> {
-///     type T = heed::RoTxn<'a>;
+/// impl<'a, T> CovariantMarker<'a> for heed::RoTxn<'static, T> {
+///     type R = heed::RoTxn<'a, T>;
 ///
-///     fn is_covariant(&'a self) -> &'a heed::RoTxn<'a> {
+///     fn is_covariant(&'a self) -> &'a heed::RoTxn<'a, T> {
 ///         self
 ///     }
 /// }
@@ -193,10 +193,12 @@ impl<'p> RwTxn<'p> {
             ))?
         };
 
+        let env_without_tls = unsafe { env.as_without_tls() };
+
         Ok(RwTxn {
             txn: RoTxn {
                 txn: NonNull::new(txn),
-                env: Cow::Borrowed(env),
+                env: Cow::Borrowed(env_without_tls),
                 _tls_marker: PhantomData,
             },
         })
@@ -210,10 +212,12 @@ impl<'p> RwTxn<'p> {
             mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
         };
 
+        let env_without_tls = unsafe { env.as_without_tls() };
+
         Ok(RwTxn {
             txn: RoTxn {
                 txn: NonNull::new(txn),
-                env: Cow::Borrowed(env),
+                env: Cow::Borrowed(env_without_tls),
                 _tls_marker: PhantomData,
             },
         })

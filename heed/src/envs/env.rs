@@ -22,7 +22,7 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
+    Unspecified, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
@@ -41,6 +41,10 @@ impl<T> Env<T> {
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
         self.inner.env_ptr
+    }
+
+    pub(crate) unsafe fn as_without_tls(&self) -> &Env<WithoutTls> {
+        unsafe { std::mem::transmute::<&Env<T>, &Env<WithoutTls>>(self) }
     }
 
     /// The size of the data file on disk.

@@ -1079,7 +1079,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -1182,7 +1182,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn, T>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
