@@ -172,13 +172,13 @@ impl<'e, 'n, T, KC, DC, C> DatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     }
 }
 
-impl<KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C> {
+impl<T, KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
+impl<T, KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {}
 
 /// A typed database that accepts only the types it was created with.
 ///

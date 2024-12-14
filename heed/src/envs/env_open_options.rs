@@ -322,7 +322,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     #[cfg(master3)]
-    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv>
+    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv<T>>
     where
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,

@@ -43,6 +43,12 @@ impl<T> Env<T> {
         self.inner.env_ptr
     }
 
+    /// Converts any `Env` into `Env<WithoutTls>`, useful for wrapping
+    /// into a `RwTxn` due to the latter always being `WithoutTls`.
+    ///
+    /// # Safety
+    ///
+    /// Do not use this `Env` to create transactions but only keep it.
     pub(crate) unsafe fn as_without_tls(&self) -> &Env<WithoutTls> {
         unsafe { std::mem::transmute::<&Env<T>, &Env<WithoutTls>>(self) }
     }
