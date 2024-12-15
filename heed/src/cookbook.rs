@@ -423,7 +423,7 @@
 //! }
 //!
 //! impl<'t> ImmutableMap<'t> {
-//!     fn from_db(rtxn: &'t RoTxn, db: Database<Str, Str>) -> heed::Result<Self> {
+//!     fn from_db<T>(rtxn: &'t RoTxn<T>, db: Database<Str, Str>) -> heed::Result<Self> {
 //!         let mut map = HashMap::new();
 //!         for result in db.iter(rtxn)? {
 //!             let (k, v) = result?;
