@@ -56,13 +56,25 @@ impl EnvOpenOptions<WithoutTls> {
 }
 
 impl<T: TlsUsage> EnvOpenOptions<T> {
-    /// Make the read transactions `!Send` by specifying they will use Thread Local Storage (TLS).
+    /// Make the read transactions `!Send` by specifying they will
+    /// use Thread Local Storage (TLS). It is often faster to open
+    /// TLS-backed transactions.
+    ///
+    /// A thread can only use one transaction at a time, plus any
+    /// child (nested) transactions. Each transaction belongs to one
+    /// thread. A `BadRslot` error will be thrown when multiple read
+    /// transactions exists on the same thread.
     pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
     }
 
-    /// Make the read transactions `Send` by specifying they will not use Thread Local Storage (TLS).
+    /// Make the read transactions `Send` by specifying they will
+    /// not use Thread Local Storage (TLS).
+    ///
+    /// A thread can use any number of read transactions at a time on
+    /// the same thread. Read transactions can be moved in between
+    /// threads (`Send`).
     pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }

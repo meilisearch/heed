@@ -117,14 +117,34 @@ impl<T> Drop for RoTxn<'_, T> {
 }
 
 /// Parameter defining that read transactions are opened with
-/// Thread Local Storage (TLS) and cannot be sent between threads `!Send`.
+/// Thread Local Storage (TLS) and cannot be sent between threads
+/// `!Send`. It is often faster to open TLS-backed transactions.
+///
+/// When used to open transactions: A thread can only use one transaction
+/// at a time, plus any child (nested) transactions. Each transaction belongs
+/// to one thread. A `BadRslot` error will be thrown when multiple read
+/// transactions exists on the same thread.
 pub enum WithTls {}
 
 /// Parameter defining that read transactions are opened without
 /// Thread Local Storage (TLS) and are therefore `Send`.
+///
+/// When used to open transactions: A thread can use any number
+/// of read transactions at a time on the same thread. Read transactions
+/// can be moved in between threads (`Send`).
 pub enum WithoutTls {}
 
+/// Specifycies if Thread Local Storage (TLS) must be used when
+/// opening transactions. It is often faster to open TLS-backed
+/// transactions but makes them `!Send`.
+///
+/// The `#MDB_NOTLS` flag is set on `Env` opening, `RoTxn`s and
+/// iterators implements the `Send` trait. This allows the user to
+/// move `RoTxn`s and iterators between threads as read transactions
+/// will no more use thread local storage and will tie reader
+/// locktable slots to transaction objects instead of to threads.
 pub trait TlsUsage {
+    /// True if TLS must be used, false otherwise.
     const ENABLED: bool;
 }
 
