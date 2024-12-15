@@ -64,6 +64,29 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// child (nested) transactions. Each transaction belongs to one
     /// thread. A `BadRslot` error will be thrown when multiple read
     /// transactions exists on the same thread.
+    ///
+    /// # Example
+    ///
+    /// This example shows that the `RoTxn<'_, WithTls>` cannot be sent between threads.
+    ///
+    /// ```compile_fail
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::types::*;
+    ///
+    /// /// Checks, at compile time, that a type can be sent accross threads.
+    /// fn is_sendable<S: Send>(_x: S) {}
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new().read_txn_with_tls();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// is_sendable(rtxn);
+    /// # Ok(()) }
+    /// ```
     pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
@@ -75,6 +98,30 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// A thread can use any number of read transactions at a time on
     /// the same thread. Read transactions can be moved in between
     /// threads (`Send`).
+    ///
+    ///
+    /// # Example
+    ///
+    /// This example shows that the `RoTxn<'_, WithoutTls>` can be sent between threads.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::types::*;
+    ///
+    /// /// Checks, at compile time, that a type can be sent accross threads.
+    /// fn is_sendable<S: Send>(_x: S) {}
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new().read_txn_without_tls();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// is_sendable(rtxn);
+    /// # Ok(()) }
+    /// ```
     pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
