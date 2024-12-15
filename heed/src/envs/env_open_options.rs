@@ -83,6 +83,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
 
 impl<T: TlsUsage> EnvOpenOptions<T> {
     /// Set the size of the memory map to use for this environment.
+    ///
+    /// It must be a multiple of the OS page size.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
         self
