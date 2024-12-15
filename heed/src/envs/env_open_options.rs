@@ -99,6 +99,16 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// the same thread. Read transactions can be moved in between
     /// threads (`Send`).
     ///
+    /// ## From LMDB's documentation
+    ///
+    /// Don't use Thread-Local Storage. Tie reader locktable slots to
+    /// #MDB_txn objects instead of to threads. I.e. #mdb_txn_reset() keeps
+    /// the slot reserved for the #MDB_txn object. A thread may use parallel
+    /// read-only transactions. A read-only transaction may span threads if
+    /// the user synchronizes its use. Applications that multiplex many
+    /// user threads over individual OS threads need this option. Such an
+    /// application must also serialize the write transactions in an OS
+    /// thread, since LMDB's write locking is unaware of the user threads.
     ///
     /// # Example
     ///
