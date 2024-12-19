@@ -86,6 +86,15 @@ impl<'e> RoTxn<'e> {
         self.env.env_mut_ptr()
     }
 
+    /// Return the transaction's ID.
+    ///
+    /// This returns the identifier associated with this transaction. For a
+    /// [`RoTxn`], this corresponds to the snapshot being read;
+    /// concurrent readers will frequently have the same transaction ID.
+    pub fn id(&self) -> usize {
+        unsafe { ffi::mdb_txn_id(self.txn.unwrap().as_ptr()) }
+    }
+
     /// Commit a read transaction.
     ///
     /// Synchronizing some [`Env`] metadata with the global handle.
