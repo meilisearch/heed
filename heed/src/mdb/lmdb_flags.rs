@@ -28,7 +28,7 @@ bitflags! {
         /// Use asynchronous msync when MDB_WRITEMAP is used.
         const MAP_ASYNC = ffi::MDB_MAPASYNC;
         /// Tie reader locktable slots to MDB_txn objects instead of to threads.
-        #[deprecated(since="0.22.0", note="please use `Env::read_txn_with_tls` or `Env::read_txn_without_tls` instead")]
+        #[deprecated(since="0.22.0", note="please use `EnvOpenOptions::read_txn_with_tls` or `EnvOpenOptions::read_txn_without_tls` instead")]
         const NO_TLS = ffi::MDB_NOTLS;
         /// Don't do any locking, caller must manage their own locks.
         const NO_LOCK = ffi::MDB_NOLOCK;
