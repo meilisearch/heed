@@ -136,7 +136,7 @@ pub enum WithTls {}
 #[derive(Debug, PartialEq, Eq)]
 pub enum WithoutTls {}
 
-/// Specifycies if Thread Local Storage (TLS) must be used when
+/// Specificies if Thread Local Storage (TLS) must be used when
 /// opening transactions. It is often faster to open TLS-backed
 /// transactions but makes them `!Send`.
 ///
