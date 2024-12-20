@@ -124,6 +124,7 @@ impl<T> Drop for RoTxn<'_, T> {
 /// at a time, plus any child (nested) transactions. Each transaction belongs
 /// to one thread. A `BadRslot` error will be thrown when multiple read
 /// transactions exists on the same thread.
+#[derive(Debug, PartialEq, Eq)]
 pub enum WithTls {}
 
 /// Parameter defining that read transactions are opened without
@@ -132,6 +133,7 @@ pub enum WithTls {}
 /// When used to open transactions: A thread can use any number
 /// of read transactions at a time on the same thread. Read transactions
 /// can be moved in between threads (`Send`).
+#[derive(Debug, PartialEq, Eq)]
 pub enum WithoutTls {}
 
 /// Specifycies if Thread Local Storage (TLS) must be used when

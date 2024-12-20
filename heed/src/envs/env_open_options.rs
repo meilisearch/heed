@@ -26,7 +26,7 @@ use crate::txn::{TlsUsage, WithoutTls};
 use crate::{EnvFlags, Error, Result, WithTls};
 
 /// Options and flags which can be used to configure how an environment is opened.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnvOpenOptions<T: TlsUsage> {
     map_size: Option<usize>,
@@ -34,12 +34,6 @@ pub struct EnvOpenOptions<T: TlsUsage> {
     max_dbs: Option<u32>,
     flags: EnvFlags,
     _tls_marker: PhantomData<T>,
-}
-
-impl Default for EnvOpenOptions<WithTls> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl EnvOpenOptions<WithTls> {
@@ -136,9 +130,6 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
     }
-}
-
-impl<T: TlsUsage> EnvOpenOptions<T> {
     /// Set the size of the memory map to use for this environment.
     ///
     /// It must be a multiple of the OS page size.
@@ -492,5 +483,18 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                 }
             }
         }
+    }
+}
+
+impl Default for EnvOpenOptions<WithTls> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: TlsUsage> Clone for EnvOpenOptions<T> {
+    fn clone(&self) -> Self {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker } = *self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker }
     }
 }
