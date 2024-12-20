@@ -46,7 +46,7 @@ use crate::Result;
 ///     }
 /// }
 /// ```
-pub struct RoTxn<'e, T> {
+pub struct RoTxn<'e, T = WithTls> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
     env: Cow<'e, Env<T>>,

@@ -36,15 +36,15 @@ pub struct EnvOpenOptions<T: TlsUsage> {
     _tls_marker: PhantomData<T>,
 }
 
-impl Default for EnvOpenOptions<WithoutTls> {
+impl Default for EnvOpenOptions<WithTls> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl EnvOpenOptions<WithoutTls> {
+impl EnvOpenOptions<WithTls> {
     /// Creates a blank new set of options ready for configuration.
-    pub fn new() -> EnvOpenOptions<WithoutTls> {
+    pub fn new() -> EnvOpenOptions<WithTls> {
         EnvOpenOptions {
             map_size: None,
             max_readers: None,
