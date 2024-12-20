@@ -55,16 +55,16 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct DatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
-    env: &'e Env,
+pub struct DatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator> {
+    env: &'e Env<T>,
     types: marker::PhantomData<(KC, DC, C)>,
     name: Option<&'n str>,
     flags: AllDatabaseFlags,
 }
 
-impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified> {
+impl<'e, T> DatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
-    pub fn new(env: &'e Env) -> Self {
+    pub fn new(env: &'e Env<T>) -> Self {
         DatabaseOpenOptions {
             env,
             types: Default::default(),
@@ -74,12 +74,12 @@ impl<'e> DatabaseOpenOptions<'e, 'static, Unspecified, Unspecified> {
     }
 }
 
-impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
+impl<'e, 'n, T, KC, DC, C> DatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, NKC, NDC> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, T, NKC, NDC> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -87,10 +87,11 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
             flags: self.flags,
         }
     }
+
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, T, KC, DC, NC> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
@@ -131,7 +132,7 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<Database<KC, DC, C>>>
+    pub fn open(&self, rtxn: &RoTxn<T>) -> Result<Option<Database<KC, DC, C>>>
     where
         KC: 'static,
         DC: 'static,
@@ -171,13 +172,13 @@ impl<'e, 'n, KC, DC, C> DatabaseOpenOptions<'e, 'n, KC, DC, C> {
     }
 }
 
-impl<KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C> {
+impl<T, KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
+impl<T, KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {}
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -339,7 +340,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn>(&self, txn: &'txn RoTxn, key: &'a KC::EItem) -> Result<Option<DC::DItem>>
+    pub fn get<'a, 'txn, T>(
+        &self,
+        txn: &'txn RoTxn<T>,
+        key: &'a KC::EItem,
+    ) -> Result<Option<DC::DItem>>
     where
         KC: BytesEncode<'a>,
         DC: BytesDecode<'txn>,
@@ -423,11 +428,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_duplicates<'a, 'txn>(
+    pub fn get_duplicates<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
-    ) -> Result<Option<RoIter<'txn, KC, DC, MoveOnCurrentKeyDuplicates>>>
+    ) -> Result<Option<RoIter<'txn, T, KC, DC, MoveOnCurrentKeyDuplicates>>>
     where
         KC: BytesEncode<'a>,
     {
@@ -486,9 +491,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn>(
+    pub fn get_lower_than<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -555,9 +560,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn>(
+    pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -628,9 +633,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn>(
+    pub fn get_greater_than<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -700,9 +705,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn>(
+    pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -759,7 +764,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -813,7 +818,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn>(&self, txn: &'txn RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -870,7 +875,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len(&self, txn: &RoTxn) -> Result<u64> {
+    pub fn len<T>(&self, txn: &RoTxn<T>) -> Result<u64> {
         self.stat(txn).map(|stat| stat.entries as u64)
     }
 
@@ -913,7 +918,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
+    pub fn is_empty<T>(&self, txn: &RoTxn<T>) -> Result<bool> {
         self.len(txn).map(|l| l == 0)
     }
 
@@ -955,7 +960,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn stat(&self, txn: &RoTxn) -> Result<DatabaseStat> {
+    pub fn stat<T>(&self, txn: &RoTxn<T>) -> Result<DatabaseStat> {
         assert_eq_env_db_txn!(self, txn);
 
         let mut db_stat = mem::MaybeUninit::uninit();
@@ -1019,7 +1024,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoIter<'txn, KC, DC>> {
+    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, T, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
@@ -1120,7 +1125,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn>(&self, txn: &'txn RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
+    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, T, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
@@ -1226,11 +1231,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, R>(
+    pub fn range<'a, 'txn, R, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRange<'txn, KC, DC, C>>
+    ) -> Result<RoRange<'txn, T, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1398,11 +1403,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, R>(
+    pub fn rev_range<'a, 'txn, R, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, KC, DC, C>>
+    ) -> Result<RoRevRange<'txn, T, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1572,11 +1577,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn>(
+    pub fn prefix_iter<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoPrefix<'txn, KC, DC, C>>
+    ) -> Result<RoPrefix<'txn, T, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1704,11 +1709,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn>(
+    pub fn rev_prefix_iter<'a, 'txn, T>(
         &self,
-        txn: &'txn RoTxn,
+        txn: &'txn RoTxn<'_, T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRevPrefix<'txn, KC, DC, C>>
+    ) -> Result<RoRevPrefix<'txn, T, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,

@@ -2,6 +2,7 @@ use std::ffi::CString;
 #[cfg(windows)]
 use std::ffi::OsStr;
 use std::io::ErrorKind::NotFound;
+use std::marker::PhantomData;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -21,38 +22,118 @@ use super::{canonicalize_path, OPENED_ENV};
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
+use crate::txn::{TlsUsage, WithTls, WithoutTls};
 use crate::{EnvFlags, Error, Result};
 
 /// Options and flags which can be used to configure how an environment is opened.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions {
+pub struct EnvOpenOptions<T: TlsUsage> {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
     flags: EnvFlags,
+    _tls_marker: PhantomData<T>,
 }
 
-impl Default for EnvOpenOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EnvOpenOptions {
+impl EnvOpenOptions<WithTls> {
     /// Creates a blank new set of options ready for configuration.
-    pub fn new() -> EnvOpenOptions {
+    pub fn new() -> EnvOpenOptions<WithTls> {
         EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
             flags: EnvFlags::empty(),
+            _tls_marker: PhantomData,
         }
     }
 }
 
-impl EnvOpenOptions {
+impl<T: TlsUsage> EnvOpenOptions<T> {
+    /// Make the read transactions `!Send` by specifying they will
+    /// use Thread Local Storage (TLS). It is often faster to open
+    /// TLS-backed transactions.
+    ///
+    /// A thread can only use one transaction at a time, plus any
+    /// child (nested) transactions. Each transaction belongs to one
+    /// thread. A `BadRslot` error will be thrown when multiple read
+    /// transactions exists on the same thread.
+    ///
+    /// # Example
+    ///
+    /// This example shows that the `RoTxn<'_, WithTls>` cannot be sent between threads.
+    ///
+    /// ```compile_fail
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::types::*;
+    ///
+    /// /// Checks, at compile time, that a type can be sent accross threads.
+    /// fn is_sendable<S: Send>(_x: S) {}
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new().read_txn_with_tls();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// is_sendable(rtxn);
+    /// # Ok(()) }
+    /// ```
+    pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    }
+
+    /// Make the read transactions `Send` by specifying they will
+    /// not use Thread Local Storage (TLS).
+    ///
+    /// A thread can use any number of read transactions at a time on
+    /// the same thread. Read transactions can be moved in between
+    /// threads (`Send`).
+    ///
+    /// ## From LMDB's documentation
+    ///
+    /// Don't use Thread-Local Storage. Tie reader locktable slots to
+    /// #MDB_txn objects instead of to threads. I.e. #mdb_txn_reset() keeps
+    /// the slot reserved for the #MDB_txn object. A thread may use parallel
+    /// read-only transactions. A read-only transaction may span threads if
+    /// the user synchronizes its use. Applications that multiplex many
+    /// user threads over individual OS threads need this option. Such an
+    /// application must also serialize the write transactions in an OS
+    /// thread, since LMDB's write locking is unaware of the user threads.
+    ///
+    /// # Example
+    ///
+    /// This example shows that the `RoTxn<'_, WithoutTls>` can be sent between threads.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::types::*;
+    ///
+    /// /// Checks, at compile time, that a type can be sent accross threads.
+    /// fn is_sendable<S: Send>(_x: S) {}
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new().read_txn_without_tls();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// is_sendable(rtxn);
+    /// # Ok(()) }
+    /// ```
+    pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    }
+
     /// Set the size of the memory map to use for this environment.
+    ///
+    /// It must be a multiple of the OS page size.
     pub fn map_size(&mut self, size: usize) -> &mut Self {
         self.map_size = Some(size);
         self
@@ -151,7 +232,7 @@ impl EnvOpenOptions {
     /// [^6]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L49-L52>
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
-    pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env> {
+    pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env<T>> {
         self.raw_open_with_encryption(
             path.as_ref(),
             #[cfg(master3)]
@@ -304,7 +385,7 @@ impl EnvOpenOptions {
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     #[cfg(master3)]
-    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv>
+    pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv<T>>
     where
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,
@@ -320,7 +401,7 @@ impl EnvOpenOptions {
         &self,
         path: &Path,
         #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
-    ) -> Result<Env> {
+    ) -> Result<Env<T>> {
         let mut lock = OPENED_ENV.write().unwrap();
 
         let path = match canonicalize_path(path) {
@@ -379,11 +460,12 @@ impl EnvOpenOptions {
                 // When the `read-txn-no-tls` feature is enabled, we must force LMDB
                 // to avoid using the thread local storage, this way we allow users
                 // to use references of RoTxn between threads safely.
-                let flags = if cfg!(feature = "read-txn-no-tls") {
+                #[allow(deprecated)] // NO_TLS is inside of the crate
+                let flags = if T::ENABLED {
                     // TODO make this a ZST flag on the Env and on RoTxn (make them Send when we can)
-                    self.flags | EnvFlags::NO_TLS
-                } else {
                     self.flags
+                } else {
+                    self.flags | EnvFlags::NO_TLS
                 };
 
                 let result = ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600);
@@ -402,5 +484,18 @@ impl EnvOpenOptions {
                 }
             }
         }
+    }
+}
+
+impl Default for EnvOpenOptions<WithTls> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: TlsUsage> Clone for EnvOpenOptions<T> {
+    fn clone(&self) -> Self {
+        let Self { map_size, max_readers, max_dbs, flags, _tls_marker } = *self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker }
     }
 }

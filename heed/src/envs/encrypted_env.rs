@@ -15,11 +15,11 @@ use crate::{Database, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
 #[derive(Clone)]
-pub struct EncryptedEnv {
-    pub(crate) inner: Env,
+pub struct EncryptedEnv<T> {
+    pub(crate) inner: Env<T>,
 }
 
-impl EncryptedEnv {
+impl<T> EncryptedEnv<T> {
     /// The size of the data file on disk.
     ///
     /// # Example
@@ -103,7 +103,7 @@ impl EncryptedEnv {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> EncryptedDatabaseOpenOptions<Unspecified, Unspecified> {
+    pub fn database_options(&self) -> EncryptedDatabaseOpenOptions<T, Unspecified, Unspecified> {
         EncryptedDatabaseOpenOptions::new(self)
     }
 
@@ -127,7 +127,7 @@ impl EncryptedEnv {
     /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
-        rtxn: &RoTxn,
+        rtxn: &RoTxn<T>,
         name: Option<&str>,
     ) -> Result<Option<EncryptedDatabase<KC, DC>>>
     where
@@ -213,7 +213,7 @@ impl EncryptedEnv {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn read_txn(&self) -> Result<RoTxn> {
+    pub fn read_txn(&self) -> Result<RoTxn<T>> {
         self.inner.read_txn()
     }
 
@@ -242,7 +242,7 @@ impl EncryptedEnv {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn static_read_txn(self) -> Result<RoTxn<'static>> {
+    pub fn static_read_txn(self) -> Result<RoTxn<'static, T>> {
         self.inner.static_read_txn()
     }
 
@@ -315,11 +315,10 @@ impl EncryptedEnv {
     }
 }
 
-unsafe impl Send for EncryptedEnv {}
+unsafe impl<T> Send for EncryptedEnv<T> {}
+unsafe impl<T> Sync for EncryptedEnv<T> {}
 
-unsafe impl Sync for EncryptedEnv {}
-
-impl fmt::Debug for EncryptedEnv {
+impl<T> fmt::Debug for EncryptedEnv<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EncryptedEnv")
             .field("path", &self.inner.path().display())

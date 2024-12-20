@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::ffi::CString;
 use std::fs::File;
+use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
@@ -21,26 +22,35 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
+    Unspecified, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
-#[derive(Clone)]
-pub struct Env {
-    inner: Arc<EnvInner>,
+pub struct Env<T> {
+    inner: Arc<EnvInner<T>>,
 }
 
-impl Env {
+impl<T> Env<T> {
     pub(crate) fn new(
         env_ptr: NonNull<MDB_env>,
         path: PathBuf,
         signal_event: Arc<SignalEvent>,
-    ) -> Env {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }) }
+    ) -> Self {
+        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event, _tls_marker: PhantomData }) }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
         self.inner.env_ptr
+    }
+
+    /// Converts any `Env` into `Env<WithoutTls>`, useful for wrapping
+    /// into a `RwTxn` due to the latter always being `WithoutTls`.
+    ///
+    /// # Safety
+    ///
+    /// Do not use this `Env` to create transactions but only keep it.
+    pub(crate) unsafe fn as_without_tls(&self) -> &Env<WithoutTls> {
+        unsafe { std::mem::transmute::<&Env<T>, &Env<WithoutTls>>(self) }
     }
 
     /// The size of the data file on disk.
@@ -194,7 +204,7 @@ impl Env {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<Unspecified, Unspecified> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<T, Unspecified, Unspecified> {
         DatabaseOpenOptions::new(self)
     }
 
@@ -218,7 +228,7 @@ impl Env {
     /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
-        rtxn: &RoTxn,
+        rtxn: &RoTxn<T>,
         name: Option<&str>,
     ) -> Result<Option<Database<KC, DC>>>
     where
@@ -353,7 +363,7 @@ impl Env {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn read_txn(&self) -> Result<RoTxn> {
+    pub fn read_txn(&self) -> Result<RoTxn<T>> {
         RoTxn::new(self)
     }
 
@@ -382,7 +392,7 @@ impl Env {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn static_read_txn(self) -> Result<RoTxn<'static>> {
+    pub fn static_read_txn(self) -> Result<RoTxn<'static, T>> {
         RoTxn::static_read_txn(self)
     }
 
@@ -481,26 +491,32 @@ impl Env {
     }
 }
 
-unsafe impl Send for Env {}
+impl<T> Clone for Env<T> {
+    fn clone(&self) -> Self {
+        Env { inner: self.inner.clone() }
+    }
+}
 
-unsafe impl Sync for Env {}
+unsafe impl<T> Send for Env<T> {}
+unsafe impl<T> Sync for Env<T> {}
 
-impl fmt::Debug for Env {
+impl<T> fmt::Debug for Env<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Env").field("path", &self.inner.path.display()).finish_non_exhaustive()
     }
 }
 
-pub(crate) struct EnvInner {
+pub(crate) struct EnvInner<T> {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
+    _tls_marker: PhantomData<T>,
 }
 
-unsafe impl Send for EnvInner {}
-unsafe impl Sync for EnvInner {}
+unsafe impl<T> Send for EnvInner<T> {}
+unsafe impl<T> Sync for EnvInner<T> {}
 
-impl Drop for EnvInner {
+impl<T> Drop for EnvInner<T> {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.write().unwrap();
         let removed = lock.remove(&self.path);

@@ -5,14 +5,14 @@ use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
-pub struct RoCursor<'txn> {
+pub struct RoCursor<'txn, T> {
     cursor: *mut ffi::MDB_cursor,
-    _marker: marker::PhantomData<&'txn ()>,
+    _marker: marker::PhantomData<&'txn T>,
 }
 
-impl<'txn> RoCursor<'txn> {
-    // TODO should I ask for a &mut RoTxn, here?
-    pub(crate) fn new(txn: &'txn RoTxn, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
+impl<'txn, T> RoCursor<'txn, T> {
+    // TODO should I ask for a &mut RoTxn<'_, T>, here?
+    pub(crate) fn new(txn: &'txn RoTxn<'_, T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn, T>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
         let mut txn = txn.txn.unwrap();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
@@ -237,14 +237,14 @@ impl<'txn> RoCursor<'txn> {
     }
 }
 
-impl Drop for RoCursor<'_> {
+impl<T> Drop for RoCursor<'_, T> {
     fn drop(&mut self) {
         unsafe { ffi::mdb_cursor_close(self.cursor) }
     }
 }
 
 pub struct RwCursor<'txn> {
-    cursor: RoCursor<'txn>,
+    cursor: RoCursor<'txn, WithoutTls>,
 }
 
 impl<'txn> RwCursor<'txn> {
@@ -404,7 +404,7 @@ impl<'txn> RwCursor<'txn> {
 }
 
 impl<'txn> Deref for RwCursor<'txn> {
-    type Target = RoCursor<'txn>;
+    type Target = RoCursor<'txn, WithoutTls>;
 
     fn deref(&self) -> &Self::Target {
         &self.cursor
