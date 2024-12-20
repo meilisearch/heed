@@ -22,8 +22,8 @@ use super::{canonicalize_path, OPENED_ENV};
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
-use crate::txn::{TlsUsage, WithoutTls};
-use crate::{EnvFlags, Error, Result, WithTls};
+use crate::txn::{TlsUsage, WithTls, WithoutTls};
+use crate::{EnvFlags, Error, Result};
 
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Debug, PartialEq, Eq)]
@@ -130,6 +130,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
         let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
         EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
     }
+
     /// Set the size of the memory map to use for this environment.
     ///
     /// It must be a multiple of the OS page size.
@@ -462,9 +463,9 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                 #[allow(deprecated)] // NO_TLS is inside of the crate
                 let flags = if T::ENABLED {
                     // TODO make this a ZST flag on the Env and on RoTxn (make them Send when we can)
-                    self.flags | EnvFlags::NO_TLS
-                } else {
                     self.flags
+                } else {
+                    self.flags | EnvFlags::NO_TLS
                 };
 
                 let result = ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600);
