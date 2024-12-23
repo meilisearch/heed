@@ -341,8 +341,9 @@
 //!
 //! # Advanced Multithreaded Access of Entries
 //!
-//! LMDB disallow sharing cursors amongs threads. It is only possible to send
-//! them between threads when the heed `read-txn-no-tls` feature is enabled.
+//! LMDB disallows sharing cursors among threads. It is only possible to send
+//! them between threads when the environment has been opened with
+//! [`EnvOpenOptions::read_txn_without_tls`] method.
 //!
 //! Please note that this should not be utilized with an encrypted heed3 database. These
 //! types of databases employ an internal cycling buffer for decrypting entries, which
