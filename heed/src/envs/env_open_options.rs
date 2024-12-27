@@ -161,7 +161,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();
-    /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
+    /// unsafe { env_builder.flags(EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
@@ -457,16 +457,11 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                     mdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                 }
 
-                // When the `read-txn-no-tls` feature is enabled, we must force LMDB
-                // to avoid using the thread local storage, this way we allow users
-                // to use references of RoTxn between threads safely.
-                #[allow(deprecated)] // NO_TLS is inside of the crate
-                let flags = if T::ENABLED {
-                    // TODO make this a ZST flag on the Env and on RoTxn (make them Send when we can)
-                    self.flags
-                } else {
-                    self.flags | EnvFlags::NO_TLS
-                };
+                // When the `<T as TlsUsage>::ENABLED` is true, we must tell
+                // LMDB to avoid using the thread local storage, this way we
+                // allow users to move RoTxn between threads safely.
+                #[allow(deprecated)] // ok because NO_TLS is inside of the crate
+                let flags = if T::ENABLED { self.flags } else { self.flags | EnvFlags::NO_TLS };
 
                 let result = ffi::mdb_env_open(env, path_str.as_ptr(), flags.bits(), 0o600);
                 match mdb_result(result) {

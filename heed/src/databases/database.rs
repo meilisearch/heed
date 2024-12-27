@@ -378,8 +378,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
     /// Returns an iterator over all of the values of a single key.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -986,8 +987,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
     /// Return an ordered iterator of all key-value pairs in this database.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -1087,8 +1089,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
     /// Return a reverse ordered iterator of all key-value pairs in this database.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -1192,8 +1195,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the comparator `C`.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -1364,8 +1368,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the comparator `C`.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -1537,8 +1542,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;
@@ -1669,8 +1675,9 @@ impl<KC, DC, C> Database<KC, DC, C> {
     ///
     /// Comparisons are made by using the bytes representation of the key.
     ///
-    /// You can make this iterator `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this iterator `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ```
     /// # use std::fs;

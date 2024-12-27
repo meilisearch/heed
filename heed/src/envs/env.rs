@@ -341,8 +341,10 @@ impl<T> Env<T> {
 
     /// Create a transaction with read-only access for use with the environment.
     ///
-    /// You can make this transaction `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this transaction `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
+    ///
     /// See [`Self::static_read_txn`] if you want the txn to own the environment.
     ///
     /// ## LMDB Limitations
@@ -371,8 +373,9 @@ impl<T> Env<T> {
     /// Contrary to [`Self::read_txn`], this version **owns** the environment, which
     /// means you won't be able to close the environment while this transaction is alive.
     ///
-    /// You can make this transaction `Send`able between threads by
-    /// using the `read-txn-no-tls` crate feature.
+    /// You can make this transaction `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
     ///
     /// ## LMDB Limitations
     ///
