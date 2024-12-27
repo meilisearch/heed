@@ -161,7 +161,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();
-    /// unsafe { env_builder.flags(EnvFlags::NO_TLS | EnvFlags::NO_META_SYNC); }
+    /// unsafe { env_builder.flags(EnvFlags::NO_META_SYNC); }
     /// let dir = tempfile::tempdir().unwrap();
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
