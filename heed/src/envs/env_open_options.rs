@@ -1,3 +1,5 @@
+#[cfg(master3)]
+use std::any::TypeId;
 use std::ffi::CString;
 #[cfg(windows)]
 use std::ffi::OsStr;
@@ -15,9 +17,11 @@ use aead::{generic_array::typenum::Unsigned, AeadCore, AeadMutInPlace, Key, KeyI
 use synchronoise::SignalEvent;
 
 #[cfg(master3)]
+use super::checksum_func_wrapper;
+#[cfg(master3)]
 use super::encrypted_env::{encrypt_func_wrapper, EncryptedEnv};
 use super::env::Env;
-use super::{canonicalize_path, OPENED_ENV};
+use super::{canonicalize_path, Checksum, NoChecksum, OPENED_ENV};
 #[cfg(windows)]
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
@@ -28,28 +32,28 @@ use crate::{EnvFlags, Error, Result};
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions<T: TlsUsage> {
+pub struct EnvOpenOptions<T: TlsUsage, C: Checksum> {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
     flags: EnvFlags,
-    _tls_marker: PhantomData<T>,
+    _marker: PhantomData<(T, C)>,
 }
 
-impl EnvOpenOptions<WithTls> {
+impl EnvOpenOptions<WithTls, NoChecksum> {
     /// Creates a blank new set of options ready for configuration.
-    pub fn new() -> EnvOpenOptions<WithTls> {
+    pub fn new() -> EnvOpenOptions<WithTls, NoChecksum> {
         EnvOpenOptions {
             map_size: None,
             max_readers: None,
             max_dbs: None,
             flags: EnvFlags::empty(),
-            _tls_marker: PhantomData,
+            _marker: PhantomData,
         }
     }
 }
 
-impl<T: TlsUsage> EnvOpenOptions<T> {
+impl<T: TlsUsage, C: Checksum + 'static> EnvOpenOptions<T, C> {
     /// Make the read transactions `!Send` by specifying they will
     /// use Thread Local Storage (TLS). It is often faster to open
     /// TLS-backed transactions.
@@ -81,9 +85,9 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// is_sendable(rtxn);
     /// # Ok(()) }
     /// ```
-    pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls, C> {
+        let Self { map_size, max_readers, max_dbs, flags, _marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _marker: PhantomData }
     }
 
     /// Make the read transactions `Send` by specifying they will
@@ -126,9 +130,111 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// is_sendable(rtxn);
     /// # Ok(()) }
     /// ```
-    pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+    pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls, C> {
+        let Self { map_size, max_readers, max_dbs, flags, _marker: _ } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _marker: PhantomData }
+    }
+
+    #[cfg(master3)]
+    /// Changes the checksum algorithm to use.
+    ///
+    /// # Basic Example
+    ///
+    /// Creates and open a database. The [`Env`] is using a [`crc`](https://github.com/mrhooray/crc-rs)
+    /// algorithm.
+    ///
+    /// Note that you cannot use **any** type of crc algorithm as it is possible to tell
+    /// the size of the crc to LMDB.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use memchr::memmem::find;
+    /// use argon2::Argon2;
+    /// use chacha20poly1305::{ChaCha20Poly1305, Key};
+    /// use heed3::types::*;
+    /// use heed3::{EnvOpenOptions, Checksum, Database, Error, MdbError};
+    ///
+    /// /// A checksum algorithm based on the well-known CRC_32_BZIP2.
+    /// enum Crc32Bzip2 {}
+    ///
+    /// impl Checksum for Crc32Bzip2 {
+    ///     // Be careful the size is in bytes not bits.
+    ///     const SIZE: u32 = 32 / 8;
+    ///
+    ///     fn checksum(input: &[u8], output: &mut [u8], _key: Option<&[u8]>) {
+    ///         let sum = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2).checksum(input);
+    ///         eprintln!("checksumming {input:?} which gives {sum:?}");
+    ///         output.copy_from_slice(&sum.to_ne_bytes());
+    ///     }
+    /// }
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let env_path = tempfile::tempdir()?;
+    /// let password = "This is the password that will be hashed by the argon2 algorithm";
+    /// let salt = "The salt added to the password hashes to add more security when stored";
+    ///
+    /// fs::create_dir_all(&env_path)?;
+    ///
+    /// let mut key = Key::default();
+    /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
+    ///
+    /// // We open the environment
+    /// let mut options = EnvOpenOptions::new().checksum::<Crc32Bzip2>();
+    /// let env = unsafe {
+    ///     options
+    ///         .map_size(10 * 1024 * 1024) // 10MB
+    ///         .max_dbs(3)
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
+    /// };
+    ///
+    /// let key1 = "first-key";
+    /// let val1 = "this is my first value";
+    /// let key2 = "second-key";
+    /// let val2 = "this is a second information";
+    ///
+    /// // We create a database and write values in it
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<Str, Str>(&mut wtxn, Some("first"))?;
+    /// db.put(&mut wtxn, key1, val1)?;
+    /// db.put(&mut wtxn, key2, val2)?;
+    /// wtxn.commit()?;
+    ///
+    /// // We check that we can read the values back
+    /// let mut rtxn = env.read_txn()?;
+    /// assert_eq!(db.get(&mut rtxn, key1)?, Some(val1));
+    /// assert_eq!(db.get(&mut rtxn, key2)?, Some(val2));
+    /// drop(rtxn);
+    ///
+    /// // We close the env and check that we can read in it
+    /// env.prepare_for_closing().wait();
+    ///
+    /// // We modify the content of the data file
+    /// let mut content = fs::read(env_path.path().join("data.mdb"))?;
+    /// let pos = find(&content, b"value").unwrap();
+    /// content[pos..pos + 5].copy_from_slice(b"thing");
+    /// fs::write(env_path.path().join("data.mdb"), content)?;
+    ///
+    /// // We reopen the environment
+    /// let mut options = EnvOpenOptions::new().checksum::<Crc32Bzip2>();
+    /// let env = unsafe {
+    ///     options
+    ///         .map_size(10 * 1024 * 1024) // 10MB
+    ///         .max_dbs(3)
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
+    /// };
+    ///
+    /// // We check that we can read the values back
+    /// let mut rtxn = env.read_txn()?;
+    /// let db = env.open_database::<Str, Str>(&rtxn, Some("first"))?.unwrap();
+    /// assert!(matches!(db.get(&mut rtxn, key1).unwrap_err(), Error::Mdb(MdbError::BadChecksum)));
+    /// drop(rtxn);
+    ///
+    /// # Ok(()) }
+    /// ```
+    pub fn checksum<NC: Checksum>(self) -> EnvOpenOptions<T, NC> {
+        let Self { map_size, max_readers, max_dbs, flags, _marker } = self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _marker: PhantomData }
     }
 
     /// Set the size of the memory map to use for this environment.
@@ -233,7 +339,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// [^7]: <https://github.com/LMDB/lmdb/blob/b8e54b4c31378932b69f1298972de54a565185b1/libraries/liblmdb/lmdb.h#L102-L105>
     /// [^8]: <http://www.lmdb.tech/doc/index.html>
     pub unsafe fn open<P: AsRef<Path>>(&self, path: P) -> Result<Env<T>> {
-        self.raw_open_with_encryption(
+        self.raw_open_with_checksum_and_encryption(
             path.as_ref(),
             #[cfg(master3)]
             None,
@@ -390,14 +496,14 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
         E: AeadMutInPlace + KeyInit,
         P: AsRef<Path>,
     {
-        self.raw_open_with_encryption(
+        self.raw_open_with_checksum_and_encryption(
             path.as_ref(),
             Some((Some(encrypt_func_wrapper::<E>), &key, <E as AeadCore>::TagSize::U32)),
         )
         .map(|inner| EncryptedEnv { inner })
     }
 
-    fn raw_open_with_encryption(
+    fn raw_open_with_checksum_and_encryption(
         &self,
         path: &Path,
         #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
@@ -434,6 +540,16 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                         encrypt_func,
                         &crate::into_val(key),
                         tag_size,
+                    ))?;
+                }
+
+                #[cfg(master3)]
+                if TypeId::of::<C>() != TypeId::of::<NoChecksum>() {
+                    eprintln!("Doing some checksumming stuff");
+                    mdb_result(ffi::mdb_env_set_checksum(
+                        env,
+                        Some(checksum_func_wrapper::<C>),
+                        C::SIZE,
                     ))?;
                 }
 
@@ -482,15 +598,15 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     }
 }
 
-impl Default for EnvOpenOptions<WithTls> {
+impl Default for EnvOpenOptions<WithTls, NoChecksum> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: TlsUsage> Clone for EnvOpenOptions<T> {
+impl<T: TlsUsage, C: Checksum> Clone for EnvOpenOptions<T, C> {
     fn clone(&self) -> Self {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker } = *self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker }
+        let Self { map_size, max_readers, max_dbs, flags, _marker } = *self;
+        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _marker }
     }
 }

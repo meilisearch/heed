@@ -32,6 +32,8 @@ synchronoise = "1.0.1"
 [dev-dependencies]
 # TODO update dependencies
 argon2 = { version = "0.5.3", features = ["std"] }
+crc = "3.2.1"
+memchr = "2.7.4"
 serde = { version = "1.0.215", features = ["derive"] }
 chacha20poly1305 = "0.10.1"
 tempfile = "3.14.0"
