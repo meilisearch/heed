@@ -11,7 +11,7 @@ pub use ffi::{
     MDB_RDONLY, MDB_RESERVE,
 };
 #[cfg(master3)]
-pub use ffi::{mdb_env_set_encrypt, MDB_enc_func, MDB_sum_func};
+pub use ffi::{mdb_env_set_checksum, mdb_env_set_encrypt, MDB_enc_func};
 #[cfg(master3)]
 use lmdb_master3_sys as ffi;
 #[cfg(not(master3))]
@@ -45,4 +45,8 @@ pub unsafe fn into_val(value: &[u8]) -> ffi::MDB_val {
 
 pub unsafe fn from_val<'a>(value: ffi::MDB_val) -> &'a [u8] {
     std::slice::from_raw_parts(value.mv_data as *const u8, value.mv_size)
+}
+
+pub unsafe fn from_val_mut<'a>(value: ffi::MDB_val) -> &'a mut [u8] {
+    std::slice::from_raw_parts_mut(value.mv_data as *mut u8, value.mv_size)
 }

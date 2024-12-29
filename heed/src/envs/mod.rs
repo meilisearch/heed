@@ -288,3 +288,51 @@ impl FlagSetMode {
         }
     }
 }
+
+/// A trait defining how to calculate checksum within the environment.
+///
+/// Enabling checksumming is not supported in the heed crate and
+/// can only be modified within the heed3 crate.
+pub trait Checksum {
+    /// The size of computed checksum values, in bytes.
+    const SIZE: u32;
+
+    /// Compute the checksum of the data in input and store the
+    /// result in output, an optional key may be used with keyed
+    /// hash algorithms.
+    ///
+    /// The key parameter is an encryption key, if encryption was
+    /// configured. This parameter will be NULL if there is no key.
+    fn checksum(input: &[u8], output: &mut [u8], key: Option<&[u8]>);
+}
+
+/// Deactivate environment checksumming.
+///
+/// Enabling checksumming is not supported in the heed crate and
+/// can only be modified within the heed3 crate.
+pub enum NoChecksum {}
+
+impl Checksum for NoChecksum {
+    const SIZE: u32 = 0;
+    fn checksum(_input: &[u8], _output: &mut [u8], _key: Option<&[u8]>) {}
+}
+
+/// The wrapper function that is called by LMDB that directly calls
+/// the Rust idiomatic function internally.
+#[cfg(master3)]
+unsafe extern "C" fn checksum_func_wrapper<C: Checksum>(
+    src: *const ffi::MDB_val,
+    dst: *mut ffi::MDB_val,
+    key_ptr: *const ffi::MDB_val,
+) {
+    let result = std::panic::catch_unwind(|| {
+        let input = ffi::from_val(*src);
+        let output = ffi::from_val_mut(*dst);
+        let key = if key_ptr.is_null() { None } else { Some(ffi::from_val(key_ptr)) };
+        C::checksum(input, output, key)
+    });
+
+    if result.is_err() {
+        std::process::abort();
+    }
+}
