@@ -171,8 +171,13 @@ impl<T: TlsUsage, C: Checksum + 'static> EnvOpenOptions<T, C> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
+    /// let password = "This is the password that will be hashed by the argon2 algorithm";
+    /// let salt = "The salt added to the password hashes to add more security when stored";
     ///
     /// fs::create_dir_all(&env_path)?;
+    ///
+    /// let mut key = Key::default();
+    /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
     ///
     /// // We open the environment
     /// let mut options = EnvOpenOptions::new().checksum::<Crc32Bzip2>();
@@ -180,7 +185,7 @@ impl<T: TlsUsage, C: Checksum + 'static> EnvOpenOptions<T, C> {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
     ///         .max_dbs(3)
-    ///         .open(&env_path)?
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
     /// };
     ///
     /// let key1 = "first-key";
@@ -196,9 +201,9 @@ impl<T: TlsUsage, C: Checksum + 'static> EnvOpenOptions<T, C> {
     /// wtxn.commit()?;
     ///
     /// // We check that we can read the values back
-    /// let rtxn = env.read_txn()?;
-    /// assert_eq!(db.get(&rtxn, key1)?, Some(val1));
-    /// assert_eq!(db.get(&rtxn, key2)?, Some(val2));
+    /// let mut rtxn = env.read_txn()?;
+    /// assert_eq!(db.get(&mut rtxn, key1)?, Some(val1));
+    /// assert_eq!(db.get(&mut rtxn, key2)?, Some(val2));
     /// drop(rtxn);
     ///
     /// // We close the env and check that we can read in it
@@ -216,13 +221,13 @@ impl<T: TlsUsage, C: Checksum + 'static> EnvOpenOptions<T, C> {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
     ///         .max_dbs(3)
-    ///         .open(&env_path)?
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
     /// };
     ///
     /// // We check that we can read the values back
-    /// let rtxn = env.read_txn()?;
+    /// let mut rtxn = env.read_txn()?;
     /// let db = env.open_database::<Str, Str>(&rtxn, Some("first"))?.unwrap();
-    /// assert!(matches!(db.get(&rtxn, key1).unwrap_err(), Error::Mdb(MdbError::BadChecksum)));
+    /// assert!(matches!(db.get(&mut rtxn, key1).unwrap_err(), Error::Mdb(MdbError::BadChecksum)));
     /// drop(rtxn);
     ///
     /// # Ok(()) }

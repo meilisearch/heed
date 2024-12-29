@@ -328,7 +328,7 @@ unsafe extern "C" fn checksum_func_wrapper<C: Checksum>(
     let result = std::panic::catch_unwind(|| {
         let input = ffi::from_val(*src);
         let output = ffi::from_val_mut(*dst);
-        let key = if key_ptr.is_null() { None } else { Some(ffi::from_val(key_ptr)) };
+        let key = if key_ptr.is_null() { None } else { Some(ffi::from_val(*key_ptr)) };
         C::checksum(input, output, key)
     });
 
