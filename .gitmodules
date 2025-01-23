@@ -1,8 +1,8 @@
 [submodule "lmdb-master-sys/lmdb"]
 	path = lmdb-master-sys/lmdb
-	url = https://git.openldap.org/openldap/openldap
-	branch = mdb.master
+	url = https://github.com/meilisearch/lmdb.git
+	branch = mdb.master.nested-rtxns
 [submodule "lmdb-master3-sys/lmdb"]
 	path = lmdb-master3-sys/lmdb
-	url = https://git.openldap.org/openldap/openldap
+	url = https://git.openldap.org/openldap/openldap.git
 	branch = mdb.master3
