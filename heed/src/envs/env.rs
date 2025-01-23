@@ -607,6 +607,54 @@ impl<T> Env<T> {
     }
 }
 
+impl Env<WithoutTls> {
+    /// Create a nested transaction with read only access for use with the environment.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let env = unsafe {
+    ///     EnvOpenOptions::new()
+    ///         .read_txn_without_tls()
+    ///         .map_size(2 * 1024 * 1024) // 2 MiB
+    ///         .open(dir.path())?
+    /// };
+    ///
+    /// // we will open the default unnamed database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // opening a write transaction
+    /// for i in 0..1000 {
+    ///     db.put(&mut wtxn, &i, &i)?;
+    /// }
+    ///
+    /// // opening multiple read-only transactions
+    /// // to check if those values are now available
+    /// // without committing beforehand
+    /// let rtxns = (0..1000).map(|_| env.nested_read_txn(&wtxn)).collect::<heed::Result<Vec<_>>>()?;
+    ///
+    /// for (i, rtxn) in rtxns.iter().enumerate() {
+    ///     let i = i as u32;
+    ///     let ret = db.get(&rtxn, &i)?;
+    ///     assert_eq!(ret, Some(i));
+    /// }
+    ///
+    /// # Ok(()) }
+    /// ```
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
+        RoTxn::<WithoutTls>::nested(self, parent)
+    }
+}
+
 impl<T> Clone for Env<T> {
     fn clone(&self) -> Self {
         Env { inner: self.inner.clone(), _tls_marker: PhantomData }
