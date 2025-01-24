@@ -100,6 +100,7 @@ impl<'e, T> RoTxn<'e, T> {
         self.inner.txn.unwrap()
     }
 
+    #[cfg(not(master3))]
     pub(crate) fn nested<'p>(
         env: &'p Env<WithoutTls>,
         parent: &'p RwTxn,

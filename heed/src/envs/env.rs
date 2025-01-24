@@ -683,6 +683,7 @@ impl Env<WithoutTls> {
     ///
     /// # Ok(()) }
     /// ```
+    #[cfg(not(master3))]
     pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
         RoTxn::<WithoutTls>::nested(self, parent)
     }
