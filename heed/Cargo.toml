@@ -24,6 +24,9 @@ synchronoise = "1.0.1"
 
 [dev-dependencies]
 memchr = "2.7.5"
+rand = "0.9.0"
+rayon = "1.10.0"
+roaring = "0.10.10"
 serde = { version = "1.0.223", features = ["derive"] }
 tempfile = "3.22.0"
 
@@ -121,6 +124,10 @@ name = "custom-dupsort-comparator"
 
 [[example]]
 name = "multi-env"
+
+[[example]]
+name = "nested-rtxns"
+path = "../examples/nested-rtxns.rs"
 
 [[example]]
 name = "nested"
