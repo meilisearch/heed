@@ -16,6 +16,7 @@ include = [
     "../examples/custom-comparator.rs",
     "../examples/multi-env.rs",
     "../examples/nested.rs",
+    "../examples/nested-rtxns.rs",
     "../examples/rmp-serde.rs",
 ]
 
