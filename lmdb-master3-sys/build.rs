@@ -112,6 +112,8 @@ fn main() {
     #[cfg(feature = "bindgen")]
     generate::generate();
 
+    println!("cargo::rerun-if-changed=lmdb");
+
     let mut lmdb = PathBuf::from(&env::var("CARGO_MANIFEST_DIR").unwrap());
     lmdb.push("lmdb");
     lmdb.push("libraries");
