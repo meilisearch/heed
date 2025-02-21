@@ -32,6 +32,7 @@ serde = { version = "1.0.217", features = ["derive"], optional = true }
 synchronoise = "1.0.1"
 
 [dev-dependencies]
+memchr = "2.7.4"
 serde = { version = "1.0.217", features = ["derive"] }
 tempfile = "3.15.0"
 
