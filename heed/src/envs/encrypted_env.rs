@@ -253,8 +253,50 @@ impl<T> EncryptedEnv<T> {
     ///
     /// This function may be used to make a backup of an existing environment.
     /// No lockfile is created, since it gets recreated at need.
-    pub fn copy_to_file<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
-        self.inner.copy_to_file(path, option)
+    ///
+    /// Note that the file must be seek to the beginning after the copy is complete.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::io::{Read, Seek, SeekFrom};
+    /// use std::path::Path;
+    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed3::types::*;
+    /// use memchr::memmem::find_iter;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?
+    /// # };
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// db.put(&mut wtxn, &"hello0", &"world0")?;
+    /// db.put(&mut wtxn, &"hello1", &"world1")?;
+    /// db.put(&mut wtxn, &"hello2", &"world2")?;
+    /// db.put(&mut wtxn, &"hello3", &"world3")?;
+    ///
+    /// wtxn.commit()?;
+    ///
+    /// let mut tmp_file = tempfile::tempfile()?;
+    /// env.copy_to_file(&mut tmp_file, CompactionOption::Enabled)?;
+    /// let offset = tmp_file.seek(SeekFrom::Current(0))?;
+    /// assert_ne!(offset, 0);
+    ///
+    /// let offset = tmp_file.seek(SeekFrom::Start(0))?;
+    /// assert_eq!(offset, 0);
+    ///
+    /// let mut content = Vec::new();
+    /// tmp_file.read_to_end(&mut content)?;
+    /// assert!(content.len() > 8 * 6); // more than 8 times hellox + worldx
+    /// # Ok(()) }
+    /// ```
+    pub fn copy_to_file(&self, file: &mut File, option: CompactionOption) -> Result<()> {
+        self.inner.copy_to_file(file, option)
     }
 
     /// Copy an LMDB environment to the specified file descriptor, with compaction option.
