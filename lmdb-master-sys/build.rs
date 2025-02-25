@@ -102,6 +102,32 @@ const MDB_IDL_LOGN: u8 = 15;
 ))]
 const MDB_IDL_LOGN: u8 = 16;
 
+#[cfg(not(any(
+    feature = "debug-simple",
+    feature = "debug-copious-tracing",
+    feature = "debug-dump-idls",
+    feature = "debug-audit-commit"
+)))]
+const MDB_DEBUG: Option<u8> = None;
+#[cfg(all(
+    feature = "debug-simple",
+    not(any(
+        feature = "debug-copious-tracing",
+        feature = "debug-dump-idls",
+        feature = "debug-audit-commit"
+    ))
+))]
+const MDB_DEBUG: Option<u8> = Some(0);
+#[cfg(all(
+    feature = "debug-copious-tracing",
+    not(any(feature = "debug-dump-idls", feature = "debug-audit-commit"))
+))]
+const MDB_DEBUG: Option<u8> = Some(1);
+#[cfg(all(feature = "debug-dump-idls", not(feature = "debug-audit-commit")))]
+const MDB_DEBUG: Option<u8> = Some(2);
+#[cfg(feature = "debug-audit-commit")]
+const MDB_DEBUG: Option<u8> = Some(3);
+
 macro_rules! warn {
     ($message:expr) => {
         println!("cargo:warning={}", $message);
@@ -132,6 +158,10 @@ fn main() {
         .flag_if_supported("-Wno-unused-parameter")
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized");
+
+    if let Some(debug) = MDB_DEBUG {
+        builder.define("MDB_DEBUG", Some(debug.to_string().as_str()));
+    }
 
     if cfg!(feature = "posix-sem") {
         builder.define("MDB_USE_POSIX_SEM", None);
