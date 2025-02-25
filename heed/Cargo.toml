@@ -64,6 +64,10 @@ arbitrary_precision = ["heed-types/arbitrary_precision"]
 raw_value = ["heed-types/raw_value"]
 unbounded_depth = ["heed-types/unbounded_depth"]
 
+asan = ["lmdb-master-sys/asan"]
+fuzzer = ["lmdb-master-sys/fuzzer"]
+fuzzer-no-link = ["lmdb-master-sys/fuzzer-no-link"]
+
 # Whether to tell LMDB to use POSIX semaphores during compilation
 # (instead of the default, which are System V semaphores).
 # POSIX semaphores are required for Apple's App Sandbox on iOS & macOS,
