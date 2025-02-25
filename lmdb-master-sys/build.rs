@@ -169,6 +169,7 @@ fn main() {
 
     if cfg!(feature = "asan") {
         builder.flag("-fsanitize=address");
+        builder.flag("-static-libasan");
     }
 
     if cfg!(feature = "fuzzer") {
