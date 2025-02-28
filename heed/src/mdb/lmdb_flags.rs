@@ -20,7 +20,7 @@ bitflags! {
         /// Don't fsync after commit.
         const NO_SYNC = ffi::MDB_NOSYNC;
         /// Open the previous transaction.
-        const PREVSNAPSHOT = ffi::MDB_PREVSNAPSHOT;
+        const PREV_SNAPSHOT = ffi::MDB_PREVSNAPSHOT;
         /// Read only.
         const READ_ONLY = ffi::MDB_RDONLY;
         /// Don't fsync metapage after commit.
