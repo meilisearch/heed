@@ -107,6 +107,10 @@ longer-keys = ["lmdb-master3-sys/longer-keys"]
 # Examples are located outside the standard heed/examples directory to prevent
 # conflicts between heed3 and heed examples when working on both crates.
 [[example]]
+name = "prev-snapshot"
+path = "../examples/prev-snapshot.rs"
+
+[[example]]
 name = "heed3-encrypted"
 path = "../examples/heed3-encrypted.rs"
 

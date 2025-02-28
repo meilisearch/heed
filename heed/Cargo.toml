@@ -132,6 +132,10 @@ name = "nested"
 path = "../examples/nested.rs"
 
 [[example]]
+name = "prev-snapshot"
+path = "../examples/prev-snapshot.rs"
+
+[[example]]
 name = "rmp-serde"
 path = "../examples/rmp-serde.rs"
 required-features = ["serde-rmp"]
