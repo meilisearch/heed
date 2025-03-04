@@ -139,6 +139,10 @@ fn main() {
         builder.define("MDB_USE_POSIX_SEM", None);
     }
 
+    if cfg!(feature = "use-valgrind") {
+        builder.define("USE_VALGRIND", None);
+    }
+
     if cfg!(feature = "asan") {
         builder.flag("-fsanitize=address");
     }

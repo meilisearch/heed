@@ -105,6 +105,8 @@ mdb_idl_logn_16 = ["lmdb-master-sys/mdb_idl_logn_16"]
 # computers then you need to keep your keys within the smaller 1982 byte limit.
 longer-keys = ["lmdb-master-sys/longer-keys"]
 
+use-valgrind = ["lmdb-master-sys/use-valgrind"]
+
 # Examples are located outside the standard heed/examples directory to prevent
 # conflicts between heed3 and heed examples when working on both crates.
 [[example]]

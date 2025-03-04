@@ -60,6 +60,7 @@ mdb_idl_logn_13 = []
 mdb_idl_logn_14 = []
 mdb_idl_logn_15 = []
 mdb_idl_logn_16 = []
+use-valgrind = []
 
 # Setting this enables you to use keys longer than 511 bytes. The exact limit
 # is computed by LMDB at compile time. You can find the exact value by calling
