@@ -14,7 +14,7 @@ bitflags! {
     #[repr(transparent)]
     pub struct EnvFlags: u32 {
         /// mmap at a fixed address (experimental).
-        const FIXEDMAP = ffi::MDB_FIXEDMAP;
+        const FIXED_MAP = ffi::MDB_FIXEDMAP;
         /// No environment directory.
         const NO_SUB_DIR = ffi::MDB_NOSUBDIR;
         /// Don't fsync after commit.
