@@ -170,7 +170,7 @@ impl<T> Env<T> {
         let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), None, 0)?;
 
         // We're going to iterate on the unnamed database
-        let mut cursor = RoCursor::new(&rtxn, dbi)?;
+        let mut cursor = RoCursor::open(&rtxn, dbi)?;
 
         while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
             if key.contains(&0) {

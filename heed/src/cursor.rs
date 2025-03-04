@@ -12,7 +12,7 @@ pub struct RoCursor<'txn> {
 
 impl<'txn> RoCursor<'txn> {
     // TODO should I ask for a &mut RoTxn<'_, T>, here?
-    pub(crate) fn new<T>(txn: &'txn RoTxn<'_, T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
+    pub(crate) fn open<T>(txn: &'txn RoTxn<'_, T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
         let mut txn = txn.txn_ptr();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
@@ -248,8 +248,8 @@ pub struct RwCursor<'txn> {
 }
 
 impl<'txn> RwCursor<'txn> {
-    pub(crate) fn new(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
-        Ok(RwCursor { cursor: RoCursor::new(txn, dbi)? })
+    pub(crate) fn open(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
+        Ok(RwCursor { cursor: RoCursor::open(txn, dbi)? })
     }
 
     /// Delete the entry the cursor is currently pointing to.
