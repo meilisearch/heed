@@ -27,7 +27,9 @@ doctest = false
 libc = "0.2.169"
 
 [build-dependencies]
-bindgen = { version = "0.71.1", default-features = false, optional = true, features = ["runtime"] }
+bindgen = { version = "0.71.1", default-features = false, optional = true, features = [
+    "runtime",
+] }
 cc = "1.2.7"
 doxygen-rs = "0.4.2"
 
@@ -60,6 +62,9 @@ mdb_idl_logn_13 = []
 mdb_idl_logn_14 = []
 mdb_idl_logn_15 = []
 mdb_idl_logn_16 = []
+
+# Enable the USE_VALGRIND feature.
+use-valgrind = []
 
 # Setting this enables you to use keys longer than 511 bytes. The exact limit
 # is computed by LMDB at compile time. You can find the exact value by calling

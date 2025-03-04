@@ -10,13 +10,13 @@ categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
 include = [
-  "../examples/all-types.rs",
-  "../examples/clear-database.rs",
-  "../examples/cursor-append.rs",
-  "../examples/custom-comparator.rs",
-  "../examples/multi-env.rs",
-  "../examples/nested.rs",
-  "../examples/rmp-serde.rs"
+    "../examples/all-types.rs",
+    "../examples/clear-database.rs",
+    "../examples/cursor-append.rs",
+    "../examples/custom-comparator.rs",
+    "../examples/multi-env.rs",
+    "../examples/nested.rs",
+    "../examples/rmp-serde.rs",
 ]
 
 [dependencies]
@@ -105,6 +105,10 @@ mdb_idl_logn_16 = ["lmdb-master-sys/mdb_idl_logn_16"]
 # computers then you need to keep your keys within the smaller 1982 byte limit.
 longer-keys = ["lmdb-master-sys/longer-keys"]
 
+# Enable a better Valgrind support. This builds LMDB with the -DUSE_VALGRIND=1 option.
+#
+# More information can be found at:
+# <https://github.com/LMDB/lmdb/blob/f20e41de09d97e4461946b7e26ec831d0c24fac7/libraries/liblmdb/mdb.c#L205-L218>
 use-valgrind = ["lmdb-master-sys/use-valgrind"]
 
 # Examples are located outside the standard heed/examples directory to prevent

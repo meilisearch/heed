@@ -9,10 +9,7 @@ keywords = ["lmdb", "database", "storage", "typed", "encryption"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
-include = [
-  "../examples/heed3-encrypted.rs",
-  "../examples/heed3-all-types.rs"
-]
+include = ["../examples/heed3-encrypted.rs", "../examples/heed3-all-types.rs"]
 
 [dependencies]
 aead = { version = "0.5.2", default-features = false }
@@ -103,6 +100,12 @@ mdb_idl_logn_16 = ["lmdb-master3-sys/mdb_idl_logn_16"]
 # example, if you are moving databases between Apple M1 and Apple Intel
 # computers then you need to keep your keys within the smaller 1982 byte limit.
 longer-keys = ["lmdb-master3-sys/longer-keys"]
+
+# Enable a better Valgrind support. This builds LMDB with the -DUSE_VALGRIND=1 option.
+#
+# More information can be found at:
+# <https://github.com/LMDB/lmdb/blob/f20e41de09d97e4461946b7e26ec831d0c24fac7/libraries/liblmdb/mdb.c#L205-L218>
+use-valgrind = ["lmdb-master3-sys/use-valgrind"]
 
 # Examples are located outside the standard heed/examples directory to prevent
 # conflicts between heed3 and heed examples when working on both crates.
