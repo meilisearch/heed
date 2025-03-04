@@ -79,15 +79,9 @@ jobs:
 
   check-all-features:
     name: Check all the features of the heed project
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -D warnings
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-          - os: macos-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -108,20 +102,15 @@ jobs:
         # Skip it if the CI is running with the heed3 Cargo.toml
         if: ${{ steps.check_toml.outputs.should_skip == 'false' }}
         run: |
+          sudo apt install -y valgrind
           cargo clean
           cargo check --all-features -p heed
 
   check-all-features-heed3:
     name: Check all the features of the heed3 project
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -D warnings
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-          - os: macos-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -133,6 +122,7 @@ jobs:
           override: true
       - name: Run cargo test
         run: |
+          sudo apt install -y valgrind
           cargo clean
           bash convert-to-heed3.sh
           cargo check --all-features -p heed3
