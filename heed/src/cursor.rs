@@ -14,7 +14,7 @@ impl<'txn, T> RoCursor<'txn, T> {
     // TODO should I ask for a &mut RoTxn<'_, T>, here?
     pub(crate) fn new(txn: &'txn RoTxn<'_, T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn, T>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
-        let mut txn = txn.txn.unwrap();
+        let mut txn = txn.txn_ptr();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
         Ok(RoCursor { cursor, _marker: marker::PhantomData })
     }

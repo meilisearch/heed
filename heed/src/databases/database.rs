@@ -140,7 +140,7 @@ impl<'e, 'n, T, KC, DC, C> DatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     {
         assert_eq_env_txn!(self.env, rtxn);
 
-        match self.env.raw_init_database::<C>(rtxn.txn.unwrap(), self.name, self.flags) {
+        match self.env.raw_init_database::<C>(rtxn.txn_ptr(), self.name, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
@@ -165,7 +165,7 @@ impl<'e, 'n, T, KC, DC, C> DatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
         assert_eq_env_txn!(self.env, wtxn);
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
-        match self.env.raw_init_database::<C>(wtxn.txn.txn.unwrap(), self.name, flags) {
+        match self.env.raw_init_database::<C>(wtxn.txn_ptr(), self.name, flags) {
             Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi)),
             Err(e) => Err(e),
         }
@@ -358,7 +358,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let result = unsafe {
             mdb_result(ffi::mdb_get(
-                txn.txn.unwrap().as_mut(),
+                txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 data_val.as_mut_ptr(),
@@ -966,7 +966,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let mut db_stat = mem::MaybeUninit::uninit();
         let result = unsafe {
-            mdb_result(ffi::mdb_stat(txn.txn.unwrap().as_mut(), self.dbi, db_stat.as_mut_ptr()))
+            mdb_result(ffi::mdb_stat(txn.txn_ptr().as_mut(), self.dbi, db_stat.as_mut_ptr()))
         };
 
         match result {
@@ -1854,7 +1854,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         unsafe {
             mdb_result(ffi::mdb_put(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut data_val,
@@ -1921,7 +1921,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         unsafe {
             mdb_result(ffi::mdb_put(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut reserved,
@@ -2019,7 +2019,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         unsafe {
             mdb_result(ffi::mdb_put(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut data_val,
@@ -2132,7 +2132,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let result = unsafe {
             mdb_result(ffi::mdb_put(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut data_val,
@@ -2288,7 +2288,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let result = unsafe {
             mdb_result(ffi::mdb_put(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut reserved,
@@ -2371,7 +2371,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let result = unsafe {
             mdb_result(ffi::mdb_del(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 ptr::null_mut(),
@@ -2463,7 +2463,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let result = unsafe {
             mdb_result(ffi::mdb_del(
-                txn.txn.txn.unwrap().as_mut(),
+                txn.txn.txn_ptr().as_mut(),
                 self.dbi,
                 &mut key_val,
                 &mut data_val,
@@ -2593,8 +2593,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         assert_eq_env_db_txn!(self, txn);
 
         unsafe {
-            mdb_result(ffi::mdb_drop(txn.txn.txn.unwrap().as_mut(), self.dbi, 0))
-                .map_err(Into::into)
+            mdb_result(ffi::mdb_drop(txn.txn.txn_ptr().as_mut(), self.dbi, 0)).map_err(Into::into)
         }
     }
 
