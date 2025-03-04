@@ -172,13 +172,13 @@ impl<'e, 'n, T, KC, DC, C> DatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     }
 }
 
-impl<T, KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {
+impl<KC, DC, C> Clone for DatabaseOpenOptions<'_, '_, KC, DC, C> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T, KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C> {}
+impl<KC, DC, C> Copy for DatabaseOpenOptions<'_, '_, KC, DC, C> {}
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -433,7 +433,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn<T>,
         key: &'a KC::EItem,
-    ) -> Result<Option<RoIter<'txn, T, KC, DC, MoveOnCurrentKeyDuplicates>>>
+    ) -> Result<Option<RoIter<'txn, KC, DC, MoveOnCurrentKeyDuplicates>>>
     where
         KC: BytesEncode<'a>,
     {
@@ -1026,7 +1026,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, T, KC, DC>> {
+    pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
         RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
@@ -1128,7 +1128,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, T, KC, DC>> {
+    pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
@@ -1239,7 +1239,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1412,7 +1412,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1587,7 +1587,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1720,7 +1720,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
         &self,
         txn: &'txn RoTxn<'_, T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRevPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,

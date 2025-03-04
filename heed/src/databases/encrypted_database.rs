@@ -53,8 +53,8 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator> {
-    inner: DatabaseOpenOptions<'e, 'n, T, KC, DC, C>,
+pub struct EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
+    inner: DatabaseOpenOptions<'e, 'n, KC, DC, C>,
 }
 
 impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
@@ -64,7 +64,7 @@ impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecifie
     }
 }
 
-impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
+impl<'e, 'n, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
@@ -75,7 +75,7 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, NC> {
         EncryptedDatabaseOpenOptions { inner: self.inner.key_comparator() }
     }
 
@@ -139,13 +139,13 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     }
 }
 
-impl<T, KC, DC, C> Clone for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C> {
+impl<KC, DC, C> Clone for EncryptedDatabaseOpenOptions<'_, '_, KC, DC, C> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T, KC, DC, C> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C> {}
+impl<KC, DC, C> Copy for EncryptedDatabaseOpenOptions<'_, '_, KC, DC, C> {}
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -374,7 +374,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn<T>,
         key: &'a KC::EItem,
-    ) -> Result<Option<RoIter<'txn, T, KC, DC, MoveOnCurrentKeyDuplicates>>>
+    ) -> Result<Option<RoIter<'txn, KC, DC, MoveOnCurrentKeyDuplicates>>>
     where
         KC: BytesEncode<'a>,
     {
@@ -862,7 +862,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoIter<'txn, T, KC, DC>> {
+    pub fn iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         self.inner.iter(txn)
     }
 
@@ -961,7 +961,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoRevIter<'txn, T, KC, DC>> {
+    pub fn rev_iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
         self.inner.rev_iter(txn)
     }
 
@@ -1068,7 +1068,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1191,7 +1191,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn<T>,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1315,7 +1315,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1440,7 +1440,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
         &self,
         txn: &'txn mut RoTxn<T>,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRevPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
