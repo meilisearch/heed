@@ -212,19 +212,20 @@ impl<KC, DC, IM> fmt::Debug for RoIter<'_, KC, DC, IM> {
 unsafe impl<KC, DC, IM> Send for RoIter<'_, KC, DC, IM> {}
 
 /// A read-write iterator structure.
-pub struct RwIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
-    cursor: RwCursor<'txn>,
+pub struct RwIter<'txn, 'p, KC, DC, IM = MoveThroughDuplicateValues> {
+    pub(crate) cursor: RwCursor<'txn, 'p>,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>) -> RwIter<'txn, KC, DC, IM> {
+impl<'txn, 'p, KC, DC, IM> RwIter<'txn, 'p, KC, DC, IM> {
+    pub(crate) fn new(cursor: RwCursor<'txn, 'p>) -> RwIter<'txn, 'p, KC, DC, IM> {
         RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
     }
 
-    pub fn as_wtxn<'p>(&mut self) -> &mut RwTxn<'p> {
-        todo!()
+    pub fn as_wtxn(&mut self) -> &mut RwTxn<'p> {
+        /// TODO should the output lifetime be 'txn?
+        self.cursor.txn
     }
 
     /// Delete the entry the cursor is currently pointing to.
@@ -344,7 +345,7 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwIter<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwIter<'txn, 'p, KC, DC, MoveBetweenKeys> {
         RwIter {
             cursor: self.cursor,
             move_on_first: self.move_on_first,
@@ -355,7 +356,9 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
     /// Move through key/values entries and output duplicate values.
     ///
     /// For more info, see [`RoIter::move_through_duplicate_values`].
-    pub fn move_through_duplicate_values(self) -> RwIter<'txn, KC, DC, MoveThroughDuplicateValues> {
+    pub fn move_through_duplicate_values(
+        self,
+    ) -> RwIter<'txn, 'p, KC, DC, MoveThroughDuplicateValues> {
         RwIter {
             cursor: self.cursor,
             move_on_first: self.move_on_first,
@@ -364,7 +367,7 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwIter<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwIter<'txn, 'p, KC2, DC2, IM> {
         RwIter {
             cursor: self.cursor,
             move_on_first: self.move_on_first,
@@ -373,22 +376,22 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwIter<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwIter<'txn, 'p, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwIter<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwIter<'txn, 'p, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwIter<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RwIter<'txn, 'p, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RwIter<'txn, KC, DC, IM>
+impl<'txn, KC, DC, IM> Iterator for RwIter<'txn, '_, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -438,7 +441,7 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RwIter<'_, KC, DC, IM> {
+impl<KC, DC, IM> fmt::Debug for RwIter<'_, '_, KC, DC, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwIter").finish()
     }
@@ -564,14 +567,14 @@ impl<KC, DC, IM> fmt::Debug for RoRevIter<'_, KC, DC, IM> {
 unsafe impl<KC, DC, IM> Send for RoRevIter<'_, KC, DC, IM> {}
 
 /// A reverse read-write iterator structure.
-pub struct RwRevIter<'txn, KC, DC, IM = MoveThroughDuplicateValues> {
-    cursor: RwCursor<'txn>,
+pub struct RwRevIter<'txn, 'p, KC, DC, IM = MoveThroughDuplicateValues> {
+    cursor: RwCursor<'txn, 'p>,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC, IM)>,
 }
 
-impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>) -> RwRevIter<'txn, KC, DC, IM> {
+impl<'txn, 'p, KC, DC, IM> RwRevIter<'txn, 'p, KC, DC, IM> {
+    pub(crate) fn new(cursor: RwCursor<'txn, 'p>) -> RwRevIter<'txn, 'p, KC, DC, IM> {
         RwRevIter { cursor, move_on_last: true, _phantom: marker::PhantomData }
     }
 
@@ -692,7 +695,7 @@ impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwRevIter<'txn, KC, DC, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwRevIter<'txn, 'p, KC, DC, MoveBetweenKeys> {
         RwRevIter {
             cursor: self.cursor,
             move_on_last: self.move_on_last,
@@ -705,7 +708,7 @@ impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RwRevIter<'txn, KC, DC, MoveThroughDuplicateValues> {
+    ) -> RwRevIter<'txn, 'p, KC, DC, MoveThroughDuplicateValues> {
         RwRevIter {
             cursor: self.cursor,
             move_on_last: self.move_on_last,
@@ -714,7 +717,7 @@ impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRevIter<'txn, KC2, DC2, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwRevIter<'txn, 'p, KC2, DC2, IM> {
         RwRevIter {
             cursor: self.cursor,
             move_on_last: self.move_on_last,
@@ -723,22 +726,22 @@ impl<'txn, KC, DC, IM> RwRevIter<'txn, KC, DC, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRevIter<'txn, KC2, DC, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwRevIter<'txn, 'p, KC2, DC, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRevIter<'txn, KC, DC2, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwRevIter<'txn, 'p, KC, DC2, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRevIter<'txn, KC, LazyDecode<DC>, IM> {
+    pub fn lazily_decode_data(self) -> RwRevIter<'txn, 'p, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, IM> Iterator for RwRevIter<'txn, KC, DC, IM>
+impl<'txn, KC, DC, IM> Iterator for RwRevIter<'txn, '_, KC, DC, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -788,7 +791,7 @@ where
     }
 }
 
-impl<KC, DC, IM> fmt::Debug for RwRevIter<'_, KC, DC, IM> {
+impl<KC, DC, IM> fmt::Debug for RwRevIter<'_, '_, KC, DC, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwRevIter").finish()
     }

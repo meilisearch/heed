@@ -1,22 +1,222 @@
 use std::ops::{Deref, DerefMut};
-use std::{marker, mem, ptr};
+use std::{mem, ptr};
 
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::*;
 
 pub struct RoCursor<'txn> {
-    cursor: *mut ffi::MDB_cursor,
-    _marker: marker::PhantomData<&'txn ()>,
+    cursor: CursorInner<'txn>,
 }
 
 impl<'txn> RoCursor<'txn> {
     // TODO should I ask for a &mut RoTxn<'_, T>, here?
     pub(crate) fn open<T>(txn: &'txn RoTxn<'_, T>, dbi: ffi::MDB_dbi) -> Result<RoCursor<'txn>> {
+        let cursor = unsafe { CursorInner::open(txn.txn_ptr().as_mut(), dbi)? };
+        Ok(RoCursor { cursor })
+    }
+}
+
+impl<'txn> Deref for RoCursor<'txn> {
+    type Target = CursorInner<'txn>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cursor
+    }
+}
+
+impl DerefMut for RoCursor<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cursor
+    }
+}
+
+pub struct RwCursor<'txn, 'p> {
+    cursor: CursorInner<'txn>,
+    pub(crate) txn: &'txn mut RwTxn<'p>,
+}
+
+impl<'txn, 'p> RwCursor<'txn, 'p> {
+    pub(crate) fn open(txn: &'txn mut RwTxn<'p>, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn, 'p>> {
+        let cursor = unsafe { CursorInner::open(txn.txn_ptr().as_mut(), dbi)? };
+        Ok(RwCursor { cursor, txn })
+    }
+
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true` if the entry was successfully deleted.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database
+    /// while modifying it.
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn del_current(&mut self) -> Result<bool> {
+        // Delete the current entry
+        let result = mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0));
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Transform the key and value that you borrow from this database into an owned
+    /// version of them (e.g. `&str` into `String`).
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
+        let mut key_val = crate::into_val(key);
+        let mut data_val = crate::into_val(data);
+
+        // Modify the pointed data
+        let result = mdb_result(ffi::mdb_cursor_put(
+            self.cursor.cursor,
+            &mut key_val,
+            &mut data_val,
+            ffi::MDB_CURRENT,
+        ));
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
+    /// can be put into an inconsistent state.
+    ///
+    /// Returns `true` if the entry was successfully written.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    ///
+    /// # Safety
+    ///
+    /// Please read the safety notes of the [`Self::put_current`] method.
+    pub unsafe fn put_current_reserved_with_flags<F>(
+        &mut self,
+        flags: PutFlags,
+        key: &[u8],
+        data_size: usize,
+        write_func: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
+    {
+        let mut key_val = crate::into_val(key);
+        let mut reserved = ffi::reserve_size_val(data_size);
+        let flags = ffi::MDB_RESERVE | flags.bits();
+
+        let result =
+            mdb_result(ffi::mdb_cursor_put(self.cursor.cursor, &mut key_val, &mut reserved, flags));
+
+        let found = match result {
+            Ok(()) => true,
+            Err(e) if e.not_found() => false,
+            Err(e) => return Err(e.into()),
+        };
+
+        let mut reserved = ReservedSpace::from_val(reserved);
+        write_func(&mut reserved)?;
+
+        if reserved.remaining() == 0 {
+            Ok(found)
+        } else {
+            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
+        }
+    }
+
+    /// Append the given key/value pair to the end of the database.
+    ///
+    /// If a key is inserted that is less than any previous key a `KeyExist` error
+    /// is returned and the key is not inserted into the database.
+    ///
+    /// # Safety
+    ///
+    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
+    /// modifying it, so you can't use the key/value that comes from the cursor to feed
+    /// this function.
+    ///
+    /// In other words: Transform the key and value that you borrow from this database into an owned
+    /// version of them (e.g. `&str` into `String`).
+    ///
+    /// > [Values returned from the database are valid only until a subsequent update operation,
+    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
+    ///
+    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+    pub unsafe fn put_current_with_flags(
+        &mut self,
+        flags: PutFlags,
+        key: &[u8],
+        data: &[u8],
+    ) -> Result<()> {
+        let mut key_val = crate::into_val(key);
+        let mut data_val = crate::into_val(data);
+
+        // Modify the pointed data
+        let result = mdb_result(ffi::mdb_cursor_put(
+            self.cursor.cursor,
+            &mut key_val,
+            &mut data_val,
+            flags.bits(),
+        ));
+
+        result.map_err(Into::into)
+    }
+}
+
+impl<'txn> Deref for RwCursor<'txn, '_> {
+    type Target = CursorInner<'txn>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cursor
+    }
+}
+
+impl DerefMut for RwCursor<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cursor
+    }
+}
+
+pub struct CursorInner<'txn> {
+    cursor: *mut ffi::MDB_cursor,
+    _marker: std::marker::PhantomData<&'txn ()>,
+}
+
+impl<'txn> CursorInner<'txn> {
+    pub fn open(txn: *mut ffi::MDB_txn, dbi: ffi::MDB_dbi) -> Result<CursorInner<'txn>> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
-        let mut txn = txn.txn_ptr();
-        unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
-        Ok(RoCursor { cursor, _marker: marker::PhantomData })
+        unsafe { mdb_result(ffi::mdb_cursor_open(txn, dbi, &mut cursor))? };
+        Ok(Self { cursor, _marker: std::marker::PhantomData })
     }
 
     pub fn current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -237,183 +437,9 @@ impl<'txn> RoCursor<'txn> {
     }
 }
 
-impl Drop for RoCursor<'_> {
+impl Drop for CursorInner<'_> {
     fn drop(&mut self) {
         unsafe { ffi::mdb_cursor_close(self.cursor) }
-    }
-}
-
-pub struct RwCursor<'txn> {
-    cursor: RoCursor<'txn>,
-}
-
-impl<'txn> RwCursor<'txn> {
-    pub(crate) fn open(txn: &'txn RwTxn, dbi: ffi::MDB_dbi) -> Result<RwCursor<'txn>> {
-        Ok(RwCursor { cursor: RoCursor::open(txn, dbi)? })
-    }
-
-    /// Delete the entry the cursor is currently pointing to.
-    ///
-    /// Returns `true` if the entry was successfully deleted.
-    ///
-    /// # Safety
-    ///
-    /// It is _[undefined behavior]_ to keep a reference of a value from this database
-    /// while modifying it.
-    ///
-    /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
-    ///
-    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn del_current(&mut self) -> Result<bool> {
-        // Delete the current entry
-        let result = mdb_result(ffi::mdb_cursor_del(self.cursor.cursor, 0));
-
-        match result {
-            Ok(()) => Ok(true),
-            Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Write a new value to the current entry.
-    ///
-    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
-    /// can be put into an inconsistent state.
-    ///
-    /// Returns `true` if the entry was successfully written.
-    ///
-    /// > This is intended to be used when the new data is the same size as the old.
-    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
-    ///
-    /// # Safety
-    ///
-    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
-    /// modifying it, so you can't use the key/value that comes from the cursor to feed
-    /// this function.
-    ///
-    /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them (e.g. `&str` into `String`).
-    ///
-    /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
-    ///
-    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
-        let mut key_val = crate::into_val(key);
-        let mut data_val = crate::into_val(data);
-
-        // Modify the pointed data
-        let result = mdb_result(ffi::mdb_cursor_put(
-            self.cursor.cursor,
-            &mut key_val,
-            &mut data_val,
-            ffi::MDB_CURRENT,
-        ));
-
-        match result {
-            Ok(()) => Ok(true),
-            Err(e) if e.not_found() => Ok(false),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Write a new value to the current entry.
-    ///
-    /// The given key **must** be equal to the one this cursor is pointing otherwise the database
-    /// can be put into an inconsistent state.
-    ///
-    /// Returns `true` if the entry was successfully written.
-    ///
-    /// > This is intended to be used when the new data is the same size as the old.
-    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
-    ///
-    /// # Safety
-    ///
-    /// Please read the safety notes of the [`Self::put_current`] method.
-    pub unsafe fn put_current_reserved_with_flags<F>(
-        &mut self,
-        flags: PutFlags,
-        key: &[u8],
-        data_size: usize,
-        write_func: F,
-    ) -> Result<bool>
-    where
-        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
-    {
-        let mut key_val = crate::into_val(key);
-        let mut reserved = ffi::reserve_size_val(data_size);
-        let flags = ffi::MDB_RESERVE | flags.bits();
-
-        let result =
-            mdb_result(ffi::mdb_cursor_put(self.cursor.cursor, &mut key_val, &mut reserved, flags));
-
-        let found = match result {
-            Ok(()) => true,
-            Err(e) if e.not_found() => false,
-            Err(e) => return Err(e.into()),
-        };
-
-        let mut reserved = ReservedSpace::from_val(reserved);
-        write_func(&mut reserved)?;
-
-        if reserved.remaining() == 0 {
-            Ok(found)
-        } else {
-            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
-        }
-    }
-
-    /// Append the given key/value pair to the end of the database.
-    ///
-    /// If a key is inserted that is less than any previous key a `KeyExist` error
-    /// is returned and the key is not inserted into the database.
-    ///
-    /// # Safety
-    ///
-    /// It is _[undefined behavior]_ to keep a reference of a value from this database while
-    /// modifying it, so you can't use the key/value that comes from the cursor to feed
-    /// this function.
-    ///
-    /// In other words: Transform the key and value that you borrow from this database into an owned
-    /// version of them (e.g. `&str` into `String`).
-    ///
-    /// > [Values returned from the database are valid only until a subsequent update operation,
-    /// > or the end of the transaction.](http://www.lmdb.tech/doc/group__mdb.html#structMDB__val)
-    ///
-    /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
-    pub unsafe fn put_current_with_flags(
-        &mut self,
-        flags: PutFlags,
-        key: &[u8],
-        data: &[u8],
-    ) -> Result<()> {
-        let mut key_val = crate::into_val(key);
-        let mut data_val = crate::into_val(data);
-
-        // Modify the pointed data
-        let result = mdb_result(ffi::mdb_cursor_put(
-            self.cursor.cursor,
-            &mut key_val,
-            &mut data_val,
-            flags.bits(),
-        ));
-
-        result.map_err(Into::into)
-    }
-}
-
-impl<'txn> Deref for RwCursor<'txn> {
-    type Target = RoCursor<'txn>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.cursor
-    }
-}
-
-impl DerefMut for RwCursor<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.cursor
     }
 }
 

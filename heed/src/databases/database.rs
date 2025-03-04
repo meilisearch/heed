@@ -1081,7 +1081,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, 'p>(&self, txn: &'txn mut RwTxn<'p>) -> Result<RwIter<'txn, 'p, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::open(txn, self.dbi).map(|cursor| RwIter::new(cursor))
@@ -1185,7 +1185,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn, 'p>(
+        &self,
+        txn: &'txn mut RwTxn<'p>,
+    ) -> Result<RwRevIter<'txn, 'p, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
         RwCursor::open(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
@@ -1326,11 +1329,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, R>(
+    pub fn range_mut<'a, 'txn, 'p, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         range: &'a R,
-    ) -> Result<RwRange<'txn, KC, DC, C>>
+    ) -> Result<RwRange<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1499,11 +1502,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, R>(
+    pub fn rev_range_mut<'a, 'txn, 'p, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         range: &'a R,
-    ) -> Result<RwRevRange<'txn, KC, DC, C>>
+    ) -> Result<RwRevRange<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1654,11 +1657,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn>(
+    pub fn prefix_iter_mut<'a, 'txn, 'p>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwPrefix<'txn, KC, DC, C>>
+    ) -> Result<RwPrefix<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1787,11 +1790,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn>(
+    pub fn rev_prefix_iter_mut<'a, 'txn, 'p>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwRevPrefix<'txn, KC, DC, C>>
+    ) -> Result<RwRevPrefix<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
