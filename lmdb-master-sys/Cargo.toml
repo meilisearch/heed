@@ -27,7 +27,9 @@ doctest = false
 libc = "0.2.155"
 
 [build-dependencies]
-bindgen = { version = "0.69.4", default-features = false, optional = true, features = ["runtime"] }
+bindgen = { version = "0.69.4", default-features = false, optional = true, features = [
+    "runtime",
+] }
 cc = "1.0.104"
 doxygen-rs = "0.4.2"
 
@@ -40,6 +42,18 @@ asan = []
 fuzzer = []
 fuzzer-no-link = []
 posix-sem = []
+
+# Prints debugging information on stderr.
+debug-simple = []
+# Add copious tracing. It enables the debug-simple feature.
+debug-copious-tracing = []
+# Add dumps of all IDLs read from and written to the database
+# (used for free space management). It enables the debug-simple
+# and debug-dump-idls features.
+debug-dump-idls = []
+# Do an audit after each commit. It enables the debug-simple,
+# debug-copious-tracing, and debug-dump-idls features.
+debug-audit-commit = []
 
 # These features configure the MDB_IDL_LOGN macro, which determines
 # the size of the free and dirty page lists (and thus the amount of memory

@@ -1,4 +1,4 @@
 [submodule "lmdb-master-sys/lmdb"]
 	path = lmdb-master-sys/lmdb
-	url = https://github.com/LMDB/lmdb
-	branch = mdb.master
+	url = https://github.com/meilisearch/lmdb.git
+	branch = allow-nested-rtxn-from-wtxn
