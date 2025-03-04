@@ -64,6 +64,8 @@ mdb_idl_logn_15 = []
 mdb_idl_logn_16 = []
 
 # Enable the USE_VALGRIND feature.
+#
+# You have to install the RPM valgrind-devel which contains memcheck.h.
 use-valgrind = []
 
 # Setting this enables you to use keys longer than 511 bytes. The exact limit

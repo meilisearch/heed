@@ -107,6 +107,8 @@ longer-keys = ["lmdb-master-sys/longer-keys"]
 
 # Enable a better Valgrind support. This builds LMDB with the -DUSE_VALGRIND=1 option.
 #
+# You have to install the RPM valgrind-devel which contains memcheck.h.
+#
 # More information can be found at:
 # <https://github.com/LMDB/lmdb/blob/f20e41de09d97e4461946b7e26ec831d0c24fac7/libraries/liblmdb/mdb.c#L205-L218>
 use-valgrind = ["lmdb-master-sys/use-valgrind"]
