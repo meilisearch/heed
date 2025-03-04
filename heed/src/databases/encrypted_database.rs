@@ -53,8 +53,8 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C = DefaultComparator> {
-    inner: DatabaseOpenOptions<'e, 'n, KC, DC, C>,
+pub struct EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator> {
+    inner: DatabaseOpenOptions<'e, 'n, T, KC, DC, C>,
 }
 
 impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
@@ -64,7 +64,7 @@ impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecifie
     }
 }
 
-impl<'e, 'n, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C> {
+impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
@@ -75,7 +75,7 @@ impl<'e, 'n, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, C> {
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, NC> {
         EncryptedDatabaseOpenOptions { inner: self.inner.key_comparator() }
     }
 
