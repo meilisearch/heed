@@ -223,6 +223,10 @@ impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
         RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
     }
 
+    pub fn as_wtxn<'p>(&mut self) -> &mut RwTxn<'p> {
+        todo!()
+    }
+
     /// Delete the entry the cursor is currently pointing to.
     ///
     /// Returns `true` if the entry was successfully deleted.
