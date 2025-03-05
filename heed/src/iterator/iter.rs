@@ -223,7 +223,7 @@ impl<'txn, 'p, KC, DC, IM> RwIter<'txn, 'p, KC, DC, IM> {
         RwIter { cursor, move_on_first: true, _phantom: marker::PhantomData }
     }
 
-    pub fn as_wtxn(&mut self) -> &mut RwTxn<'p> {
+    pub fn as_wtxn<'a: 'txn>(&'a mut self) -> &'txn mut RwTxn<'p> {
         /// TODO should the output lifetime be 'txn?
         self.cursor.txn
     }
