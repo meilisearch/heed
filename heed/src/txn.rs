@@ -60,7 +60,7 @@ struct RoTxnInner<'e> {
 }
 
 impl<'e, T> RoTxn<'e, T> {
-    pub(crate) fn new(env: &'e Env<T>) -> Result<RoTxn<'e, T>> {
+    pub(crate) fn begin(env: &'e Env<T>) -> Result<RoTxn<'e, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -78,7 +78,7 @@ impl<'e, T> RoTxn<'e, T> {
         })
     }
 
-    pub(crate) fn static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
+    pub(crate) fn begin_static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -258,7 +258,7 @@ pub struct RwTxn<'p> {
 }
 
 impl<'p> RwTxn<'p> {
-    pub(crate) fn new<T>(env: &'p Env<T>) -> Result<RwTxn<'p>> {
+    pub(crate) fn begin<T>(env: &'p Env<T>) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -279,7 +279,7 @@ impl<'p> RwTxn<'p> {
         })
     }
 
-    pub(crate) fn nested<T>(env: &'p Env<T>, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+    pub(crate) fn begin_nested<T>(env: &'p Env<T>, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
         let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.inner.txn.unwrap().as_mut() };
 

@@ -170,7 +170,7 @@ impl<T> Env<T> {
         let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), None, 0)?;
 
         // We're going to iterate on the unnamed database
-        let mut cursor = RoCursor::new(&rtxn, dbi)?;
+        let mut cursor = RoCursor::open(&rtxn, dbi)?;
 
         while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
             if key.contains(&0) {
@@ -315,7 +315,7 @@ impl<T> Env<T> {
     /// the thread initiating the new one will wait on a mutex upon completion of the previous
     /// transaction.
     pub fn write_txn(&self) -> Result<RwTxn> {
-        RwTxn::new(self)
+        RwTxn::begin(self)
     }
 
     /// Create a nested transaction with read and write access for use with the environment.
@@ -326,7 +326,7 @@ impl<T> Env<T> {
     /// A parent transaction and its cursors may not issue any other operations than _commit_ and
     /// _abort_ while it has active child transactions.
     pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
-        RwTxn::nested(self, parent)
+        RwTxn::begin_nested(self, parent)
     }
 
     /// Create a transaction with read-only access for use with the environment.
@@ -356,7 +356,7 @@ impl<T> Env<T> {
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
     pub fn read_txn(&self) -> Result<RoTxn<T>> {
-        RoTxn::new(self)
+        RoTxn::begin(self)
     }
 
     /// Create a transaction with read-only access for use with the environment.
@@ -386,7 +386,7 @@ impl<T> Env<T> {
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
     pub fn static_read_txn(self) -> Result<RoTxn<'static, T>> {
-        RoTxn::static_read_txn(self)
+        RoTxn::begin_static_read_txn(self)
     }
 
     /// Copy an LMDB environment to the specified path, with options.

@@ -439,7 +439,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         if cursor.move_on_key(&key_bytes)? {
             Ok(Some(RoIter::new(cursor)))
@@ -503,7 +503,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         cursor.move_on_key_greater_than_or_equal_to(&key_bytes)?;
 
@@ -572,7 +572,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let result = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
             Ok(Some((key, data))) if key == &key_bytes[..] => Ok(Some((key, data))),
@@ -645,7 +645,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         let entry = match cursor.move_on_key_greater_than_or_equal_to(&key_bytes)? {
             Some((key, data)) if key > &key_bytes[..] => Some((key, data)),
@@ -717,7 +717,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
         match cursor.move_on_key_greater_than_or_equal_to(&key_bytes) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
@@ -772,7 +772,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         match cursor.move_on_first(MoveOperation::Any) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
@@ -826,7 +826,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let mut cursor = RoCursor::new(txn, self.dbi)?;
+        let mut cursor = RoCursor::open(txn, self.dbi)?;
         match cursor.move_on_last(MoveOperation::Any) {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
                 (Ok(key), Ok(data)) => Ok(Some((key, data))),
@@ -1028,7 +1028,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// ```
     pub fn iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
-        RoCursor::new(txn, self.dbi).map(|cursor| RoIter::new(cursor))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoIter::new(cursor))
     }
 
     /// Return a mutable ordered iterator of all key-value pairs in this database.
@@ -1081,10 +1081,10 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwIter<'txn, KC, DC>> {
+    pub fn iter_mut<'txn, 'p>(&self, txn: &'txn mut RwTxn<'p>) -> Result<RwIter<'txn, 'p, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwIter::new(cursor))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwIter::new(cursor))
     }
 
     /// Return a reverse ordered iterator of all key-value pairs in this database.
@@ -1131,7 +1131,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
     pub fn rev_iter<'txn, T>(&self, txn: &'txn RoTxn<T>) -> Result<RoRevIter<'txn, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoRevIter::new(cursor))
     }
 
     /// Return a mutable reverse ordered iterator of all key-value\
@@ -1185,10 +1185,13 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter_mut<'txn>(&self, txn: &'txn mut RwTxn) -> Result<RwRevIter<'txn, KC, DC>> {
+    pub fn rev_iter_mut<'txn, 'p>(
+        &self,
+        txn: &'txn mut RwTxn<'p>,
+    ) -> Result<RwRevIter<'txn, 'p, KC, DC>> {
         assert_eq_env_db_txn!(self, txn);
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwRevIter::new(cursor))
     }
 
     /// Return an ordered iterator of a range of key-value pairs in this database.
@@ -1270,7 +1273,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable ordered iterator of a range of key-value pairs in this database.
@@ -1326,11 +1329,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range_mut<'a, 'txn, R>(
+    pub fn range_mut<'a, 'txn, 'p, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         range: &'a R,
-    ) -> Result<RwRange<'txn, KC, DC, C>>
+    ) -> Result<RwRange<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1361,7 +1364,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a reverse ordered iterator of a range of key-value pairs in this database.
@@ -1443,7 +1446,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a mutable reverse ordered iterator of a range of key-value pairs in this database.
@@ -1499,11 +1502,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range_mut<'a, 'txn, R>(
+    pub fn rev_range_mut<'a, 'txn, 'p, R>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         range: &'a R,
-    ) -> Result<RwRevRange<'txn, KC, DC, C>>
+    ) -> Result<RwRevRange<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1534,7 +1537,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwRevRange::new(cursor, start_bound, end_bound))
     }
 
     /// Return a lexicographically ordered iterator of all key-value pairs
@@ -1596,7 +1599,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RoCursor::new(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable lexicographically ordered iterator of all key-value pairs
@@ -1654,11 +1657,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter_mut<'a, 'txn>(
+    pub fn prefix_iter_mut<'a, 'txn, 'p>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwPrefix<'txn, KC, DC, C>>
+    ) -> Result<RwPrefix<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1667,7 +1670,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RwCursor::new(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a reversed lexicographically ordered iterator of all key-value pairs
@@ -1729,7 +1732,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RoCursor::new(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
+        RoCursor::open(txn, self.dbi).map(|cursor| RoRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Return a mutable reversed lexicographically ordered iterator of all key-value pairs
@@ -1787,11 +1790,11 @@ impl<KC, DC, C> Database<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter_mut<'a, 'txn>(
+    pub fn rev_prefix_iter_mut<'a, 'txn, 'p>(
         &self,
-        txn: &'txn mut RwTxn,
+        txn: &'txn mut RwTxn<'p>,
         prefix: &'a KC::EItem,
-    ) -> Result<RwRevPrefix<'txn, KC, DC, C>>
+    ) -> Result<RwRevPrefix<'txn, 'p, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1800,7 +1803,7 @@ impl<KC, DC, C> Database<KC, DC, C> {
 
         let prefix_bytes = KC::bytes_encode(prefix).map_err(Error::Encoding)?;
         let prefix_bytes = prefix_bytes.into_owned();
-        RwCursor::new(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
+        RwCursor::open(txn, self.dbi).map(|cursor| RwRevPrefix::new(cursor, prefix_bytes))
     }
 
     /// Insert a key-value pair in this database, replacing any previous value. The entry is

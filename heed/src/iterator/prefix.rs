@@ -4,7 +4,7 @@ use std::marker;
 use heed_traits::LexicographicComparator;
 use types::LazyDecode;
 
-use crate::cursor::MoveOperation;
+use crate::cursor::{CursorInner, MoveOperation};
 use crate::envs::DefaultComparator;
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
@@ -48,7 +48,7 @@ fn retreat_prefix<C: LexicographicComparator>(bytes: &mut [u8]) -> bool {
 }
 
 fn move_on_prefix_end<'txn, C: LexicographicComparator>(
-    cursor: &mut RoCursor<'txn>,
+    cursor: &mut CursorInner<'txn>,
     prefix: &mut [u8],
 ) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
     if advance_prefix::<C>(prefix) {
@@ -203,15 +203,18 @@ impl<KC, DC, C, IM> fmt::Debug for RoPrefix<'_, KC, DC, C, IM> {
 unsafe impl<KC, DC, IM> Send for RoPrefix<'_, WithoutTls, KC, DC, IM> {}
 
 /// A read-write prefix iterator structure.
-pub struct RwPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
-    cursor: RwCursor<'txn>,
+pub struct RwPrefix<'txn, 'p, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
+    cursor: RwCursor<'txn, 'p>,
     prefix: Vec<u8>,
     move_on_first: bool,
     _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwPrefix<'txn, KC, DC, C, IM> {
+impl<'txn, 'p, KC, DC, C, IM> RwPrefix<'txn, 'p, KC, DC, C, IM> {
+    pub(crate) fn new(
+        cursor: RwCursor<'txn, 'p>,
+        prefix: Vec<u8>,
+    ) -> RwPrefix<'txn, 'p, KC, DC, C, IM> {
         RwPrefix { cursor, prefix, move_on_first: true, _phantom: marker::PhantomData }
     }
 
@@ -332,7 +335,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwPrefix<'txn, 'p, KC, DC, C, MoveBetweenKeys> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -346,7 +349,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RwPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
+    ) -> RwPrefix<'txn, 'p, KC, DC, C, MoveThroughDuplicateValues> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -356,7 +359,7 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwPrefix<'txn, KC2, DC2, C, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwPrefix<'txn, 'p, KC2, DC2, C, IM> {
         RwPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -366,22 +369,22 @@ impl<'txn, KC, DC, C, IM> RwPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, KC2, DC, C, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwPrefix<'txn, 'p, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, KC, DC2, C, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwPrefix<'txn, 'p, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
+    pub fn lazily_decode_data(self) -> RwPrefix<'txn, 'p, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, C, IM> Iterator for RwPrefix<'txn, KC, DC, C, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RwPrefix<'txn, '_, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -447,7 +450,7 @@ where
     }
 }
 
-impl<KC, DC, C, IM> fmt::Debug for RwPrefix<'_, KC, DC, C, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RwPrefix<'_, '_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwPrefix").finish()
     }
@@ -592,15 +595,18 @@ impl<KC, DC, C, IM> fmt::Debug for RoRevPrefix<'_, KC, DC, C, IM> {
 unsafe impl<KC, DC, IM> Send for RoRevPrefix<'_, WithoutTls, KC, DC, IM> {}
 
 /// A reverse read-write prefix iterator structure.
-pub struct RwRevPrefix<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
-    cursor: RwCursor<'txn>,
+pub struct RwRevPrefix<'txn, 'p, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
+    cursor: RwCursor<'txn, 'p>,
     prefix: Vec<u8>,
     move_on_last: bool,
     _phantom: marker::PhantomData<(KC, DC, C, IM)>,
 }
 
-impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
-    pub(crate) fn new(cursor: RwCursor<'txn>, prefix: Vec<u8>) -> RwRevPrefix<'txn, KC, DC, C, IM> {
+impl<'txn, 'p, KC, DC, C, IM> RwRevPrefix<'txn, 'p, KC, DC, C, IM> {
+    pub(crate) fn new(
+        cursor: RwCursor<'txn, 'p>,
+        prefix: Vec<u8>,
+    ) -> RwRevPrefix<'txn, 'p, KC, DC, C, IM> {
         RwRevPrefix { cursor, prefix, move_on_last: true, _phantom: marker::PhantomData }
     }
 
@@ -721,7 +727,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// Move on the first value of keys, ignoring duplicate values.
     ///
     /// For more info, see [`RoIter::move_between_keys`].
-    pub fn move_between_keys(self) -> RwRevPrefix<'txn, KC, DC, C, MoveBetweenKeys> {
+    pub fn move_between_keys(self) -> RwRevPrefix<'txn, 'p, KC, DC, C, MoveBetweenKeys> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -735,7 +741,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     /// For more info, see [`RoIter::move_through_duplicate_values`].
     pub fn move_through_duplicate_values(
         self,
-    ) -> RwRevPrefix<'txn, KC, DC, C, MoveThroughDuplicateValues> {
+    ) -> RwRevPrefix<'txn, 'p, KC, DC, C, MoveThroughDuplicateValues> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -745,7 +751,7 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the codec types of this iterator, specifying the codecs.
-    pub fn remap_types<KC2, DC2>(self) -> RwRevPrefix<'txn, KC2, DC2, C, IM> {
+    pub fn remap_types<KC2, DC2>(self) -> RwRevPrefix<'txn, 'p, KC2, DC2, C, IM> {
         RwRevPrefix {
             cursor: self.cursor,
             prefix: self.prefix,
@@ -755,22 +761,22 @@ impl<'txn, KC, DC, C, IM> RwRevPrefix<'txn, KC, DC, C, IM> {
     }
 
     /// Change the key codec type of this iterator, specifying the new codec.
-    pub fn remap_key_type<KC2>(self) -> RwRevPrefix<'txn, KC2, DC, C, IM> {
+    pub fn remap_key_type<KC2>(self) -> RwRevPrefix<'txn, 'p, KC2, DC, C, IM> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this iterator, specifying the new codec.
-    pub fn remap_data_type<DC2>(self) -> RwRevPrefix<'txn, KC, DC2, C, IM> {
+    pub fn remap_data_type<DC2>(self) -> RwRevPrefix<'txn, 'p, KC, DC2, C, IM> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(self) -> RwRevPrefix<'txn, KC, LazyDecode<DC>, C, IM> {
+    pub fn lazily_decode_data(self) -> RwRevPrefix<'txn, 'p, KC, LazyDecode<DC>, C, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<'txn, KC, DC, C, IM> Iterator for RwRevPrefix<'txn, KC, DC, C, IM>
+impl<'txn, KC, DC, C, IM> Iterator for RwRevPrefix<'txn, '_, KC, DC, C, IM>
 where
     KC: BytesDecode<'txn>,
     DC: BytesDecode<'txn>,
@@ -835,7 +841,7 @@ where
     }
 }
 
-impl<KC, DC, C, IM> fmt::Debug for RwRevPrefix<'_, KC, DC, C, IM> {
+impl<KC, DC, C, IM> fmt::Debug for RwRevPrefix<'_, '_, KC, DC, C, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwRevPrefix").finish()
     }

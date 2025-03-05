@@ -2,6 +2,7 @@
 //!
 //! - [Decode Values on Demand](#decode-values-on-demand)
 //! - [Listing and Opening the Named Databases](#listing-and-opening-the-named-databases)
+//! - [Moving entries from one database to another](#moving-entries-from-one-database-to-another)
 //! - [Create Custom and Prefix Codecs](#create-custom-and-prefix-codecs)
 //! - [Change the Environment Size Dynamically](#change-the-environment-size-dynamically)
 //! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
@@ -127,6 +128,73 @@
 //!
 //!     Ok(())
 //! }
+//! ```
+//!
+//! # Moving entries from one database to another
+//!
+//! TBD
+//!
+//! ```rust,compile_fail
+//! # use std::error::Error;
+//! # use heed::types::*;
+//! # use heed::{Database, EnvOpenOptions};
+//! # fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+//! #    let path = tempfile::tempdir()?;
+//! #    let env = unsafe {
+//! #        EnvOpenOptions::new()
+//! #            .map_size(1024 * 1024 * 100) // 100 MiB
+//! #            .open(&path)?
+//! #    };
+//! let mut wtxn = env.write_txn()?;
+//! # let database1: Database<Str, Str> = env.create_database(&mut wtxn, Some("database1"))?;
+//! # let database2: Database<Str, Str> = env.create_database(&mut wtxn, Some("database2"))?;
+//! # for i in 0..10 {
+//! #     let key = format!("key{}", i);
+//! #     let value = format!("value{}", i);
+//! #     database1.put(&mut wtxn, &key, &value)?;
+//! # }
+//! for result in database1.iter(&wtxn)? {
+//!     let (k, v) = result?;
+//!     // compilation error: cannot use &mut and & of RwTxn simultaneously
+//!     database2.put(&mut wtxn, k, v)?;
+//! }
+//! # wtxn.commit()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! TBD we use an iter_mut + as_wtxn and owned strings. Explain why this is necessary.
+//!
+//! ```
+//! # use std::error::Error;
+//! # use heed::types::*;
+//! # use heed::{Database, EnvOpenOptions};
+//! # fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+//! #    let path = tempfile::tempdir()?;
+//! #    let env = unsafe {
+//! #        EnvOpenOptions::new()
+//! #            .max_dbs(10)
+//! #            .map_size(1024 * 1024 * 100) // 100 MiB
+//! #            .open(&path)?
+//! #    };
+//! let mut wtxn = env.write_txn()?;
+//! # let database1: Database<Str, Str> = env.create_database(&mut wtxn, Some("database1"))?;
+//! # let database2: Database<Str, Str> = env.create_database(&mut wtxn, Some("database2"))?;
+//! # for i in 0..10 {
+//! #     let key = format!("key{}", i);
+//! #     let value = format!("value{}", i);
+//! #     database1.put(&mut wtxn, &key, &value)?;
+//! # }
+//! let mut iter = database1.iter_mut(&mut wtxn)?;
+//! while let Some((k, v)) = iter.next().transpose()? {
+//!     let ck = k.to_owned();
+//!     let cv = v.to_owned();
+//!     database2.put(iter.as_wtxn(), &ck, &cv)?;
+//! }
+//! # drop(iter);
+//! # wtxn.commit()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Create Custom and Prefix Codecs
