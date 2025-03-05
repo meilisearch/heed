@@ -210,6 +210,8 @@ impl TlsUsage for WithoutTls {
 }
 
 impl TlsUsage for AnyTls {
+    // Users cannot open environments with AnyTls; therefore, this will never be read.
+    // We prefer to put the most restrictive value.
     const ENABLED: bool = false;
 }
 
@@ -273,7 +275,6 @@ impl<'p> RwTxn<'p> {
         Ok(RwTxn {
             txn: RoTxn {
                 inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
-
                 _tls_marker: PhantomData,
             },
         })
