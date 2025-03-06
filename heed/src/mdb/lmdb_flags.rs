@@ -103,10 +103,10 @@ bitflags! {
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &"bonjour", &())?;
         /// db.put(&mut wtxn, &"hello", &())?;
-        /// db.put(&mut wtxn, &"holla", &())?;
+        /// db.put(&mut wtxn, &"hola", &())?;
         ///
         /// let mut iter = db.iter(&wtxn)?;
-        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hola", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
         /// assert_eq!(iter.next().transpose()?, None);
@@ -115,7 +115,7 @@ bitflags! {
         /// let mut iter = db.rev_iter(&wtxn)?;
         /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
-        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hola", ())));
         /// assert_eq!(iter.next().transpose()?, None);
         /// drop(iter);
         ///
@@ -382,12 +382,12 @@ bitflags! {
         ///
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &"bonjour")?;
-        /// db.put(&mut wtxn, &68, &"holla")?;
+        /// db.put(&mut wtxn, &68, &"hola")?;
         /// db.put(&mut wtxn, &68, &"hello")?;
         /// db.put(&mut wtxn, &92, &"hallo")?;
         ///
         /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
-        /// assert_eq!(iter.next().transpose()?, Some((68, "holla")));
+        /// assert_eq!(iter.next().transpose()?, Some((68, "hola")));
         /// assert_eq!(iter.next().transpose()?, Some((68, "hello")));
         /// assert_eq!(iter.next().transpose()?, Some((68, "bonjour")));
         /// assert_eq!(iter.next().transpose()?, None);
