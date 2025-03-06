@@ -6,6 +6,99 @@ pub use self::iter::{RoIter, RoRevIter, RwIter, RwRevIter};
 pub use self::prefix::{RoPrefix, RoRevPrefix, RwPrefix, RwRevPrefix};
 pub use self::range::{RoRange, RoRevRange, RwRange, RwRevRange};
 
+/// This is just set of tests to check that the Cursors
+/// are not Send. We need to use doc test as it is the
+/// only way to check for expected compilation failures.
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoIter;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoIter<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoRevIter;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoRevIter<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoRange;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoRange<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoRevRange;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoRevRange<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoPrefix;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoPrefix<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RoRevPrefix;
+/// fn is_send<T: Send>() {}
+/// is_send::<RoRevPrefix<Bytes, Bytes>>();
+/// ```
+///
+/// Starting the next section with the Read-write Iterators.
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwIter;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwIter<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwRevIter;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwRevIter<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwRange;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwRange<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwRevRange;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwRevRange<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwPrefix;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwPrefix<Bytes, Bytes>>();
+/// ```
+///
+/// ```rust,compile_fail
+/// use heed::types::*;
+/// use heed::RwRevPrefix;
+/// fn is_send<T: Send>() {}
+/// is_send::<RwRevPrefix<Bytes, Bytes>>();
+/// ```
+#[doc(hidden)]
+#[allow(unused)]
+fn test_txns_are_not_send() {}
+
 #[cfg(test)]
 mod tests {
     use std::ops;

@@ -2,8 +2,9 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
+use std::sync::Arc;
 
-use crate::envs::Env;
+use crate::envs::{Env, EnvInner};
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::Result;
@@ -46,11 +47,16 @@ use crate::Result;
 ///     }
 /// }
 /// ```
-pub struct RoTxn<'e, T = WithTls> {
+#[repr(transparent)]
+pub struct RoTxn<'e, T = AnyTls> {
+    inner: RoTxnInner<'e>,
+    _tls_marker: PhantomData<&'e T>,
+}
+
+struct RoTxnInner<'e> {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
-    env: Cow<'e, Env<T>>,
-    _tls_marker: PhantomData<T>,
+    env: Cow<'e, Arc<EnvInner>>,
 }
 
 impl<'e, T> RoTxn<'e, T> {
@@ -66,7 +72,10 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Borrowed(env), _tls_marker: PhantomData })
+        Ok(RoTxn {
+            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
+            _tls_marker: PhantomData,
+        })
     }
 
     pub(crate) fn static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
@@ -81,11 +90,18 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn { txn: NonNull::new(txn), env: Cow::Owned(env), _tls_marker: PhantomData })
+        Ok(RoTxn {
+            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Owned(env.inner) },
+            _tls_marker: PhantomData,
+        })
+    }
+
+    pub(crate) fn txn_ptr(&self) -> NonNull<ffi::MDB_txn> {
+        self.inner.txn.unwrap()
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.env.env_mut_ptr()
+        self.inner.env.env_mut_ptr()
     }
 
     /// Return the transaction's ID.
@@ -94,7 +110,7 @@ impl<'e, T> RoTxn<'e, T> {
     /// [`RoTxn`], this corresponds to the snapshot being read;
     /// concurrent readers will frequently have the same transaction ID.
     pub fn id(&self) -> usize {
-        unsafe { ffi::mdb_txn_id(self.txn.unwrap().as_ptr()) }
+        unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) }
     }
 
     /// Commit a read transaction.
@@ -109,15 +125,53 @@ impl<'e, T> RoTxn<'e, T> {
     pub fn commit(mut self) -> Result<()> {
         // Asserts that the transaction hasn't been already
         // committed/aborter and ensure we cannot use it twice.
-        let mut txn = self.txn.take().unwrap();
+        let mut txn = self.inner.txn.take().unwrap();
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
         result.map_err(Into::into)
     }
 }
 
+impl<'a> Deref for RoTxn<'a, WithTls> {
+    type Target = RoTxn<'a, AnyTls>;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+#[cfg(master3)]
+impl std::ops::DerefMut for RoTxn<'_, WithTls> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'a> Deref for RoTxn<'a, WithoutTls> {
+    type Target = RoTxn<'a, AnyTls>;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+#[cfg(master3)]
+impl std::ops::DerefMut for RoTxn<'_, WithoutTls> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
 impl<T> Drop for RoTxn<'_, T> {
     fn drop(&mut self) {
-        if let Some(mut txn) = self.txn.take() {
+        if let Some(mut txn) = self.inner.txn.take() {
             // Asserts that the transaction hasn't been already
             // committed/aborter and ensure we cannot use it twice.
             unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
@@ -145,6 +199,12 @@ pub enum WithTls {}
 #[derive(Debug, PartialEq, Eq)]
 pub enum WithoutTls {}
 
+/// Parameter defining that read transactions might have been opened with or
+/// without Thread Local Storage (TLS).
+///
+/// `RwTxn`s and any `RoTxn` dereference to `&RoTxn<AnyTls>`.
+pub enum AnyTls {}
+
 /// Specificies if Thread Local Storage (TLS) must be used when
 /// opening transactions. It is often faster to open TLS-backed
 /// transactions but makes them `!Send`.
@@ -164,6 +224,12 @@ impl TlsUsage for WithTls {
 }
 
 impl TlsUsage for WithoutTls {
+    const ENABLED: bool = false;
+}
+
+impl TlsUsage for AnyTls {
+    // Users cannot open environments with AnyTls; therefore, this will never be read.
+    // We prefer to put the most restrictive value.
     const ENABLED: bool = false;
 }
 
@@ -224,12 +290,9 @@ impl<'p> RwTxn<'p> {
             ))?
         };
 
-        let env_without_tls = unsafe { env.as_without_tls() };
-
         Ok(RwTxn {
             txn: RoTxn {
-                txn: NonNull::new(txn),
-                env: Cow::Borrowed(env_without_tls),
+                inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
                 _tls_marker: PhantomData,
             },
         })
@@ -237,25 +300,22 @@ impl<'p> RwTxn<'p> {
 
     pub(crate) fn nested<T>(env: &'p Env<T>, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.txn.unwrap().as_mut() };
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.inner.txn.unwrap().as_mut() };
 
         unsafe {
             mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
         };
 
-        let env_without_tls = unsafe { env.as_without_tls() };
-
         Ok(RwTxn {
             txn: RoTxn {
-                txn: NonNull::new(txn),
-                env: Cow::Borrowed(env_without_tls),
+                inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
                 _tls_marker: PhantomData,
             },
         })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.txn.env.env_mut_ptr()
+        self.txn.inner.env.env_mut_ptr()
     }
 
     /// Commit all the operations of a transaction into the database.
@@ -263,7 +323,7 @@ impl<'p> RwTxn<'p> {
     pub fn commit(mut self) -> Result<()> {
         // Asserts that the transaction hasn't been already
         // committed/aborter and ensure we cannot use it two times.
-        let mut txn = self.txn.txn.take().unwrap();
+        let mut txn = self.txn.inner.txn.take().unwrap();
         let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
         result.map_err(Into::into)
     }
@@ -273,7 +333,7 @@ impl<'p> RwTxn<'p> {
     pub fn abort(mut self) {
         // Asserts that the transaction hasn't been already
         // committed/aborter and ensure we cannot use it twice.
-        let mut txn = self.txn.txn.take().unwrap();
+        let mut txn = self.txn.inner.txn.take().unwrap();
         unsafe { ffi::mdb_txn_abort(txn.as_mut()) }
     }
 }
@@ -291,5 +351,26 @@ impl<'p> Deref for RwTxn<'p> {
 impl std::ops::DerefMut for RwTxn<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.txn
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ro_txns_are_send() {
+        use crate::{RoTxn, WithoutTls};
+
+        fn is_send<T: Send>() {}
+
+        is_send::<RoTxn<WithoutTls>>();
+    }
+
+    #[test]
+    fn rw_txns_are_send() {
+        use crate::RwTxn;
+
+        fn is_send<T: Send>() {}
+
+        is_send::<RwTxn>();
     }
 }

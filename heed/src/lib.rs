@@ -104,7 +104,7 @@ use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode, Comparator, LexicographicComparator};
-pub use self::txn::{RoTxn, RwTxn, TlsUsage, WithTls, WithoutTls};
+pub use self::txn::{AnyTls, RoTxn, RwTxn, TlsUsage, WithTls, WithoutTls};
 
 /// The underlying LMDB library version information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

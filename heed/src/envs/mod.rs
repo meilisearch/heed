@@ -31,6 +31,7 @@ mod env_open_options;
 #[cfg(master3)]
 pub use encrypted_env::EncryptedEnv;
 pub use env::Env;
+pub(crate) use env::EnvInner;
 pub use env_open_options::EnvOpenOptions;
 
 /// Records the current list of opened environments for tracking purposes. The canonical

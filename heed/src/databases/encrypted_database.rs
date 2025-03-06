@@ -111,7 +111,7 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn<T>) -> Result<Option<EncryptedDatabase<KC, DC, C>>>
+    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<EncryptedDatabase<KC, DC, C>>>
     where
         KC: 'static,
         DC: 'static,
@@ -305,9 +305,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get<'a, 'txn, T>(
+    pub fn get<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<DC::DItem>>
     where
@@ -370,11 +370,11 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_duplicates<'a, 'txn, T>(
+    pub fn get_duplicates<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
-    ) -> Result<Option<RoIter<'txn, T, KC, DC, MoveOnCurrentKeyDuplicates>>>
+    ) -> Result<Option<RoIter<'txn, KC, DC, MoveOnCurrentKeyDuplicates>>>
     where
         KC: BytesEncode<'a>,
     {
@@ -425,9 +425,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than<'a, 'txn, T>(
+    pub fn get_lower_than<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -481,9 +481,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_lower_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_lower_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -537,9 +537,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than<'a, 'txn, T>(
+    pub fn get_greater_than<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -593,9 +593,9 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn get_greater_than_or_equal_to<'a, 'txn, T>(
+    pub fn get_greater_than_or_equal_to<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         key: &'a KC::EItem,
     ) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
@@ -641,7 +641,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn first<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn first<'txn>(&self, txn: &'txn mut RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -685,7 +685,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn last<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<Option<(KC::DItem, DC::DItem)>>
+    pub fn last<'txn>(&self, txn: &'txn mut RoTxn) -> Result<Option<(KC::DItem, DC::DItem)>>
     where
         KC: BytesDecode<'txn>,
         DC: BytesDecode<'txn>,
@@ -732,7 +732,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn len<T>(&self, txn: &RoTxn<T>) -> Result<u64> {
+    pub fn len(&self, txn: &RoTxn) -> Result<u64> {
         self.inner.len(txn)
     }
 
@@ -775,7 +775,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn is_empty<T>(&self, txn: &RoTxn<T>) -> Result<bool> {
+    pub fn is_empty(&self, txn: &RoTxn) -> Result<bool> {
         self.inner.is_empty(txn)
     }
 
@@ -817,7 +817,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn stat<T>(&self, txn: &RoTxn<T>) -> Result<DatabaseStat> {
+    pub fn stat(&self, txn: &RoTxn) -> Result<DatabaseStat> {
         self.inner.stat(txn)
     }
 
@@ -862,7 +862,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoIter<'txn, T, KC, DC>> {
+    pub fn iter<'txn>(&self, txn: &'txn mut RoTxn) -> Result<RoIter<'txn, KC, DC>> {
         self.inner.iter(txn)
     }
 
@@ -961,7 +961,7 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_iter<'txn, T>(&self, txn: &'txn mut RoTxn<T>) -> Result<RoRevIter<'txn, T, KC, DC>> {
+    pub fn rev_iter<'txn>(&self, txn: &'txn mut RoTxn) -> Result<RoRevIter<'txn, KC, DC>> {
         self.inner.rev_iter(txn)
     }
 
@@ -1064,11 +1064,11 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn range<'a, 'txn, R, T>(
+    pub fn range<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         range: &'a R,
-    ) -> Result<RoRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1187,11 +1187,11 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_range<'a, 'txn, R, T>(
+    pub fn rev_range<'a, 'txn, R>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         range: &'a R,
-    ) -> Result<RoRevRange<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevRange<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         R: RangeBounds<KC::EItem>,
@@ -1311,11 +1311,11 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn prefix_iter<'a, 'txn, T>(
+    pub fn prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         prefix: &'a KC::EItem,
-    ) -> Result<RoPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,
@@ -1436,11 +1436,11 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn rev_prefix_iter<'a, 'txn, T>(
+    pub fn rev_prefix_iter<'a, 'txn>(
         &self,
-        txn: &'txn mut RoTxn<T>,
+        txn: &'txn mut RoTxn,
         prefix: &'a KC::EItem,
-    ) -> Result<RoRevPrefix<'txn, T, KC, DC, C>>
+    ) -> Result<RoRevPrefix<'txn, KC, DC, C>>
     where
         KC: BytesEncode<'a>,
         C: LexicographicComparator,

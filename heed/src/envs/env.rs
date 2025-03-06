@@ -22,12 +22,14 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified, WithoutTls,
+    Unspecified,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
+#[repr(transparent)]
 pub struct Env<T> {
-    inner: Arc<EnvInner<T>>,
+    pub(crate) inner: Arc<EnvInner>,
+    _tls_marker: PhantomData<T>,
 }
 
 impl<T> Env<T> {
@@ -36,21 +38,11 @@ impl<T> Env<T> {
         path: PathBuf,
         signal_event: Arc<SignalEvent>,
     ) -> Self {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event, _tls_marker: PhantomData }) }
+        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }), _tls_marker: PhantomData }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.inner.env_ptr
-    }
-
-    /// Converts any `Env` into `Env<WithoutTls>`, useful for wrapping
-    /// into a `RwTxn` due to the latter always being `WithoutTls`.
-    ///
-    /// # Safety
-    ///
-    /// Do not use this `Env` to create transactions but only keep it.
-    pub(crate) unsafe fn as_without_tls(&self) -> &Env<WithoutTls> {
-        unsafe { std::mem::transmute::<&Env<T>, &Env<WithoutTls>>(self) }
+        self.inner.env_mut_ptr()
     }
 
     /// The size of the data file on disk.
@@ -175,7 +167,7 @@ impl<T> Env<T> {
 
         let rtxn = self.read_txn()?;
         // Open the main database
-        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), None, 0)?;
+        let dbi = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), None, 0)?;
 
         // We're going to iterate on the unnamed database
         let mut cursor = RoCursor::new(&rtxn, dbi)?;
@@ -188,12 +180,10 @@ impl<T> Env<T> {
             let key = String::from_utf8(key.to_vec()).unwrap();
             // Calling `ffi::db_stat` on a database instance does not involve key comparison
             // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) =
-                self.raw_open_dbi::<DefaultComparator>(rtxn.txn.unwrap(), Some(&key), 0)
-            {
+            if let Ok(dbi) = self.raw_open_dbi::<DefaultComparator>(rtxn.txn_ptr(), Some(&key), 0) {
                 let mut stat = mem::MaybeUninit::uninit();
                 unsafe {
-                    mdb_result(ffi::mdb_stat(rtxn.txn.unwrap().as_mut(), dbi, stat.as_mut_ptr()))?
+                    mdb_result(ffi::mdb_stat(rtxn.txn_ptr().as_mut(), dbi, stat.as_mut_ptr()))?
                 };
                 let stat = unsafe { stat.assume_init() };
                 size += compute_size(stat);
@@ -228,7 +218,7 @@ impl<T> Env<T> {
     /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
-        rtxn: &RoTxn<T>,
+        rtxn: &RoTxn,
         name: Option<&str>,
     ) -> Result<Option<Database<KC, DC>>>
     where
@@ -531,7 +521,7 @@ impl<T> Env<T> {
 
 impl<T> Clone for Env<T> {
     fn clone(&self) -> Self {
-        Env { inner: self.inner.clone() }
+        Env { inner: self.inner.clone(), _tls_marker: PhantomData }
     }
 }
 
@@ -544,17 +534,22 @@ impl<T> fmt::Debug for Env<T> {
     }
 }
 
-pub(crate) struct EnvInner<T> {
+pub(crate) struct EnvInner {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
-    _tls_marker: PhantomData<T>,
 }
 
-unsafe impl<T> Send for EnvInner<T> {}
-unsafe impl<T> Sync for EnvInner<T> {}
+impl EnvInner {
+    pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
+        self.env_ptr
+    }
+}
 
-impl<T> Drop for EnvInner<T> {
+unsafe impl Send for EnvInner {}
+unsafe impl Sync for EnvInner {}
+
+impl Drop for EnvInner {
     fn drop(&mut self) {
         let mut lock = OPENED_ENV.write().unwrap();
         let removed = lock.remove(&self.path);
