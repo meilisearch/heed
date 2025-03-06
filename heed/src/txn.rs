@@ -141,10 +141,28 @@ impl<'a> Deref for RoTxn<'a, WithTls> {
     }
 }
 
+#[cfg(master3)]
+impl std::ops::DerefMut for RoTxn<'_, WithTls> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
 impl<'a> Deref for RoTxn<'a, WithoutTls> {
     type Target = RoTxn<'a, AnyTls>;
 
     fn deref(&self) -> &Self::Target {
+        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
+        // as RoTxnInner.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+#[cfg(master3)]
+impl std::ops::DerefMut for RoTxn<'_, WithoutTls> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
         // as RoTxnInner.
         unsafe { std::mem::transmute(self) }
