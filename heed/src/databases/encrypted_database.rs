@@ -53,8 +53,16 @@ use crate::*;
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
-pub struct EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator> {
-    inner: DatabaseOpenOptions<'e, 'n, T, KC, DC, C>,
+pub struct EncryptedDatabaseOpenOptions<
+    'e,
+    'n,
+    T,
+    KC,
+    DC,
+    C = DefaultComparator,
+    CDUP = DefaultComparator,
+> {
+    inner: DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>,
 }
 
 impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
@@ -64,7 +72,7 @@ impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecifie
     }
 }
 
-impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
+impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP> {
     /// Change the type of the database.
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
@@ -72,11 +80,21 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     pub fn types<NKC, NDC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, NKC, NDC> {
         EncryptedDatabaseOpenOptions { inner: self.inner.types() }
     }
+
     /// Change the customized key compare function of the database.
     ///
     /// By default no customized compare function will be set when opening a database.
-    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, NC> {
+    pub fn key_comparator<NC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, NC, CDUP> {
         EncryptedDatabaseOpenOptions { inner: self.inner.key_comparator() }
+    }
+
+    /// Change the customized dup sort compare function of the database.
+    ///
+    /// By default no customized compare function will be set when opening a database.
+    pub fn dup_sort_comparator<NCDUP>(
+        self,
+    ) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C, NCDUP> {
+        EncryptedDatabaseOpenOptions { inner: self.inner.dup_sort_comparator() }
     }
 
     /// Change the name of the database.
@@ -111,11 +129,12 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<EncryptedDatabase<KC, DC, C>>>
+    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<EncryptedDatabase<KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
+        CDUP: Comparator + 'static,
     {
         self.inner.open(rtxn).map(|opt| opt.map(EncryptedDatabase::new))
     }
@@ -129,23 +148,24 @@ impl<'e, 'n, T, KC, DC, C> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create(&self, wtxn: &mut RwTxn) -> Result<EncryptedDatabase<KC, DC, C>>
+    pub fn create(&self, wtxn: &mut RwTxn) -> Result<EncryptedDatabase<KC, DC, C, CDUP>>
     where
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
+        CDUP: Comparator + 'static,
     {
         self.inner.create(wtxn).map(EncryptedDatabase::new)
     }
 }
 
-impl<T, KC, DC, C> Clone for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C> {
+impl<T, KC, DC, C, CDUP> Clone for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T, KC, DC, C> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C> {}
+impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP> {}
 
 /// A typed database that accepts only the types it was created with.
 ///
@@ -259,12 +279,12 @@ impl<T, KC, DC, C> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC, C> {
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct EncryptedDatabase<KC, DC, C = DefaultComparator> {
-    inner: Database<KC, DC, C>,
+pub struct EncryptedDatabase<KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
+    inner: Database<KC, DC, C, CDUP>,
 }
 
-impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
-    pub(crate) fn new(inner: Database<KC, DC, C>) -> EncryptedDatabase<KC, DC, C> {
+impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
+    pub(crate) fn new(inner: Database<KC, DC, C, CDUP>) -> EncryptedDatabase<KC, DC, C, CDUP> {
         EncryptedDatabase { inner }
     }
 
@@ -2228,20 +2248,21 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     }
 }
 
-impl<KC, DC, C> Clone for EncryptedDatabase<KC, DC, C> {
-    fn clone(&self) -> EncryptedDatabase<KC, DC, C> {
+impl<KC, DC, C, CDUP> Clone for EncryptedDatabase<KC, DC, C, CDUP> {
+    fn clone(&self) -> EncryptedDatabase<KC, DC, C, CDUP> {
         *self
     }
 }
 
-impl<KC, DC, C> Copy for EncryptedDatabase<KC, DC, C> {}
+impl<KC, DC, C, CDUP> Copy for EncryptedDatabase<KC, DC, C, CDUP> {}
 
-impl<KC, DC, C> fmt::Debug for EncryptedDatabase<KC, DC, C> {
+impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EncryptedDatabase")
             .field("key_codec", &any::type_name::<KC>())
             .field("data_codec", &any::type_name::<DC>())
-            .field("comparator", &any::type_name::<C>())
+            .field("key_comparator", &any::type_name::<C>())
+            .field("dup_sort_comparator", &any::type_name::<CDUP>())
             .finish()
     }
 }
