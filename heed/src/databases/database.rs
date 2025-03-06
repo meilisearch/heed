@@ -2707,20 +2707,21 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     }
 }
 
-impl<KC, DC, C> Clone for Database<KC, DC, C> {
-    fn clone(&self) -> Database<KC, DC, C> {
+impl<KC, DC, C, CDUP> Clone for Database<KC, DC, C, CDUP> {
+    fn clone(&self) -> Database<KC, DC, C, CDUP> {
         *self
     }
 }
 
-impl<KC, DC, C> Copy for Database<KC, DC, C> {}
+impl<KC, DC, C, CDUP> Copy for Database<KC, DC, C, CDUP> {}
 
-impl<KC, DC, C> fmt::Debug for Database<KC, DC, C> {
+impl<KC, DC, C, CDUP> fmt::Debug for Database<KC, DC, C, CDUP> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Database")
             .field("key_codec", &any::type_name::<KC>())
             .field("data_codec", &any::type_name::<DC>())
-            .field("comparator", &any::type_name::<C>())
+            .field("key_comparator", &any::type_name::<C>())
+            .field("dup_sort_comparator", &any::type_name::<CDUP>())
             .finish()
     }
 }
