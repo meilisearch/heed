@@ -218,7 +218,7 @@ impl<T> Env<T> {
     /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
-        rtxn: &RoTxn<T>,
+        rtxn: &RoTxn,
         name: Option<&str>,
     ) -> Result<Option<Database<KC, DC>>>
     where
