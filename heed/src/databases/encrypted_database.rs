@@ -1064,6 +1064,45 @@ impl<KC, DC, C> EncryptedDatabase<KC, DC, C> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
+    ///
+    /// It can be complex to work with ranges of slices and using
+    /// the `..` or `..=` range syntax is not the best way to deal
+    /// with that. We highly recommend using the [`Bound`](std::ops::Bound) enum for that.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// use std::ops::Bound;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(30)
+    /// #     .open(dir.path())?
+    /// # };
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Bytes, Unit> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // make sure to create slices and not ref array
+    /// // by using the [..] syntax.
+    /// let start = &[0, 0, 0][..];
+    /// let end = &[9, 0, 0][..];
+    ///
+    /// // equivalent to start..end
+    /// let range = (Bound::Included(start), Bound::Excluded(end));
+    ///
+    /// let iter = db.range(&mut wtxn, &range)?;
+    ///
+    /// drop(iter);
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
     pub fn range<'a, 'txn, R>(
         &self,
         txn: &'txn mut RoTxn,
