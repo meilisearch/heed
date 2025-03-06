@@ -199,8 +199,6 @@ impl<KC, DC, C, IM> fmt::Debug for RoRange<'_, KC, DC, C, IM> {
     }
 }
 
-unsafe impl<KC, DC, C, IM> Send for RoRange<'_, KC, DC, C, IM> {}
-
 /// A read-write range iterator structure.
 pub struct RwRange<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
     cursor: RwCursor<'txn>,
@@ -636,8 +634,6 @@ impl<KC, DC, C, IM> fmt::Debug for RoRevRange<'_, KC, DC, C, IM> {
         f.debug_struct("RoRevRange").finish()
     }
 }
-
-unsafe impl<KC, DC, C, IM> Send for RoRevRange<'_, KC, DC, C, IM> {}
 
 /// A reverse read-write range iterator structure.
 pub struct RwRevRange<'txn, KC, DC, C = DefaultComparator, IM = MoveThroughDuplicateValues> {
