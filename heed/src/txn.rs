@@ -335,3 +335,24 @@ impl std::ops::DerefMut for RwTxn<'_> {
         &mut self.txn
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ro_txns_are_send() {
+        use crate::{RoTxn, WithoutTls};
+
+        fn is_send<T: Send>() {}
+
+        is_send::<RoTxn<WithoutTls>>();
+    }
+
+    #[test]
+    fn rw_txns_are_send() {
+        use crate::RwTxn;
+
+        fn is_send<T: Send>() {}
+
+        is_send::<RwTxn>();
+    }
+}
