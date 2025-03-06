@@ -88,6 +88,15 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
         EncryptedDatabaseOpenOptions { inner: self.inner.key_comparator() }
     }
 
+    /// Change the customized dup sort compare function of the database.
+    ///
+    /// By default no customized compare function will be set when opening a database.
+    pub fn dup_sort_comparator<NCDUP>(
+        self,
+    ) -> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC, C, NCDUP> {
+        EncryptedDatabaseOpenOptions { inner: self.inner.dup_sort_comparator() }
+    }
+
     /// Change the name of the database.
     ///
     /// By default the database is unnamed and there only is a single unnamed database.
