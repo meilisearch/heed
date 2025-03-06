@@ -233,7 +233,7 @@ bitflags! {
         /// wtxn.commit()?;
         /// # Ok(()) }
         /// ```
-        #[deprecated(since="0.21.0", note="please use `IntegerComparator` instead")]
+        #[deprecated(since="0.21.0", note="prefer using `IntegerComparator` with the `DatabaseOpenOptions::key_comparator` method instead")]
         const INTEGER_KEY = ffi::MDB_INTEGERKEY;
         /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
         ///
@@ -354,6 +354,7 @@ bitflags! {
         /// wtxn.commit()?;
         /// # Ok(()) }
         /// ```
+        #[deprecated(since="0.22.0", note="prefer using `IntegerComparator` with the `DatabaseOpenOptions::dup_sort_comparator` method instead")]
         const INTEGER_DUP = ffi::MDB_INTEGERDUP;
         /// With [`DatabaseFlags::DUP_SORT`], use reverse string dups.
         ///
