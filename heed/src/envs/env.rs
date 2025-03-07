@@ -21,8 +21,8 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
-    CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
+    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
+    RoTxn, RwTxn, Unspecified, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
@@ -326,6 +326,8 @@ impl<T> Env<T> {
     /// A parent transaction and its cursors may not issue any other operations than _commit_ and
     /// _abort_ while it has active child transactions.
     pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+        assert_eq_env_txn!(self, parent);
+
         RwTxn::nested(self, parent)
     }
 
@@ -525,6 +527,57 @@ impl<T> Env<T> {
         }
         mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size) })
             .map_err(Into::into)
+    }
+}
+
+impl Env<WithoutTls> {
+    /// Create a nested transaction with read only access for use with the environment.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let env = unsafe {
+    ///     EnvOpenOptions::new()
+    ///         .read_txn_without_tls()
+    ///         .map_size(2 * 1024 * 1024) // 2 MiB
+    ///         .open(dir.path())?
+    /// };
+    ///
+    /// // we will open the default unnamed database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // opening a write transaction
+    /// for i in 0..1000 {
+    ///     db.put(&mut wtxn, &i, &i)?;
+    /// }
+    ///
+    /// // opening multiple read-only transactions
+    /// // to check if those values are now available
+    /// // without committing beforehand
+    /// let rtxns = (0..1000).map(|_| env.nested_read_txn(&wtxn)).collect::<heed::Result<Vec<_>>>()?;
+    ///
+    /// for (i, rtxn) in rtxns.iter().enumerate() {
+    ///     let i = i as u32;
+    ///     let ret = db.get(&rtxn, &i)?;
+    ///     assert_eq!(ret, Some(i));
+    /// }
+    ///
+    /// # Ok(()) }
+    /// ```
+    #[cfg(not(master3))]
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
+        assert_eq_env_txn!(self, parent);
+
+        RoTxn::<WithoutTls>::nested(self, parent)
     }
 }
 
