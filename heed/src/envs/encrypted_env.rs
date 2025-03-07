@@ -330,6 +330,13 @@ impl<T> EncryptedEnv<T> {
         self.inner.max_readers()
     }
 
+    /// Get the maximum size of keys and MDB_DUPSORT data we can write.
+    ///
+    /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
+    pub fn max_key_size(&self) -> usize {
+        self.inner.max_key_size()
+    }
+
     /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
     /// multiple threads can wait on this event.
     ///
@@ -355,13 +362,6 @@ impl<T> EncryptedEnv<T> {
     /// but the library does not check for this condition, so the caller must ensure it explicitly.
     pub unsafe fn resize(&self, new_size: usize) -> Result<()> {
         self.inner.resize(new_size)
-    }
-
-    /// Get the maximum size of keys and MDB_DUPSORT data we can write.
-    ///
-    /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
-    pub fn max_key_size(&self) -> usize {
-        self.inner.max_key_size()
     }
 }
 
