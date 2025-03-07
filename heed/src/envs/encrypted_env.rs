@@ -325,6 +325,11 @@ impl<T> EncryptedEnv<T> {
         self.inner.path()
     }
 
+    /// Returns the maximum number of threads/reader slots for the environment.
+    pub fn max_readers(&self) -> u32 {
+        self.inner.max_readers()
+    }
+
     /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
     /// multiple threads can wait on this event.
     ///
