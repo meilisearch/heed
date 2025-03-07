@@ -470,6 +470,23 @@ impl<T> Env<T> {
         &self.inner.path
     }
 
+    /// Returns the maximum number of threads/reader slots for the environment.
+    pub fn max_readers(&self) -> u32 {
+        let env_ptr = self.inner.env_ptr.as_ptr();
+        let mut max_readers = 0;
+        // safety: The env and the max_readers pointer are valid
+        unsafe { mdb_result(ffi::mdb_env_get_maxreaders(env_ptr, &mut max_readers)).unwrap() };
+        max_readers
+    }
+
+    /// Get the maximum size of keys and MDB_DUPSORT data we can write.
+    ///
+    /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
+    pub fn max_key_size(&self) -> usize {
+        let maxsize: i32 = unsafe { ffi::mdb_env_get_maxkeysize(self.env_mut_ptr().as_mut()) };
+        maxsize as usize
+    }
+
     /// Returns an `EnvClosingEvent` that can be used to wait for the closing event,
     /// multiple threads can wait on this event.
     ///
@@ -508,14 +525,6 @@ impl<T> Env<T> {
         }
         mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size) })
             .map_err(Into::into)
-    }
-
-    /// Get the maximum size of keys and MDB_DUPSORT data we can write.
-    ///
-    /// Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511
-    pub fn max_key_size(&self) -> usize {
-        let maxsize: i32 = unsafe { ffi::mdb_env_get_maxkeysize(self.env_mut_ptr().as_mut()) };
-        maxsize as usize
     }
 }
 
