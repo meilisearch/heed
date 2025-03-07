@@ -21,8 +21,8 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
-    CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified, WithoutTls,
+    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
+    RoTxn, RwTxn, Unspecified, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
@@ -326,6 +326,8 @@ impl<T> Env<T> {
     /// A parent transaction and its cursors may not issue any other operations than _commit_ and
     /// _abort_ while it has active child transactions.
     pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+        assert_eq_env_txn!(self, parent);
+
         RwTxn::nested(self, parent)
     }
 
@@ -573,6 +575,8 @@ impl Env<WithoutTls> {
     /// ```
     #[cfg(not(master3))]
     pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
+        assert_eq_env_txn!(self, parent);
+
         RoTxn::<WithoutTls>::nested(self, parent)
     }
 }
