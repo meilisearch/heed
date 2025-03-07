@@ -22,7 +22,7 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
+    Unspecified, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
