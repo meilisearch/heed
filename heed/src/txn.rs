@@ -106,7 +106,7 @@ impl<'e, T> RoTxn<'e, T> {
         parent: &'p RwTxn,
     ) -> Result<RoTxn<'p, WithoutTls>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.txn.unwrap().as_mut() };
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.inner.txn.unwrap().as_mut() };
 
         unsafe {
             // Note that we open a write transaction here and this is the (current)
@@ -114,13 +114,10 @@ impl<'e, T> RoTxn<'e, T> {
             mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
         };
 
-        let env_without_tls = unsafe { env.as_without_tls() };
-
         // Note that we wrap the write txn into a RoTxn so it's
         // safe as the user cannot do any modification with it.
         Ok(RoTxn {
-            txn: NonNull::new(txn),
-            env: Cow::Borrowed(env_without_tls),
+            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
             _tls_marker: PhantomData,
         })
     }
