@@ -157,5 +157,9 @@ fn main() {
         builder.define("MDB_MAXKEYSIZE", "0");
     }
 
+    if !cfg!(debug_assertions) {
+        builder.define("NDEBUG", None);
+    }
+
     builder.compile("liblmdb.a")
 }
