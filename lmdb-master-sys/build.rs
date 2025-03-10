@@ -135,6 +135,9 @@ fn main() {
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized");
 
+    #[cfg(windows)]
+    builder.flag("/experimental:c11atomics");
+
     if cfg!(feature = "posix-sem") {
         builder.define("MDB_USE_POSIX_SEM", None);
     }
