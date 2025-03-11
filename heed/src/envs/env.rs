@@ -23,12 +23,12 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified,
+    Unspecified, WithTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
 #[repr(transparent)]
-pub struct Env<T> {
+pub struct Env<T = WithTls> {
     pub(crate) inner: Arc<EnvInner>,
     _tls_marker: PhantomData<T>,
 }

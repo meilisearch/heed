@@ -28,7 +28,7 @@ use crate::{EnvFlags, Error, Result};
 /// Options and flags which can be used to configure how an environment is opened.
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnvOpenOptions<T: TlsUsage> {
+pub struct EnvOpenOptions<T: TlsUsage = WithTls> {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
