@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::ffi::CString;
-use std::fs::File;
+use std::fs::{self, File};
+use std::io::Seek;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
@@ -439,6 +440,68 @@ impl<T> Env<T> {
     pub fn copy_to_file(&self, file: &mut File, option: CompactionOption) -> Result<()> {
         let fd = get_file_fd(file);
         unsafe { self.copy_to_fd(fd, option) }
+    }
+
+    /// Copy an LMDB environment to a file created at the given path, with options.
+    ///
+    /// This function may be used to make a backup of an existing environment.
+    /// No lockfile is created, since it gets recreated at need.
+    ///
+    /// Note that the file is automatically seeked to the beginning after the copy
+    /// is complete and deleted in case of error.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::io::{Read, Seek, SeekFrom};
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::types::*;
+    /// use memchr::memmem::find_iter;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?
+    /// # };
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// db.put(&mut wtxn, &"hello0", &"world0")?;
+    /// db.put(&mut wtxn, &"hello1", &"world1")?;
+    /// db.put(&mut wtxn, &"hello2", &"world2")?;
+    /// db.put(&mut wtxn, &"hello3", &"world3")?;
+    ///
+    /// wtxn.commit()?;
+    ///
+    /// let tmp_dir = tempfile::tempdir()?;
+    /// let path = tmp_dir.path().join("data.mdb");
+    /// let mut tmp_file = env.copy_to_path(path, CompactionOption::Enabled)?;
+    /// let offset = tmp_file.seek(SeekFrom::Current(0))?;
+    /// assert_eq!(offset, 0);
+    ///
+    /// let mut content = Vec::new();
+    /// tmp_file.read_to_end(&mut content)?;
+    /// assert_eq!(find_iter(&content, b"hello").count(), 4);
+    /// assert_eq!(find_iter(&content, b"world").count(), 4);
+    /// # Ok(()) }
+    /// ```
+    pub fn copy_to_path<P: AsRef<Path>>(&self, path: P, option: CompactionOption) -> Result<File> {
+        let path = path.as_ref();
+        let mut file =
+            File::options().write(true).create(true).truncate(true).read(true).open(path)?;
+        match self.copy_to_file(&mut file, option) {
+            Ok(_) => {
+                file.rewind()?;
+                Ok(file)
+            }
+            Err(err) => {
+                fs::remove_file(path)?;
+                Err(err)
+            }
+        }
     }
 
     /// Copy an LMDB environment to the specified file descriptor, with compaction option.
