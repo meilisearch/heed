@@ -9,7 +9,6 @@ keywords = ["lmdb", "database", "storage", "typed", "encryption"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
-include = ["../examples/heed3-encrypted.rs", "../examples/heed3-all-types.rs"]
 
 [dependencies]
 aead = { version = "0.5.2", default-features = false }
@@ -113,12 +112,9 @@ use-valgrind = ["lmdb-master3-sys/use-valgrind"]
 # conflicts between heed3 and heed examples when working on both crates.
 [[example]]
 name = "prev-snapshot"
-path = "../examples/prev-snapshot.rs"
 
 [[example]]
 name = "heed3-encrypted"
-path = "../examples/heed3-encrypted.rs"
 
 [[example]]
 name = "heed3-all-types"
-path = "../examples/heed3-all-types.rs"

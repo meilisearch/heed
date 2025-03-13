@@ -9,15 +9,6 @@ keywords = ["lmdb", "database", "storage", "typed"]
 categories = ["database", "data-structures"]
 readme = "../README.md"
 edition = "2021"
-include = [
-    "../examples/all-types.rs",
-    "../examples/clear-database.rs",
-    "../examples/cursor-append.rs",
-    "../examples/custom-comparator.rs",
-    "../examples/multi-env.rs",
-    "../examples/nested.rs",
-    "../examples/rmp-serde.rs",
-]
 
 [dependencies]
 bitflags = { version = "2.9.0", features = ["serde"] }
@@ -113,41 +104,30 @@ longer-keys = ["lmdb-master-sys/longer-keys"]
 # <https://github.com/LMDB/lmdb/blob/f20e41de09d97e4461946b7e26ec831d0c24fac7/libraries/liblmdb/mdb.c#L205-L218>
 use-valgrind = ["lmdb-master-sys/use-valgrind"]
 
-# Examples are located outside the standard heed/examples directory to prevent
-# conflicts between heed3 and heed examples when working on both crates.
 [[example]]
 name = "all-types"
-path = "../examples/all-types.rs"
 
 [[example]]
 name = "clear-database"
-path = "../examples/clear-database.rs"
 
 [[example]]
 name = "cursor-append"
-path = "../examples/cursor-append.rs"
 
 [[example]]
 name = "custom-comparator"
-path = "../examples/custom-comparator.rs"
 
 [[example]]
 name = "custom-dupsort-comparator"
-path = "../examples/custom-dupsort-comparator.rs"
 
 [[example]]
 name = "multi-env"
-path = "../examples/multi-env.rs"
 
 [[example]]
 name = "nested"
-path = "../examples/nested.rs"
 
 [[example]]
 name = "prev-snapshot"
-path = "../examples/prev-snapshot.rs"
 
 [[example]]
 name = "rmp-serde"
-path = "../examples/rmp-serde.rs"
 required-features = ["serde-rmp"]
