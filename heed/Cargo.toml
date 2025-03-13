@@ -132,6 +132,10 @@ name = "custom-comparator"
 path = "../examples/custom-comparator.rs"
 
 [[example]]
+name = "custom-dupsort-comparator"
+path = "../examples/custom-dupsort-comparator.rs"
+
+[[example]]
 name = "multi-env"
 path = "../examples/multi-env.rs"
 

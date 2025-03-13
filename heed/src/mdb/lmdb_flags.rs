@@ -103,10 +103,10 @@ bitflags! {
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &"bonjour", &())?;
         /// db.put(&mut wtxn, &"hello", &())?;
-        /// db.put(&mut wtxn, &"holla", &())?;
+        /// db.put(&mut wtxn, &"hola", &())?;
         ///
         /// let mut iter = db.iter(&wtxn)?;
-        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hola", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
         /// assert_eq!(iter.next().transpose()?, None);
@@ -115,7 +115,7 @@ bitflags! {
         /// let mut iter = db.rev_iter(&wtxn)?;
         /// assert_eq!(iter.next().transpose()?, Some(("bonjour", ())));
         /// assert_eq!(iter.next().transpose()?, Some(("hello", ())));
-        /// assert_eq!(iter.next().transpose()?, Some(("holla", ())));
+        /// assert_eq!(iter.next().transpose()?, Some(("hola", ())));
         /// assert_eq!(iter.next().transpose()?, None);
         /// drop(iter);
         ///
@@ -233,7 +233,7 @@ bitflags! {
         /// wtxn.commit()?;
         /// # Ok(()) }
         /// ```
-        #[deprecated(since="0.21.0", note="please use `IntegerComparator` instead")]
+        #[deprecated(since="0.21.0", note="prefer using `IntegerComparator` with the `DatabaseOpenOptions::key_comparator` method instead")]
         const INTEGER_KEY = ffi::MDB_INTEGERKEY;
         /// With [`DatabaseFlags::DUP_SORT`], sorted dup items have fixed size.
         ///
@@ -354,6 +354,7 @@ bitflags! {
         /// wtxn.commit()?;
         /// # Ok(()) }
         /// ```
+        #[deprecated(since="0.22.0", note="prefer using `IntegerComparator` with the `DatabaseOpenOptions::dup_sort_comparator` method instead")]
         const INTEGER_DUP = ffi::MDB_INTEGERDUP;
         /// With [`DatabaseFlags::DUP_SORT`], use reverse string dups.
         ///
@@ -382,12 +383,12 @@ bitflags! {
         ///
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &"bonjour")?;
-        /// db.put(&mut wtxn, &68, &"holla")?;
+        /// db.put(&mut wtxn, &68, &"hola")?;
         /// db.put(&mut wtxn, &68, &"hello")?;
         /// db.put(&mut wtxn, &92, &"hallo")?;
         ///
         /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
-        /// assert_eq!(iter.next().transpose()?, Some((68, "holla")));
+        /// assert_eq!(iter.next().transpose()?, Some((68, "hola")));
         /// assert_eq!(iter.next().transpose()?, Some((68, "hello")));
         /// assert_eq!(iter.next().transpose()?, Some((68, "bonjour")));
         /// assert_eq!(iter.next().transpose()?, None);
