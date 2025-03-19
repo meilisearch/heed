@@ -2646,6 +2646,82 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         }
     }
 
+    /// Removes this database entirely.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that no other copies of the database exist before calling, as
+    /// they will become invalid.
+    /// Do not remove a database if an existing transaction has modified it.
+    /// Doing so can cause database corruption or other errors.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?
+    /// # };
+    /// /// List databases in an env
+    #[cfg_attr(not(master3), doc = concat!(
+    "fn list_dbs(env: &heed::Env, rotxn: &heed::RoTxn<'_>) -> heed::Result<Vec<String>> {\n",
+    "    let names_db: Database<Str, DecodeIgnore> =",
+    ))]
+    #[cfg_attr(master3, doc = concat!(
+    "fn list_dbs(\n",
+    "    env: &heed::Env,\n",
+    "    rotxn: &heed::RoTxn<'_>,\n",
+    ") -> Result<Vec<String>, Box<dyn std::error::Error>> {\n",
+    "    // mdb-master3 uses null-terminated C strings as DB names\n",
+    "    let names_db: Database<Bytes, DecodeIgnore> =",
+    ))]
+    ///         env.open_database(&rotxn, None)?
+    ///            .expect("the unnamed database always exists");
+    ///     let mut names = Vec::new();
+    ///     for item in names_db.iter(&rotxn)? {
+    ///         let (name, ()) = item?;
+    #[cfg_attr(master3, doc = concat!(
+    "        let name = std::ffi::CStr::from_bytes_with_nul(name)?.to_str()?;",
+    ))]
+    ///         names.push(name.to_owned());
+    ///     }
+    ///     Ok(names)
+    /// }
+    ///
+    /// type BEI32 = I32<BigEndian>;
+    ///
+    /// let mut rwtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_database(&mut rwtxn, Some("iter-i32"))?;
+    /// rwtxn.commit()?;
+    ///
+    /// let rotxn = env.read_txn()?;
+    /// let db_names = list_dbs(&env, &rotxn)?;
+    /// assert_eq!(db_names, vec!["iter-i32".to_owned()]);
+    /// drop(rotxn);
+    ///
+    /// let mut rwtxn = env.write_txn()?;
+    /// unsafe { db.remove(&mut rwtxn)? };
+    /// let db_names = list_dbs(&env, &rwtxn)?;
+    /// assert!(db_names.is_empty());
+    /// rwtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub unsafe fn remove(self, rwtxn: &mut RwTxn) -> Result<()> {
+        assert_eq_env_db_txn!(self, rwtxn);
+
+        unsafe {
+            mdb_result(ffi::mdb_drop(rwtxn.txn.txn_ptr().as_mut(), self.dbi, 1)).map_err(Into::into)
+        }
+    }
+
     /// Change the codec types of this database, specifying the codecs.
     ///
     /// # Safety
