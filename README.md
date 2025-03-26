@@ -6,7 +6,7 @@
 [![Docs](https://docs.rs/heed/badge.svg)](https://docs.rs/heed)
 [![dependency status](https://deps.rs/repo/github/meilisearch/heed/status.svg)](https://deps.rs/repo/github/meilisearch/heed)
 [![Build](https://github.com/meilisearch/heed/actions/workflows/rust.yml/badge.svg)](https://github.com/meilisearch/heed/actions/workflows/rust.yml)
-![Discord](https://img.shields.io/discord/1006923006964154428?style=flat&logo=discord&logoColor=ffffff&label=&labelColor=6A7EC2&color=7389D8&link=https%3A%2F%2Fdiscord.com%2Fchannels%2F1006923006964154428%2F1347203493106024528)
+[![Discord](https://img.shields.io/discord/1006923006964154428?style=flat&logo=discord&logoColor=ffffff&label=&labelColor=6A7EC2&color=7389D8)](https://discord.com/channels/1006923006964154428/1347203493106024528)
 
 Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database) abstractions with minimal overhead. These libraries enable the storage of various Rust types within LMDB, extending support to include Serde-compatible types. It supports not only the LMDB `mdb.master` branch but also the `mdb.master3` branch, which features encryption-at-rest.
 
