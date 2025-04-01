@@ -135,7 +135,9 @@ fn main() {
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized")
         // Enable atomics on Windows
-        .flag_if_supported("/std:c11");
+        .flag_if_supported("/std:c11")
+        // Explicitly enable C11 atomics support
+        .flag_if_supported("/experimental:c11atomics");
 
     // On Windows, link explicitly advapi32 for security functions
     #[cfg(target_os = "windows")]
