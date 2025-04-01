@@ -127,7 +127,6 @@ name = "multi-env"
 
 [[example]]
 name = "nested-rtxns"
-path = "../examples/nested-rtxns.rs"
 
 [[example]]
 name = "nested"
