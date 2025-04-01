@@ -23,7 +23,7 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 use crate::EnvOpenOptions;
 use crate::{
     CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified, WithTls,
+    Unspecified, WithTls, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
@@ -346,7 +346,12 @@ impl<T> Env<T> {
         RwTxn::nested(self, parent)
     }
 
-    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p>> {
+    /// Create a nested read transaction that is capable of reading uncommitted changes.
+    ///
+    /// This is a custom LMDB fork feature that allows reading uncommitted changes.
+    /// It enables parallel processing of data across multiple threads through
+    /// concurrent read-only transactions. You can [read more in this PR](https://github.com/meilisearch/heed/pull/307).
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
         RoTxn::nested(self, parent)
     }
 
