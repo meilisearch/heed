@@ -610,10 +610,14 @@ impl<T> Env<T> {
 }
 
 impl Env<WithoutTls> {
-    /// Create a nested transaction with read only access for use with the environment.
+    /// Create a nested read transaction that is capable of reading uncommitted changes.
     ///
     /// The new transaction will be a nested transaction, with the transaction indicated by parent
     /// as its parent. Transactions may be nested to any level.
+    ///
+    /// This is a custom LMDB fork feature that allows reading uncommitted changes.
+    /// It enables parallel processing of data across multiple threads through
+    /// concurrent read-only transactions. You can [read more in this PR](https://github.com/meilisearch/heed/pull/307).
     ///
     /// ```
     /// use std::fs;
