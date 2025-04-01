@@ -22,8 +22,8 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
-    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified, WithTls, WithoutTls,
+    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
+    RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
