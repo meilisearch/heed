@@ -133,7 +133,9 @@ fn main() {
         // https://github.com/mozilla/lmdb/blob/b7df2cac50fb41e8bd16aab4cc5fd167be9e032a/libraries/liblmdb/Makefile#L23
         .flag_if_supported("-Wno-unused-parameter")
         .flag_if_supported("-Wbad-function-cast")
-        .flag_if_supported("-Wuninitialized");
+        .flag_if_supported("-Wuninitialized")
+        // Enable atomics on Windows
+        .flag_if_supported("/std:c11");
 
     // On Windows, link explicitly advapi32 for security functions
     #[cfg(target_os = "windows")]
