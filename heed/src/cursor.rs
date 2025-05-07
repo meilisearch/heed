@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use std::ptr::NonNull;
 use std::{marker, mem, ptr};
 
 use crate::mdb::error::mdb_result;
@@ -6,7 +7,7 @@ use crate::mdb::ffi;
 use crate::*;
 
 pub struct RoCursor<'txn> {
-    cursor: *mut ffi::MDB_cursor,
+    cursor: NonNull<ffi::MDB_cursor>,
     _marker: marker::PhantomData<&'txn ()>,
 }
 
@@ -15,7 +16,7 @@ impl<'txn> RoCursor<'txn> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
         let mut txn = txn.txn_ptr();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
-        Ok(RoCursor { cursor, _marker: marker::PhantomData })
+        Ok(RoCursor { cursor: NonNull::new(cursor).unwrap(), _marker: marker::PhantomData })
     }
 
     pub fn current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
@@ -241,6 +242,8 @@ impl Drop for RoCursor<'_> {
         unsafe { ffi::mdb_cursor_close(self.cursor) }
     }
 }
+
+unsafe impl Send for RoCursor<'_> {}
 
 pub struct RwCursor<'txn> {
     cursor: RoCursor<'txn>,
