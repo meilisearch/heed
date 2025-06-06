@@ -774,8 +774,12 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
             None => return Ok(None),
         };
         
-        // Check if value is a sub-database
-        if DupSort::is_sub_db(&value) {
+        // Check if value is a single value with our optimization
+        if DupSort::is_single_value(&value) {
+            // Single value optimization - decode and return it
+            let single_value = DupSort::decode_single_value(&value)?;
+            Ok(Some((key, Cow::Owned(single_value.to_vec()))))
+        } else if DupSort::is_sub_db(&value) {
             // It's a sub-database, navigate to first entry
             let sub_db = DupSort::decode_sub_db(&value)?;
             let mut dup_position = CursorPosition {
@@ -816,7 +820,7 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
                 }
             }
         } else {
-            // Single value - no duplicates
+            // Legacy case - value stored directly
             Ok(Some((key, value)))
         }
     }
@@ -829,7 +833,8 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
         
         // Must have active dup cursor
         if self.dup_cursor.is_none() {
-            return self.first_dup();
+            // No active dup cursor means we're either on a single value or haven't started
+            return Ok(None);
         }
         
         // Work with the dup cursor

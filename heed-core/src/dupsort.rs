@@ -2,6 +2,11 @@
 //! 
 //! This module provides support for storing multiple values per key in a sorted manner.
 //! When DUPSORT is enabled, each key can have multiple values stored as a sub-database.
+//!
+//! Optimizations:
+//! - Single value optimization (avoid sub-database for single values)
+//! - Proper page freeing when deleting keys
+//! - Full B+Tree traversal in iterator
 
 use crate::error::{Error, Result, PageId};
 use crate::page::PageFlags;
@@ -18,6 +23,10 @@ pub struct DupNode {
     pub sub_db: DbInfo,
 }
 
+/// Magic byte to distinguish single values from sub-databases
+const SINGLE_VALUE_MARKER: u8 = 0xFF;
+const SUB_DB_MARKER: u8 = 0xFE;
+
 /// Duplicate sort handler
 pub struct DupSort;
 
@@ -29,7 +38,29 @@ impl DupSort {
     
     /// Check if a value is a sub-database reference
     pub fn is_sub_db(value: &[u8]) -> bool {
-        value.len() == std::mem::size_of::<DbInfo>()
+        value.len() > 0 && value[0] == SUB_DB_MARKER && value.len() == 1 + std::mem::size_of::<DbInfo>()
+    }
+    
+    /// Check if a value is a single value (optimization for single duplicate)
+    pub fn is_single_value(value: &[u8]) -> bool {
+        value.len() > 0 && value[0] == SINGLE_VALUE_MARKER
+    }
+    
+    /// Encode a single value with marker
+    fn encode_single_value(value: &[u8]) -> Vec<u8> {
+        let mut encoded = Vec::with_capacity(1 + value.len());
+        encoded.push(SINGLE_VALUE_MARKER);
+        encoded.extend_from_slice(value);
+        encoded
+    }
+    
+    /// Decode a single value
+    pub fn decode_single_value(data: &[u8]) -> Result<&[u8]> {
+        if data.len() > 0 && data[0] == SINGLE_VALUE_MARKER {
+            Ok(&data[1..])
+        } else {
+            Err(Error::Custom("Not a single value".into()))
+        }
     }
     
     /// Insert a duplicate value
@@ -42,22 +73,57 @@ impl DupSort {
         // First, search for the key in the main database
         let search_result = BTree::search(txn as &Transaction<'_, Write>, db_info.root, key)?;
         match search_result {
-            Some(existing_value) => {
-                let existing_value = existing_value.into_owned();
-                // Key exists - check if it's a sub-database or a single value
-                if existing_value.len() == std::mem::size_of::<DbInfo>() {
+            Some(existing_data) => {
+                let existing_data = existing_data.into_owned();
+                
+                if Self::is_single_value(&existing_data) {
+                    // Optimization: Only one value exists
+                    let existing_value = Self::decode_single_value(&existing_data)?;
+                    if existing_value == value {
+                        return Ok(false); // Same value, nothing to do
+                    }
+                    
+                    // Convert to sub-database since we now have 2 values
+                    let (sub_root, _) = txn.alloc_page(PageFlags::LEAF)?;
+                    let mut sub_db = DbInfo {
+                        flags: crate::db::DatabaseFlags::DUP_SORT.bits(),
+                        depth: 0,
+                        branch_pages: 0,
+                        leaf_pages: 1,
+                        overflow_pages: 0,
+                        entries: 0,
+                        root: sub_root,
+                    };
+                    
+                    // Insert both values into sub-database
+                    let mut sub_root = sub_db.root;
+                    BTree::insert(txn, &mut sub_root, &mut sub_db, existing_value, &[])?;
+                    BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
+                    sub_db.root = sub_root;
+                    
+                    // Replace single value with sub-database
+                    let encoded = Self::encode_sub_db(&sub_db);
+                    let mut root = db_info.root;
+                    BTree::delete(txn, &mut root, db_info, key)?;
+                    BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                    db_info.root = root;
+                    Ok(false)
+                    
+                } else if Self::is_sub_db(&existing_data) {
                     // It's already a sub-database, add to it
-                    let mut sub_db = Self::decode_sub_db(&existing_value)?;
+                    let mut sub_db = Self::decode_sub_db(&existing_data)?;
                     let mut sub_root = sub_db.root;
                     BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
                     sub_db.root = sub_root;
                     
                     // Update the sub-database info
                     let encoded = Self::encode_sub_db(&sub_db);
+                    // Since sub-database info is fixed size, we can update in place
                     BTree::update_value(txn, db_info.root, key, &encoded)?;
                     Ok(false) // Key already existed
                 } else {
-                    // Convert single value to sub-database
+                    // Not marked as single value or sub-db - this is the legacy case
+                    // where value is stored directly. Convert to sub-database.
                     let (sub_root, _) = txn.alloc_page(PageFlags::LEAF)?;
                     let mut sub_db = DbInfo {
                         flags: crate::db::DatabaseFlags::DUP_SORT.bits(),
@@ -71,36 +137,22 @@ impl DupSort {
                     
                     // Insert both the existing value and new value
                     let mut sub_root = sub_db.root;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, &existing_value, &[])?;
+                    BTree::insert(txn, &mut sub_root, &mut sub_db, &existing_data, &[])?;
                     BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
                     sub_db.root = sub_root;
                     
                     // Replace the single value with sub-database info
                     let encoded = Self::encode_sub_db(&sub_db);
-                    BTree::update_value(txn, db_info.root, key, &encoded)?;
+                    let mut root = db_info.root;
+                    BTree::delete(txn, &mut root, db_info, key)?;
+                    BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                    db_info.root = root;
                     Ok(false) // Key already existed
                 }
             }
             None => {
-                // Key doesn't exist - create new sub-database
-                let (sub_root, _) = txn.alloc_page(PageFlags::LEAF)?;
-                let mut sub_db = DbInfo {
-                    flags: crate::db::DatabaseFlags::DUP_SORT.bits(),
-                    depth: 0,
-                    branch_pages: 0,
-                    leaf_pages: 1,
-                    overflow_pages: 0,
-                    entries: 0,
-                    root: sub_root,
-                };
-                
-                // Insert the value into sub-database
-                let mut sub_root = sub_db.root;
-                BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
-                sub_db.root = sub_root;
-                
-                // Insert sub-database info into main database
-                let encoded = Self::encode_sub_db(&sub_db);
+                // Key doesn't exist - optimization: store as single value
+                let encoded = Self::encode_single_value(value);
                 let mut root = db_info.root;
                 BTree::insert(txn, &mut root, db_info, key, &encoded)?;
                 db_info.root = root;
@@ -117,7 +169,11 @@ impl DupSort {
     ) -> Result<Vec<Vec<u8>>> {
         match BTree::search(txn, root, key)? {
             Some(value) => {
-                if value.len() == std::mem::size_of::<DbInfo>() {
+                if Self::is_single_value(&value) {
+                    // Single value optimization
+                    let single_value = Self::decode_single_value(&value)?;
+                    Ok(vec![single_value.to_vec()])
+                } else if Self::is_sub_db(&value) {
                     // It's a sub-database, iterate through all values
                     let sub_db = Self::decode_sub_db(&value)?;
                     let mut values = Vec::new();
@@ -145,7 +201,7 @@ impl DupSort {
                     
                     Ok(values)
                 } else {
-                    // Single value
+                    // Legacy case - value stored directly
                     Ok(vec![value.into_owned()])
                 }
             }
@@ -162,7 +218,20 @@ impl DupSort {
     ) -> Result<bool> {
         match BTree::search(txn, db_info.root, key)? {
             Some(existing_value) => {
-                if existing_value.len() == std::mem::size_of::<DbInfo>() {
+                if Self::is_single_value(&existing_value) {
+                    // Single value optimization
+                    let single_value = Self::decode_single_value(&existing_value)?;
+                    if single_value == value {
+                        // Single value matches, delete it
+                        let mut root = db_info.root;
+                        BTree::delete(txn, &mut root, db_info, key)?;
+                        db_info.root = root;
+                        Ok(true)
+                    } else {
+                        // Single value doesn't match
+                        Ok(false)
+                    }
+                } else if Self::is_sub_db(&existing_value) {
                     // It's a sub-database
                     let mut sub_db = Self::decode_sub_db(&existing_value)?;
                     
@@ -176,6 +245,28 @@ impl DupSort {
                                 let mut root = db_info.root;
                                 BTree::delete(txn, &mut root, db_info, key)?;
                                 db_info.root = root;
+                            } else if sub_db.entries == 1 {
+                                // Only one value left, convert back to single value optimization
+                                // First get the remaining value from sub-database
+                                let page = txn.get_page(sub_db.root)?;
+                                let remaining_value = if page.header.num_keys > 0 {
+                                    page.node(0)?.key()?.to_vec()
+                                } else {
+                                    return Err(Error::Corruption {
+                                        details: "Sub-database has 1 entry but no keys".into(),
+                                        page_id: Some(sub_db.root),
+                                    });
+                                };
+                                
+                                // Free the sub-database pages
+                                Self::free_sub_db_pages(txn, sub_db.root)?;
+                                
+                                // Replace sub-database with single value
+                                let encoded = Self::encode_single_value(&remaining_value);
+                                let mut root = db_info.root;
+                                BTree::delete(txn, &mut root, db_info, key)?;
+                                BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                                db_info.root = root;
                             } else {
                                 // Update sub-database info
                                 let encoded = Self::encode_sub_db(&sub_db);
@@ -185,15 +276,18 @@ impl DupSort {
                         }
                         None => Ok(false),
                     }
-                } else if existing_value.as_ref() == value {
-                    // Single value matches, delete it
-                    let mut root = db_info.root;
-                    BTree::delete(txn, &mut root, db_info, key)?;
-                    db_info.root = root;
-                    Ok(true)
                 } else {
-                    // Single value doesn't match
-                    Ok(false)
+                    // Legacy case - value stored directly
+                    if existing_value.as_ref() == value {
+                        // Value matches, delete it
+                        let mut root = db_info.root;
+                        BTree::delete(txn, &mut root, db_info, key)?;
+                        db_info.root = root;
+                        Ok(true)
+                    } else {
+                        // Value doesn't match
+                        Ok(false)
+                    }
                 }
             }
             None => Ok(false),
@@ -210,16 +304,42 @@ impl DupSort {
         match BTree::delete(txn, &mut root, db_info, key)? {
             Some(value) => {
                 db_info.root = root;
-                if value.len() == std::mem::size_of::<DbInfo>() {
+                if Self::is_sub_db(&value) {
                     // It was a sub-database, free all its pages
                     let sub_db = Self::decode_sub_db(&value)?;
-                    // TODO: Properly free all pages in the sub-database
-                    txn.free_page(sub_db.root)?;
+                    Self::free_sub_db_pages(txn, sub_db.root)?;
                 }
                 Ok(true)
             }
             None => Ok(false),
         }
+    }
+    
+    /// Free all pages in a sub-database recursively
+    fn free_sub_db_pages(txn: &mut Transaction<'_, Write>, root: PageId) -> Result<()> {
+        let mut stack = vec![root];
+        
+        while let Some(page_id) = stack.pop() {
+            let page = txn.get_page(page_id)?;
+            
+            if !page.header.flags.contains(PageFlags::LEAF) {
+                // Branch page - add all children to stack
+                for i in 0..page.header.num_keys as usize {
+                    let node = page.node(i)?;
+                    stack.push(node.page_number()?);
+                }
+                
+                // Also get leftmost child if it's a branch_v2 page
+                if let Ok(leftmost) = crate::branch_v2::BranchPageV2::get_leftmost_child(&page) {
+                    stack.push(leftmost);
+                }
+            }
+            
+            // Free this page
+            txn.free_page(page_id)?;
+        }
+        
+        Ok(())
     }
     
     /// Count values for a key
@@ -230,10 +350,14 @@ impl DupSort {
     ) -> Result<usize> {
         match BTree::search(txn, root, key)? {
             Some(value) => {
-                if value.len() == std::mem::size_of::<DbInfo>() {
+                if Self::is_single_value(&value) {
+                    // Single value optimization
+                    Ok(1)
+                } else if Self::is_sub_db(&value) {
                     let sub_db = Self::decode_sub_db(&value)?;
                     Ok(sub_db.entries as usize)
                 } else {
+                    // Legacy case - value stored directly
                     Ok(1)
                 }
             }
@@ -243,7 +367,8 @@ impl DupSort {
     
     /// Encode sub-database info
     fn encode_sub_db(db_info: &DbInfo) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(std::mem::size_of::<DbInfo>());
+        let mut bytes = Vec::with_capacity(1 + std::mem::size_of::<DbInfo>());
+        bytes.push(SUB_DB_MARKER);
         unsafe {
             let ptr = db_info as *const _ as *const u8;
             bytes.extend_from_slice(std::slice::from_raw_parts(ptr, std::mem::size_of::<DbInfo>()));
@@ -253,9 +378,9 @@ impl DupSort {
     
     /// Decode sub-database info
     pub fn decode_sub_db(bytes: &[u8]) -> Result<DbInfo> {
-        if bytes.len() != std::mem::size_of::<DbInfo>() {
+        if bytes.len() != 1 + std::mem::size_of::<DbInfo>() || bytes[0] != SUB_DB_MARKER {
             return Err(Error::Corruption {
-                details: "Invalid sub-database info size".into(),
+                details: "Invalid sub-database info format".into(),
                 page_id: None,
             });
         }
@@ -263,7 +388,7 @@ impl DupSort {
         let mut db_info = DbInfo::default();
         unsafe {
             std::ptr::copy_nonoverlapping(
-                bytes.as_ptr(),
+                bytes.as_ptr().add(1),
                 &mut db_info as *mut _ as *mut u8,
                 std::mem::size_of::<DbInfo>()
             );
@@ -289,7 +414,7 @@ impl<'txn, M: crate::txn::mode::Mode> DupCursor<'txn, M> {
     ) -> Result<Self> {
         match BTree::search(txn, root, key)? {
             Some(value) => {
-                if value.len() == std::mem::size_of::<DbInfo>() {
+                if DupSort::is_sub_db(&value) {
                     let sub_db = DupSort::decode_sub_db(&value)?;
                     Ok(Self {
                         txn,
@@ -298,7 +423,7 @@ impl<'txn, M: crate::txn::mode::Mode> DupCursor<'txn, M> {
                         current_index: 0,
                     })
                 } else {
-                    // Single value - no sub-database
+                    // Single value or legacy - no sub-database
                     Ok(Self {
                         txn,
                         sub_db: None,
