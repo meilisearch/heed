@@ -199,6 +199,52 @@ impl ReaderTable {
             .filter(|slot| !slot.is_free())
             .count()
     }
+    
+    /// Enumerate all active readers with detailed information
+    pub fn enumerate_readers(&self) -> Vec<ReaderInfo> {
+        let mut readers = Vec::new();
+        
+        for (slot_idx, slot) in self.slots.iter().enumerate() {
+            let pid = slot.pid.load(Ordering::Acquire);
+            if pid > 0 {
+                readers.push(ReaderInfo {
+                    slot_index: slot_idx,
+                    pid,
+                    tid: slot.tid.load(Ordering::Acquire),
+                    txn_id: TransactionId(slot.txn_id.load(Ordering::Acquire)),
+                    timestamp: slot.timestamp.load(Ordering::Acquire),
+                    is_stale: slot.is_stale(),
+                });
+            }
+        }
+        
+        readers
+    }
+}
+
+/// Detailed information about an active reader
+#[derive(Debug, Clone)]
+pub struct ReaderInfo {
+    /// Slot index
+    pub slot_index: usize,
+    /// Process ID
+    pub pid: u32,
+    /// Thread ID
+    pub tid: u64,
+    /// Transaction ID
+    pub txn_id: TransactionId,
+    /// Timestamp when acquired (nanoseconds since epoch)
+    pub timestamp: u64,
+    /// Whether this reader appears to be stale
+    pub is_stale: bool,
+}
+
+impl ReaderInfo {
+    /// Get age of this reader in seconds
+    pub fn age_seconds(&self) -> u64 {
+        let now = current_timestamp();
+        (now.saturating_sub(self.timestamp)) / 1_000_000_000
+    }
 }
 
 /// Get current thread ID

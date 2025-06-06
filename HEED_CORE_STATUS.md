@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~95% Complete
+## Current Status: ~96% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -62,6 +62,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
   - Stale reader detection
   - Oldest reader tracking for garbage collection
   - Process-based liveness checks
+  - Enhanced reader enumeration with detailed info
 
 - **Cursor Operations** ✅ 
   - Create cursors for databases
@@ -131,8 +132,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 ### Other Missing LMDB Features
 
 - **Custom Comparators** ✅ - Basic support for custom key ordering (stub implementation)
-- **Fixed-Size Values** - No MDB_INTEGERKEY optimization
-- **Reader Enumeration** - Cannot list active readers externally
+- **Fixed-Size Values** ✅ - Basic framework for fixed-size optimization
+- **Reader Enumeration** ✅ - Enhanced reader enumeration API
 - **Direct Page Access** - No low-level page manipulation
 - **Memory Control** - No MDB_NOMEMINIT, MDB_FIXEDMAP options
 - **Multiple Operations** - No MDB_MULTIPLE for batch operations
@@ -156,7 +157,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 | Free Page Reuse | ✅ | ✅ | Mostly complete |
 | Nested Transactions | ✅ | ❌ | Not implemented |
 | Custom Comparators | ✅ | ⚠️ | Framework implemented |
-| Fixed-Size Values | ✅ | ❌ | Not implemented |
+| Fixed-Size Values | ✅ | ⚠️ | Framework implemented |
 
 ## 📋 TODO List (Priority Order)
 
@@ -199,8 +200,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 ### Low Priority
 7. **Advanced Features**
    - ✅ Custom comparator framework implemented
-   - Fixed-size value optimizations
-   - Reader enumeration API
+   - ✅ Fixed-size value optimization framework
+   - ✅ Enhanced reader enumeration API
    - Memory control options
 
 8. **Compatibility Features**
@@ -238,7 +239,7 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **95% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **96% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog
