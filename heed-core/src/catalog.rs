@@ -8,6 +8,7 @@ use crate::meta::DbInfo;
 use crate::btree::BTree;
 use crate::txn::{Transaction, Write};
 use crate::db::DatabaseFlags;
+use crate::comparator::LexicographicComparator;
 
 /// Database catalog stored in the main database
 pub struct Catalog;
@@ -29,7 +30,7 @@ impl Catalog {
         // Insert into the main database B+Tree
         let mut root = main_db.root;
         let mut updated_info = main_db;
-        BTree::insert(txn, &mut root, &mut updated_info, key, &value)?;
+        BTree::<LexicographicComparator>::insert(txn, &mut root, &mut updated_info, key, &value)?;
         
         // Update the main database info if changed
         if root != main_db.root || updated_info.entries != main_db.entries {
@@ -55,7 +56,7 @@ impl Catalog {
         
         // Search in the main database B+Tree
         let key = name.as_bytes();
-        match BTree::search(txn, main_db.root, key)? {
+        match BTree::<LexicographicComparator>::search(txn, main_db.root, key)? {
             Some(value) => Ok(Some(Self::deserialize_db_info(&value)?)),
             None => Ok(None),
         }
@@ -122,7 +123,7 @@ impl Catalog {
         let key = name.as_bytes();
         let mut root = main_db.root;
         let mut updated_info = main_db;
-        let result = BTree::delete(txn, &mut root, &mut updated_info, key)?;
+        let result = BTree::<LexicographicComparator>::delete(txn, &mut root, &mut updated_info, key)?;
         let deleted = result.is_some();
         
         // Update the main database info if changed

@@ -8,6 +8,7 @@ use crate::txn::{Transaction, mode::Mode};
 use crate::env::{Environment, state};
 use crate::btree::BTree;
 use crate::meta::DbInfo;
+use crate::comparator::{Comparator, LexicographicComparator};
 
 bitflags! {
     /// Database flags
@@ -102,14 +103,14 @@ impl Value for String {
 }
 
 /// Database handle
-pub struct Database<K = Vec<u8>, V = Vec<u8>, C = ()> {
+pub struct Database<K = Vec<u8>, V = Vec<u8>, C = LexicographicComparator> {
     env_inner: Arc<crate::env::EnvInner>,
     name: Option<String>,
     info: DbInfo,
     _phantom: PhantomData<(K, V, C)>,
 }
 
-impl<K: Key, V: Value, C> Database<K, V, C> {
+impl<K: Key, V: Value, C: Comparator> Database<K, V, C> {
     /// Create a new database handle
     pub(crate) fn new(
         env_inner: Arc<crate::env::EnvInner>,
@@ -239,7 +240,7 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
             return Ok(None);
         }
         
-        match BTree::search(txn, db_info.root, &key_bytes)? {
+        match BTree::<C>::search(txn, db_info.root, &key_bytes)? {
             Some(value_bytes) => {
                 let value = V::decode(&value_bytes)?;
                 Ok(Some(value))
@@ -265,7 +266,7 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
             root = info.root;
         } else {
             // Regular insert
-            BTree::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
+            BTree::<C>::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
         }
         
         // Update db info if root changed
@@ -288,7 +289,7 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
         let mut info = *db_info;
         let mut root = info.root;
         
-        let result = BTree::delete(txn, &mut root, &mut info, &key_bytes)?;
+        let result = BTree::<C>::delete(txn, &mut root, &mut info, &key_bytes)?;
         if result.is_some() {
             // Update db info if needed
             if root != info.root {
@@ -367,7 +368,7 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
         } else {
             // Regular insertion
             let mut root = info.root;
-            BTree::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
+            BTree::<C>::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
             if root != info.root {
                 info.root = root;
             }
@@ -395,7 +396,7 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
             Ok(decoded_values)
         } else {
             // Regular get - return single value as array
-            match BTree::search(txn, db_info.root, &key_bytes)? {
+            match BTree::<C>::search(txn, db_info.root, &key_bytes)? {
                 Some(value_bytes) => {
                     let value = V::decode(&value_bytes)?;
                     Ok(vec![value])
@@ -418,11 +419,11 @@ impl<K: Key, V: Value, C> Database<K, V, C> {
             crate::dupsort::DupSort::delete(txn, &mut info, &key_bytes, &value_bytes)?
         } else {
             // For non-DUPSORT, delete only if value matches
-            match BTree::search(txn, info.root, &key_bytes)? {
+            match BTree::<C>::search(txn, info.root, &key_bytes)? {
                 Some(existing_value) => {
                     if existing_value == value_bytes {
                         let mut root = info.root;
-                        BTree::delete(txn, &mut root, &mut info, &key_bytes)?;
+                        BTree::<C>::delete(txn, &mut root, &mut info, &key_bytes)?;
                         if root != info.root {
                             info.root = root;
                         }
@@ -487,7 +488,7 @@ impl Environment<state::Open> {
         
         // Check if database exists in the main database catalog
         let main_db_info = *txn.db_info(None)?;
-        match BTree::search(txn, main_db_info.root, db_name.as_bytes())? {
+        match BTree::<LexicographicComparator>::search(txn, main_db_info.root, db_name.as_bytes())? {
             Some(value) => {
                 // Database exists, decode the DbInfo using Catalog deserialization
                 if let Ok(info) = crate::catalog::Catalog::deserialize_db_info(&value) {
@@ -519,7 +520,7 @@ impl Environment<state::Open> {
                 let info_bytes = crate::catalog::Catalog::serialize_db_info(&info);
                 
                 // Insert into main database
-                BTree::insert(txn, &mut main_root, &mut main_db_info, db_name.as_bytes(), &info_bytes)?;
+                BTree::<LexicographicComparator>::insert(txn, &mut main_root, &mut main_db_info, db_name.as_bytes(), &info_bytes)?;
                 
                 // Update main database info
                 main_db_info.root = main_root;
@@ -549,7 +550,7 @@ impl Environment<state::Open> {
         // For named databases, look in the main database
         if let Some(db_name) = name {
             let main_db_info = txn.db_info(None)?;
-            match BTree::search(txn, main_db_info.root, db_name.as_bytes())? {
+            match BTree::<LexicographicComparator>::search(txn, main_db_info.root, db_name.as_bytes())? {
                 Some(value) => {
                     // Try to deserialize using Catalog format
                     if let Ok(info) = crate::catalog::Catalog::deserialize_db_info(&value) {
@@ -603,7 +604,7 @@ impl Environment<state::Open> {
         // Check if database exists
         let (db_info_to_drop, main_db_info_root) = {
             let main_db_info = txn.db_info(None)?;
-            match BTree::search(txn, main_db_info.root, name.as_bytes())? {
+            match BTree::<LexicographicComparator>::search(txn, main_db_info.root, name.as_bytes())? {
                 Some(value) => {
                     if value.len() == std::mem::size_of::<DbInfo>() {
                         let mut db_info = DbInfo::default();
@@ -632,7 +633,7 @@ impl Environment<state::Open> {
         let mut main_db_info_mut = main_db_info;
         let mut main_root = main_db_info_root;
         
-        BTree::delete(txn, &mut main_root, &mut main_db_info_mut, name.as_bytes())?;
+        BTree::<LexicographicComparator>::delete(txn, &mut main_root, &mut main_db_info_mut, name.as_bytes())?;
         
         // Update main database info
         main_db_info_mut.root = main_root;

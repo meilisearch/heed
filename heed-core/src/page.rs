@@ -11,6 +11,7 @@ use std::ptr;
 use bitflags::bitflags;
 use static_assertions::const_assert;
 use crate::error::{Error, Result, PageId, PageType};
+use crate::comparator::{Comparator, LexicographicComparator};
 
 /// Default page size constant
 pub const PAGE_SIZE: usize = 4096;
@@ -275,18 +276,33 @@ impl Page {
     
     /// Add a node to the page at the correct sorted position
     pub fn add_node_sorted(&mut self, key: &[u8], value: &[u8]) -> Result<usize> {
-        self.add_node_sorted_internal(key, value, false, 0)
+        self.add_node_sorted_with_comparator::<LexicographicComparator>(key, value)
+    }
+    
+    /// Add a node to the page at the correct sorted position with a custom comparator
+    pub fn add_node_sorted_with_comparator<C: Comparator>(&mut self, key: &[u8], value: &[u8]) -> Result<usize> {
+        self.add_node_sorted_internal_with_comparator::<C>(key, value, false, 0)
     }
     
     /// Add a node with overflow page reference
     pub fn add_node_sorted_overflow(&mut self, key: &[u8], overflow_page_id: PageId) -> Result<usize> {
+        self.add_node_sorted_overflow_with_comparator::<LexicographicComparator>(key, overflow_page_id)
+    }
+    
+    /// Add a node with overflow page reference with a custom comparator
+    pub fn add_node_sorted_overflow_with_comparator<C: Comparator>(&mut self, key: &[u8], overflow_page_id: PageId) -> Result<usize> {
         // For overflow nodes, we store the page ID as the "value"
         let page_bytes = overflow_page_id.0.to_le_bytes();
-        self.add_node_sorted_internal(key, &page_bytes, true, std::mem::size_of::<u64>())
+        self.add_node_sorted_internal_with_comparator::<C>(key, &page_bytes, true, std::mem::size_of::<u64>())
     }
     
     /// Internal method to add a node
     fn add_node_sorted_internal(&mut self, key: &[u8], value: &[u8], is_overflow: bool, value_size_override: usize) -> Result<usize> {
+        self.add_node_sorted_internal_with_comparator::<LexicographicComparator>(key, value, is_overflow, value_size_override)
+    }
+    
+    /// Internal method to add a node with a custom comparator
+    fn add_node_sorted_internal_with_comparator<C: Comparator>(&mut self, key: &[u8], value: &[u8], is_overflow: bool, value_size_override: usize) -> Result<usize> {
         let actual_value_size = if is_overflow { value_size_override } else { value.len() };
         let node_size = NodeHeader::SIZE + key.len() + value.len();
         
@@ -295,7 +311,7 @@ impl Page {
         }
         
         // Find insertion position
-        let insert_pos = match self.search_key(key)? {
+        let insert_pos = match self.search_key_with_comparator::<C>(key)? {
             SearchResult::Found { index: _ } => {
                 return Err(Error::Custom("Key already exists".into()));
             }
@@ -390,6 +406,11 @@ impl Page {
     
     /// Search for a key using binary search (assumes sorted nodes)
     pub fn search_key(&self, key: &[u8]) -> Result<SearchResult> {
+        self.search_key_with_comparator::<LexicographicComparator>(key)
+    }
+    
+    /// Search for a key using binary search with a custom comparator
+    pub fn search_key_with_comparator<C: Comparator>(&self, key: &[u8]) -> Result<SearchResult> {
         if self.header.num_keys == 0 {
             return Ok(SearchResult::NotFound { insert_pos: 0 });
         }
@@ -403,7 +424,7 @@ impl Page {
             let node = self.node(mid)?;
             let node_key = node.key()?;
             
-            match key.cmp(node_key) {
+            match C::compare(key, node_key) {
                 std::cmp::Ordering::Less => right = mid,
                 std::cmp::Ordering::Greater => left = mid + 1,
                 std::cmp::Ordering::Equal => return Ok(SearchResult::Found { index: mid }),

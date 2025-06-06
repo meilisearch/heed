@@ -3,6 +3,9 @@
 use crate::error::{Error, Result, PageId};
 use crate::page::{PageFlags, Page};
 use crate::txn::{Transaction, Write};
+use crate::btree::BTree;
+use crate::meta::DbInfo;
+use crate::comparator::LexicographicComparator;
 use std::collections::VecDeque;
 
 /// Traverse a B+Tree and collect all page IDs
@@ -165,7 +168,7 @@ mod tests {
         for i in 0..100 {
             let key = format!("key_{:04}", i);
             let value = format!("value_{:04}", i);
-            BTree::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
+            BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
         }
         
         // Collect all pages
@@ -198,7 +201,7 @@ mod tests {
         for i in 0..50 {
             let key = format!("key_{:04}", i);
             let value = format!("value_{:04}", i);
-            BTree::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
+            BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
         }
         
         // Collect pages before freeing

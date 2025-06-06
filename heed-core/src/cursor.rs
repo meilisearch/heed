@@ -6,6 +6,7 @@ use crate::txn::{Transaction, mode::Mode};
 use crate::page::{PageFlags, SearchResult};
 use crate::dupsort::DupSort;
 use crate::meta::DbInfo;
+use crate::comparator::{Comparator, LexicographicComparator};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -28,7 +29,7 @@ struct DupCursorState {
 }
 
 /// A database cursor for iteration
-pub struct Cursor<'txn, K, V, C = ()> {
+pub struct Cursor<'txn, K, V, C = LexicographicComparator> {
     /// Reference to the transaction (type-erased)
     txn: *const (),
     /// Transaction lifetime
@@ -49,7 +50,7 @@ pub struct Cursor<'txn, K, V, C = ()> {
     _phantom: PhantomData<(K, V, C)>,
 }
 
-impl<'txn, K, V, C> Cursor<'txn, K, V, C> {
+impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
     /// Create a new cursor
     pub fn new<M: Mode, KT, VT>(txn: &'txn Transaction<'txn, M>, db: &'txn Database<KT, VT, C>) -> Result<Self> 
     where
@@ -436,7 +437,7 @@ impl<'txn, K, V, C> Cursor<'txn, K, V, C> {
                 return Ok(None);
             }
             
-            match page.search_key(key)? {
+            match page.search_key_with_comparator::<C>(key)? {
                 SearchResult::Found { index } => {
                     position.pages.push(current_page_id);
                     position.indices.push(index);
@@ -489,7 +490,7 @@ impl<'txn, K, V, C> Cursor<'txn, K, V, C> {
 }
 
 // Convenience methods for typed access
-impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
+impl<'txn, K: crate::db::Key, V: crate::db::Value, C: Comparator> Cursor<'txn, K, V, C> {
     /// Move to first entry
     pub fn first(&mut self) -> Result<Option<(Vec<u8>, V)>> {
         match self.first_raw()? {
@@ -582,7 +583,7 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
         let mut root = info.root;
         
         // Delete using B+Tree
-        match crate::btree::BTree::delete(txn, &mut root, &mut info, &current_key)? {
+        match crate::btree::BTree::<C>::delete(txn, &mut root, &mut info, &current_key)? {
             Some(_) => {
                 // Update db info - root may have changed during delete
                 info.root = root;
@@ -653,7 +654,7 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
         
         // Insert using B+Tree
         // Returns Some(old_value) if key was updated, None if inserted
-        let _old_value = crate::btree::BTree::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
+        let _old_value = crate::btree::BTree::<C>::insert(txn, &mut root, &mut info, &key_bytes, &value_bytes)?;
         
         // Update db info - root may have changed during insert
         info.root = root;
@@ -732,7 +733,7 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C> Cursor<'txn, K, V, C> {
         let mut root = info.root;
         
         // Update using B+Tree
-        let old_value = crate::btree::BTree::insert(txn, &mut root, &mut info, &current_key, &value_bytes)?;
+        let old_value = crate::btree::BTree::<C>::insert(txn, &mut root, &mut info, &current_key, &value_bytes)?;
         
         if old_value.is_some() {
             // Key was updated (as expected)

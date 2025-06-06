@@ -29,6 +29,7 @@ pub mod branch;
 pub mod branch_v2;
 pub mod tree_utils;
 pub mod nested_txn;
+pub mod comparator;
 
 #[cfg(test)]
 mod io_test;

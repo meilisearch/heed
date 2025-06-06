@@ -13,6 +13,7 @@ use crate::page::PageFlags;
 use crate::txn::{Transaction, Write};
 use crate::meta::DbInfo;
 use crate::btree::BTree;
+use crate::comparator::LexicographicComparator;
 
 /// Duplicate sort node - stores multiple values for a single key
 #[derive(Debug)]
@@ -71,7 +72,7 @@ impl DupSort {
         value: &[u8],
     ) -> Result<bool> {
         // First, search for the key in the main database
-        let search_result = BTree::search(txn as &Transaction<'_, Write>, db_info.root, key)?;
+        let search_result = BTree::<LexicographicComparator>::search(txn as &Transaction<'_, Write>, db_info.root, key)?;
         match search_result {
             Some(existing_data) => {
                 let existing_data = existing_data.into_owned();
@@ -97,15 +98,15 @@ impl DupSort {
                     
                     // Insert both values into sub-database
                     let mut sub_root = sub_db.root;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, existing_value, &[])?;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut sub_root, &mut sub_db, existing_value, &[])?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
                     sub_db.root = sub_root;
                     
                     // Replace single value with sub-database
                     let encoded = Self::encode_sub_db(&sub_db);
                     let mut root = db_info.root;
-                    BTree::delete(txn, &mut root, db_info, key)?;
-                    BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                    BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut root, db_info, key, &encoded)?;
                     db_info.root = root;
                     Ok(false)
                     
@@ -113,13 +114,13 @@ impl DupSort {
                     // It's already a sub-database, add to it
                     let mut sub_db = Self::decode_sub_db(&existing_data)?;
                     let mut sub_root = sub_db.root;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
                     sub_db.root = sub_root;
                     
                     // Update the sub-database info
                     let encoded = Self::encode_sub_db(&sub_db);
                     // Since sub-database info is fixed size, we can update in place
-                    BTree::update_value(txn, db_info.root, key, &encoded)?;
+                    BTree::<LexicographicComparator>::update_value(txn, db_info.root, key, &encoded)?;
                     Ok(false) // Key already existed
                 } else {
                     // Not marked as single value or sub-db - this is the legacy case
@@ -137,15 +138,15 @@ impl DupSort {
                     
                     // Insert both the existing value and new value
                     let mut sub_root = sub_db.root;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, &existing_data, &[])?;
-                    BTree::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut sub_root, &mut sub_db, &existing_data, &[])?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut sub_root, &mut sub_db, value, &[])?;
                     sub_db.root = sub_root;
                     
                     // Replace the single value with sub-database info
                     let encoded = Self::encode_sub_db(&sub_db);
                     let mut root = db_info.root;
-                    BTree::delete(txn, &mut root, db_info, key)?;
-                    BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                    BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
+                    BTree::<LexicographicComparator>::insert(txn, &mut root, db_info, key, &encoded)?;
                     db_info.root = root;
                     Ok(false) // Key already existed
                 }
@@ -154,7 +155,7 @@ impl DupSort {
                 // Key doesn't exist - optimization: store as single value
                 let encoded = Self::encode_single_value(value);
                 let mut root = db_info.root;
-                BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                BTree::<LexicographicComparator>::insert(txn, &mut root, db_info, key, &encoded)?;
                 db_info.root = root;
                 Ok(true) // New key
             }
@@ -167,7 +168,7 @@ impl DupSort {
         root: PageId,
         key: &[u8],
     ) -> Result<Vec<Vec<u8>>> {
-        match BTree::search(txn, root, key)? {
+        match BTree::<LexicographicComparator>::search(txn, root, key)? {
             Some(value) => {
                 if Self::is_single_value(&value) {
                     // Single value optimization
@@ -216,7 +217,7 @@ impl DupSort {
         key: &[u8],
         value: &[u8],
     ) -> Result<bool> {
-        match BTree::search(txn, db_info.root, key)? {
+        match BTree::<LexicographicComparator>::search(txn, db_info.root, key)? {
             Some(existing_value) => {
                 if Self::is_single_value(&existing_value) {
                     // Single value optimization
@@ -224,7 +225,7 @@ impl DupSort {
                     if single_value == value {
                         // Single value matches, delete it
                         let mut root = db_info.root;
-                        BTree::delete(txn, &mut root, db_info, key)?;
+                        BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
                         db_info.root = root;
                         Ok(true)
                     } else {
@@ -237,13 +238,13 @@ impl DupSort {
                     
                     // Delete from sub-database
                     let mut sub_root = sub_db.root;
-                    match BTree::delete(txn, &mut sub_root, &mut sub_db, value)? {
+                    match BTree::<LexicographicComparator>::delete(txn, &mut sub_root, &mut sub_db, value)? {
                         Some(_) => {
                             sub_db.root = sub_root;
                             if sub_db.entries == 0 {
                                 // Sub-database is empty, remove the key entirely
                                 let mut root = db_info.root;
-                                BTree::delete(txn, &mut root, db_info, key)?;
+                                BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
                                 db_info.root = root;
                             } else if sub_db.entries == 1 {
                                 // Only one value left, convert back to single value optimization
@@ -264,13 +265,13 @@ impl DupSort {
                                 // Replace sub-database with single value
                                 let encoded = Self::encode_single_value(&remaining_value);
                                 let mut root = db_info.root;
-                                BTree::delete(txn, &mut root, db_info, key)?;
-                                BTree::insert(txn, &mut root, db_info, key, &encoded)?;
+                                BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
+                                BTree::<LexicographicComparator>::insert(txn, &mut root, db_info, key, &encoded)?;
                                 db_info.root = root;
                             } else {
                                 // Update sub-database info
                                 let encoded = Self::encode_sub_db(&sub_db);
-                                BTree::update_value(txn, db_info.root, key, &encoded)?;
+                                BTree::<LexicographicComparator>::update_value(txn, db_info.root, key, &encoded)?;
                             }
                             Ok(true)
                         }
@@ -281,7 +282,7 @@ impl DupSort {
                     if existing_value.as_ref() == value {
                         // Value matches, delete it
                         let mut root = db_info.root;
-                        BTree::delete(txn, &mut root, db_info, key)?;
+                        BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)?;
                         db_info.root = root;
                         Ok(true)
                     } else {
@@ -301,7 +302,7 @@ impl DupSort {
         key: &[u8],
     ) -> Result<bool> {
         let mut root = db_info.root;
-        match BTree::delete(txn, &mut root, db_info, key)? {
+        match BTree::<LexicographicComparator>::delete(txn, &mut root, db_info, key)? {
             Some(value) => {
                 db_info.root = root;
                 if Self::is_sub_db(&value) {
@@ -348,7 +349,7 @@ impl DupSort {
         root: PageId,
         key: &[u8],
     ) -> Result<usize> {
-        match BTree::search(txn, root, key)? {
+        match BTree::<LexicographicComparator>::search(txn, root, key)? {
             Some(value) => {
                 if Self::is_single_value(&value) {
                     // Single value optimization
@@ -412,7 +413,7 @@ impl<'txn, M: crate::txn::mode::Mode> DupCursor<'txn, M> {
         root: PageId,
         key: &[u8],
     ) -> Result<Self> {
-        match BTree::search(txn, root, key)? {
+        match BTree::<LexicographicComparator>::search(txn, root, key)? {
             Some(value) => {
                 if DupSort::is_sub_db(&value) {
                     let sub_db = DupSort::decode_sub_db(&value)?;

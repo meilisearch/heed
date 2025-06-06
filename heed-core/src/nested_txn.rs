@@ -17,6 +17,13 @@ pub struct NestedTransaction<'env, 'parent> {
     _phantom: std::marker::PhantomData<&'env ()>,
 }
 
+impl<'env, 'parent> std::fmt::Debug for NestedTransaction<'env, 'parent> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NestedTransaction")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'env, 'parent> NestedTransaction<'env, 'parent> {
     /// Create a new nested transaction (NOT IMPLEMENTED)
     pub(crate) fn new(_parent: &'parent mut Transaction<'env, Write>) -> Result<Self> {

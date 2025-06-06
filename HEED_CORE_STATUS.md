@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~94% Complete
+## Current Status: ~95% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -130,7 +130,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 
 ### Other Missing LMDB Features
 
-- **Custom Comparators** - No support for custom key ordering
+- **Custom Comparators** ✅ - Basic support for custom key ordering (stub implementation)
 - **Fixed-Size Values** - No MDB_INTEGERKEY optimization
 - **Reader Enumeration** - Cannot list active readers externally
 - **Direct Page Access** - No low-level page manipulation
@@ -155,7 +155,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 | MVCC | ✅ | ✅ | Complete |
 | Free Page Reuse | ✅ | ✅ | Mostly complete |
 | Nested Transactions | ✅ | ❌ | Not implemented |
-| Custom Comparators | ✅ | ❌ | Not implemented |
+| Custom Comparators | ✅ | ⚠️ | Framework implemented |
 | Fixed-Size Values | ✅ | ❌ | Not implemented |
 
 ## 📋 TODO List (Priority Order)
@@ -198,7 +198,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 
 ### Low Priority
 7. **Advanced Features**
-   - Custom comparator support
+   - ✅ Custom comparator framework implemented
    - Fixed-size value optimizations
    - Reader enumeration API
    - Memory control options
@@ -238,7 +238,7 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **94% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **95% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog

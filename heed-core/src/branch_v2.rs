@@ -11,6 +11,7 @@
 
 use crate::error::{Error, Result, PageId};
 use crate::page::{Page, PageFlags, PageHeader, NodeHeader};
+use crate::comparator::{Comparator, LexicographicComparator};
 use std::mem::size_of;
 
 /// Branch page header stored at the beginning of page data
@@ -93,6 +94,11 @@ impl BranchPageV2 {
     
     /// Find the appropriate child for a given key
     pub fn find_child(page: &Page, search_key: &[u8]) -> Result<PageId> {
+        Self::find_child_with_comparator::<LexicographicComparator>(page, search_key)
+    }
+    
+    /// Find the appropriate child for a given key with a custom comparator
+    pub fn find_child_with_comparator<C: Comparator>(page: &Page, search_key: &[u8]) -> Result<PageId> {
         if !page.header.flags.contains(PageFlags::BRANCH) {
             return Err(Error::InvalidOperation("Not a branch page"));
         }
@@ -113,7 +119,7 @@ impl BranchPageV2 {
             let node = page.node(mid)?;
             let node_key = node.key()?;
             
-            match search_key.cmp(node_key) {
+            match C::compare(search_key, node_key) {
                 std::cmp::Ordering::Less => {
                     right = mid;
                 }

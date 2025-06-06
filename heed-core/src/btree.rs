@@ -4,7 +4,10 @@ use crate::error::{Error, Result, PageId};
 use crate::page::{PageFlags, PageHeader, SearchResult, PAGE_SIZE};
 use crate::txn::{Transaction, Write};
 use crate::meta::DbInfo;
+use crate::comparator::{Comparator, LexicographicComparator};
 use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::marker::PhantomData;
 
 /// Maximum number of keys per page (B+Tree order)
 /// This is calculated based on page size and typical key/value sizes
@@ -14,9 +17,17 @@ pub const MAX_KEYS_PER_PAGE: usize = (PAGE_SIZE - PageHeader::SIZE) / 16;
 pub const MIN_KEYS_PER_PAGE: usize = MAX_KEYS_PER_PAGE / 2;
 
 /// B+Tree operations
-pub struct BTree;
+pub struct BTree<C = LexicographicComparator> {
+    _phantom: PhantomData<C>,
+}
 
-impl BTree {
+impl<C: Comparator> BTree<C> {
+    /// Create a new BTree instance
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
     /// Search for a key in the B+Tree
     pub fn search<'txn>(
         txn: &'txn Transaction<'txn, impl crate::txn::mode::Mode>,
@@ -33,7 +44,7 @@ impl BTree {
                 return Ok(None);
             }
             
-            match page.search_key(key)? {
+            match page.search_key_with_comparator::<C>(key)? {
                 SearchResult::Found { index } => {
                     let node = page.node(index)?;
                     
@@ -50,7 +61,7 @@ impl BTree {
                         }
                     } else {
                         // In branch page, follow the child pointer
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
                 SearchResult::NotFound { insert_pos } => {
@@ -59,7 +70,7 @@ impl BTree {
                         return Ok(None);
                     } else {
                         // In branch page, use the branch helper
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
             }
@@ -78,7 +89,7 @@ impl BTree {
         loop {
             let page = txn.get_page_mut(current_page_id)?;
             
-            match page.search_key(key)? {
+            match page.search_key_with_comparator::<C>(key)? {
                 SearchResult::Found { index } => {
                     if page.header.flags.contains(PageFlags::LEAF) {
                         // Found in leaf page - update the value
@@ -106,7 +117,7 @@ impl BTree {
                         return Ok(());
                     } else {
                         // In branch page, follow the child
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
                 SearchResult::NotFound { insert_pos } => {
@@ -115,7 +126,7 @@ impl BTree {
                         return Err(Error::KeyNotFound);
                     } else {
                         // In branch page, use the branch helper
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
             }
@@ -219,7 +230,7 @@ impl BTree {
         // Check if key already exists
         let search_result = {
             let page = txn.get_page(page_id)?;
-            page.search_key(key)?
+            page.search_key_with_comparator::<C>(key)?
         };
         
         match search_result {
@@ -309,7 +320,7 @@ impl BTree {
         }
         
         // Find child to insert into using the branch page logic
-        let child_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+        let child_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
         
         // Sanity check: child page ID should never be 0
         if child_page_id.0 == 0 {
@@ -534,7 +545,7 @@ impl BTree {
         // First, search for the key and get node info
         let (search_result, num_keys, pgno) = {
             let page = txn.get_page(page_id)?;
-            (page.search_key(key)?, page.header.num_keys, page.header.pgno)
+            (page.search_key_with_comparator::<C>(key)?, page.header.num_keys, page.header.pgno)
         };
         
         match search_result {
@@ -593,11 +604,11 @@ impl BTree {
         let page = txn.get_page(page_id)?;
         
         // Find child to delete from using branch_v2 logic
-        let child_page_id = crate::branch_v2::BranchPageV2::find_child(&page, key)?;
+        let child_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
         
         // We need to track which child index we're using for rebalancing
         // This is a bit tricky with branch_v2's structure
-        let child_index = match page.search_key(key)? {
+        let child_index = match page.search_key_with_comparator::<C>(key)? {
             SearchResult::Found { index } => index,
             SearchResult::NotFound { insert_pos } => {
                 // For branch_v2, if insert_pos is 0, we're going to leftmost child
@@ -1206,7 +1217,7 @@ impl BTree {
         // First check if key exists without modifying the page
         let search_result = {
             let page = txn.get_page(page_id)?;
-            page.search_key(key)?
+            page.search_key_with_comparator::<C>(key)?
         };
         
         
@@ -1317,7 +1328,7 @@ impl BTree {
     ) -> Result<(PageId, InsertResult)> {
         let child_page_id = {
             let page = txn.get_page(page_id)?;
-            crate::branch_v2::BranchPageV2::find_child(&page, key)?
+            crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?
         };
         
         // Recursively insert into child with COW
@@ -1429,7 +1440,7 @@ mod tests {
         let txn = env.begin_txn().unwrap();
         let root = PageId(3); // Main DB root
         
-        let result = BTree::search(&txn, root, b"key").unwrap();
+        let result = BTree::<LexicographicComparator>::search(&txn, root, b"key").unwrap();
         assert!(result.is_none());
     }
     
@@ -1443,7 +1454,7 @@ mod tests {
         assert_eq!(page.header.num_keys, 1);
         
         // Search for it
-        match page.search_key(b"test").unwrap() {
+        match page.search_key_with_comparator::<LexicographicComparator>(b"test").unwrap() {
             SearchResult::Found { index } => {
                 assert_eq!(index, 0);
             }
@@ -1466,7 +1477,7 @@ mod tests {
         db_info.leaf_pages = 1;
         
         // Insert a key using B+Tree
-        let old = BTree::insert(&mut txn, &mut root, &mut db_info, b"key1", b"value1").unwrap();
+        let old = BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"key1", b"value1").unwrap();
         assert!(old.is_none());
         assert_eq!(db_info.entries, 1);
         
@@ -1478,7 +1489,7 @@ mod tests {
         
         // Search for the key
         let txn = env.begin_txn().unwrap();
-        let result = BTree::search(&txn, root, b"key1").unwrap();
+        let result = BTree::<LexicographicComparator>::search(&txn, root, b"key1").unwrap();
         assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&b"value1"[..]));
     }
     
@@ -1506,7 +1517,7 @@ mod tests {
         ];
         
         for (key, value) in &keys {
-            let old = BTree::insert(&mut txn, &mut root, &mut db_info, *key, *value).unwrap();
+            let old = BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, *key, *value).unwrap();
             assert!(old.is_none());
         }
         
@@ -1517,7 +1528,7 @@ mod tests {
         // Search for all keys
         let txn = env.begin_txn().unwrap();
         for (key, expected_value) in &keys {
-            let result = BTree::search(&txn, root, *key).unwrap();
+            let result = BTree::<LexicographicComparator>::search(&txn, root, *key).unwrap();
             assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&expected_value[..]));
         }
     }
@@ -1537,18 +1548,18 @@ mod tests {
         db_info.leaf_pages = 1;
         
         // Insert some keys
-        BTree::insert(&mut txn, &mut root, &mut db_info, b"key1", b"value1").unwrap();
-        BTree::insert(&mut txn, &mut root, &mut db_info, b"key2", b"value2").unwrap();
-        BTree::insert(&mut txn, &mut root, &mut db_info, b"key3", b"value3").unwrap();
+        BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"key1", b"value1").unwrap();
+        BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"key2", b"value2").unwrap();
+        BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"key3", b"value3").unwrap();
         assert_eq!(db_info.entries, 3);
         
         // Delete a key
-        let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, b"key2").unwrap();
+        let deleted = BTree::<LexicographicComparator>::delete(&mut txn, &mut root, &mut db_info, b"key2").unwrap();
         assert_eq!(deleted, Some(b"value2".to_vec()));
         assert_eq!(db_info.entries, 2);
         
         // Try to delete non-existent key
-        let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, b"key4").unwrap();
+        let deleted = BTree::<LexicographicComparator>::delete(&mut txn, &mut root, &mut db_info, b"key4").unwrap();
         assert_eq!(deleted, None);
         assert_eq!(db_info.entries, 2);
         
@@ -1556,9 +1567,9 @@ mod tests {
         
         // Verify remaining keys
         let txn = env.begin_txn().unwrap();
-        assert!(BTree::search(&txn, root, b"key1").unwrap().is_some());
-        assert!(BTree::search(&txn, root, b"key2").unwrap().is_none());
-        assert!(BTree::search(&txn, root, b"key3").unwrap().is_some());
+        assert!(BTree::<LexicographicComparator>::search(&txn, root, b"key1").unwrap().is_some());
+        assert!(BTree::<LexicographicComparator>::search(&txn, root, b"key2").unwrap().is_none());
+        assert!(BTree::<LexicographicComparator>::search(&txn, root, b"key3").unwrap().is_some());
     }
     
     #[test]
@@ -1580,21 +1591,21 @@ mod tests {
         for i in 0..num_keys {
             let key = format!("key{:04}", i);
             let value = format!("value{:04}", i);
-            BTree::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
+            BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
         }
         assert_eq!(db_info.entries, num_keys);
         
         // Delete keys in a pattern that should trigger rebalancing
         for i in (0..num_keys).step_by(3) {
             let key = format!("key{:04}", i);
-            let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, key.as_bytes()).unwrap();
+            let deleted = BTree::<LexicographicComparator>::delete(&mut txn, &mut root, &mut db_info, key.as_bytes()).unwrap();
             assert!(deleted.is_some());
         }
         
         // Verify the tree is still valid
         for i in 0..num_keys {
             let key = format!("key{:04}", i);
-            let result = BTree::search(&txn, root, key.as_bytes()).unwrap();
+            let result = BTree::<LexicographicComparator>::search(&txn, root, key.as_bytes()).unwrap();
             if i % 3 == 0 {
                 assert!(result.is_none(), "Key {} should be deleted", key);
             } else {
@@ -1622,20 +1633,20 @@ mod tests {
         // Insert some keys
         let keys = vec![b"key1", b"key2", b"key3", b"key4", b"key5"];
         for key in &keys {
-            BTree::insert(&mut txn, &mut root, &mut db_info, *key, *key).unwrap();
+            BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, *key, *key).unwrap();
         }
         assert_eq!(db_info.entries, keys.len() as u64);
         
         // Delete all keys
         for key in &keys {
-            let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, *key).unwrap();
+            let deleted = BTree::<LexicographicComparator>::delete(&mut txn, &mut root, &mut db_info, *key).unwrap();
             assert!(deleted.is_some());
         }
         assert_eq!(db_info.entries, 0);
         
         // Tree should be empty
         for key in &keys {
-            let result = BTree::search(&txn, root, *key).unwrap();
+            let result = BTree::<LexicographicComparator>::search(&txn, root, *key).unwrap();
             assert!(result.is_none());
         }
         
@@ -1668,13 +1679,13 @@ mod tests {
         let large_value = vec![0xAB; 5000]; // 5KB
         
         // Insert with large value
-        let old = BTree::insert(&mut txn, &mut root, &mut db_info, b"large_key", &large_value).unwrap();
+        let old = BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"large_key", &large_value).unwrap();
         assert!(old.is_none());
         assert_eq!(db_info.entries, 1);
         
         // Insert some normal values
-        BTree::insert(&mut txn, &mut root, &mut db_info, b"small1", b"value1").unwrap();
-        BTree::insert(&mut txn, &mut root, &mut db_info, b"small2", b"value2").unwrap();
+        BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"small1", b"value1").unwrap();
+        BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, b"small2", b"value2").unwrap();
         
         // Update the root in db_info after all inserts
         db_info.root = root;
@@ -1686,11 +1697,11 @@ mod tests {
         // Search for large value
         let txn = env.begin_txn().unwrap();
         let db_info = txn.db_info(None).unwrap();
-        let result = BTree::search(&txn, db_info.root, b"large_key").unwrap();
+        let result = BTree::<LexicographicComparator>::search(&txn, db_info.root, b"large_key").unwrap();
         assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&large_value[..]));
         
         // Search for normal values
-        let result = BTree::search(&txn, db_info.root, b"small1").unwrap();
+        let result = BTree::<LexicographicComparator>::search(&txn, db_info.root, b"small1").unwrap();
         assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&b"value1"[..]));
         
         drop(txn);
@@ -1699,7 +1710,7 @@ mod tests {
         let mut txn = env.begin_write_txn().unwrap();
         let mut db_info = *txn.db_info(None).unwrap();
         let mut root = db_info.root;
-        let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, b"large_key").unwrap();
+        let deleted = BTree::<LexicographicComparator>::delete(&mut txn, &mut root, &mut db_info, b"large_key").unwrap();
         assert_eq!(deleted, Some(large_value));
         
         // Update db_info with new root
@@ -1707,7 +1718,7 @@ mod tests {
         txn.update_db_info(None, db_info).unwrap();
         
         // Verify it's deleted
-        let result = BTree::search(&txn, db_info.root, b"large_key").unwrap();
+        let result = BTree::<LexicographicComparator>::search(&txn, db_info.root, b"large_key").unwrap();
         assert!(result.is_none());
         
         txn.commit().unwrap();
