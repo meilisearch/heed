@@ -48,16 +48,19 @@ rand = "0.8"
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
 heed = { path = "../heed" }
+rocksdb = "0.22"
+redb = "2.1"
+anyhow = "1.0"
+sled = "0.34"
 
 [features]
 default = ["io_uring"]
 io_uring = ["dep:io-uring"]
 simd = [] # Will use portable SIMD when stable
 
-# Benchmarks will be added later
-# [[bench]]
-# name = "benchmarks"
-# harness = false
+[[bench]]
+name = "db_comparison"
+harness = false
 
 [[example]]
 name = "simple"

@@ -237,6 +237,25 @@ cargo run --example simple
 cargo run --example test_catalog
 ```
 
+### Correctness Testing
+```bash
+cargo test --test lmdb_comparison
+```
+All correctness tests pass - heed-core produces identical results to LMDB.
+
+### Performance Benchmarking
+```bash
+cargo run --example bench_simple      # Quick heed-core vs LMDB comparison
+cargo run --example bench_all_dbs     # Compare against RocksDB, redb
+cargo bench                           # Full criterion benchmarks
+```
+
+Key performance findings:
+- Write performance: Competitive at small scale, 2.8x slower at large scale
+- Read performance: 5-8x slower than other databases
+- Cursor iteration: 109x slower than LMDB FFI
+- See `PERFORMANCE_ANALYSIS.md` for detailed results
+
 ## 📈 Progress Summary
 
 heed-core is approximately **96% complete** and provides a functional pure Rust LMDB implementation with:
