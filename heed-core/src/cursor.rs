@@ -101,7 +101,13 @@ impl<'txn, K, V, C> Cursor<'txn, K, V, C> {
     fn get_node_value(&self, node: &crate::page::Node<'txn>) -> Result<Cow<'txn, [u8]>> {
         if let Some(overflow_id) = node.overflow_page()? {
             // Read from overflow pages
-            let overflow_value = crate::overflow::read_overflow_value(self.txn::<crate::txn::Read>(), overflow_id)?;
+            let overflow_value = if self.is_write {
+                let txn = unsafe { &*(self.txn as *const Transaction<'txn, crate::txn::Write>) };
+                crate::overflow::read_overflow_value(txn, overflow_id)?
+            } else {
+                let txn = self.txn::<crate::txn::Read>();
+                crate::overflow::read_overflow_value(txn, overflow_id)?
+            };
             Ok(Cow::Owned(overflow_value))
         } else {
             node.value()

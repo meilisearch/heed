@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~86% Complete
+## Current Status: ~88% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -61,11 +61,16 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
   - Oldest reader tracking for garbage collection
   - Process-based liveness checks
 
-- **Cursor Operations**
+- **Cursor Operations** ✅ 
   - Create cursors for databases
-  - Basic navigation: first(), last(), next()
-  - Iterate over all entries
+  - Full navigation: first(), last(), next(), prev()
+  - Seek to specific keys  
+  - Read and write operations through cursors
+  - Delete at cursor position
+  - Update values at cursor position
+  - Put with no-overwrite option
   - Current position tracking
+  - Proper overflow page handling in cursors
 
 - **DUPSORT (Duplicate Sort)**
   - Store multiple values per key
@@ -95,11 +100,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
    - Overflow page handling in COW fixed
    - Read transactions see consistent snapshots for all data
 
-2. **Complete Cursor Operations**
-   - No previous() navigation
-   - No seek() to specific keys
-   - No put/delete through cursors
-   - Limited range queries
+2. **Complete Cursor Operations** ✅ (Completed!)
+   - All cursor operations are now fully implemented
 
 3. **Free Page Management** (Partially Complete)
    - Free list structure implemented with reader tracking
@@ -136,8 +138,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 | Reader Tracking | ✅ | ✅ | Complete |
 | Durability Modes | ✅ | ✅ | Complete |
 | DUPSORT | ✅ | ⚠️ | Basic implementation |
-| Cursors | ✅ | ⚠️ | Read-only, limited |
-| MVCC | ✅ | ⚠️ | Partially implemented |
+| Cursors | ✅ | ✅ | Complete |
+| MVCC | ✅ | ✅ | Complete |
 | Free Page Reuse | ✅ | ⚠️ | Partially implemented |
 | Nested Transactions | ✅ | ❌ | Not implemented |
 | Custom Comparators | ✅ | ❌ | Not implemented |
@@ -159,11 +161,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
    - ❌ Persist freelist to database
    - ❌ Handle complex borrow checker constraints
 
-3. **Finish Cursor Operations**
-   - Implement previous() for backward navigation
-   - Add seek() and seek_range() operations
-   - Enable put/delete through cursors
-   - Support for MDB_SET_RANGE
+3. **Finish Cursor Operations** ✅ (Completed!)
+   - All operations fully implemented and tested
 
 ### Medium Priority
 4. **Add Nested Transactions**
@@ -223,20 +222,20 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **86% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **88% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog
 - ✅ Type-safe Rust API with generic key/value types
-- ✅ Reader tracking and basic MVCC foundation
+- ✅ Reader tracking and full MVCC implementation
 - ✅ DUPSORT functionality for multiple values per key
-- ⚠️ Limited cursor functionality (read-only)
+- ✅ Complete cursor functionality with all operations
 - ✅ Full Copy-on-Write implementation (COW working correctly with overflow pages)
-- ❌ No page recycling (memory grows without reuse)
+- ⚠️ Limited page recycling (basic freelist without persistence)
 - ❌ No nested transactions
 
 For production use requiring full LMDB compatibility, the FFI-based heed wrapper remains more complete. However, heed-core is suitable for applications that:
 - Need pure Rust without C dependencies
-- Can accept growing file size (no page reuse)
+- Can accept growing file size (limited page reuse)
 - Don't require nested transactions
-- Primarily use forward cursor iteration
+- Need full cursor operations including seek and write
