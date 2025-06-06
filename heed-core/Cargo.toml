@@ -1,0 +1,63 @@
+[package]
+name = "heed-core"
+version = "0.1.0"
+authors = ["Kerollmops <renault.cle@gmail.com>"]
+description = "Pure Rust implementation of LMDB with modern performance optimizations"
+license = "MIT"
+repository = "https://github.com/meilisearch/heed"
+keywords = ["lmdb", "database", "storage", "typed", "pure-rust"]
+categories = ["database", "data-structures"]
+edition = "2021"
+rust-version = "1.75"
+
+[dependencies]
+# Core dependencies
+bitflags = "2.6"
+byteorder = { version = "1.5", default-features = false }
+thiserror = "1.0"
+tracing = "0.1"
+
+# Memory and I/O
+memmap2 = "0.9"
+page_size = "0.6"
+libc = "0.2"
+
+# Concurrency
+crossbeam-epoch = "0.9"
+crossbeam-utils = "0.8"
+parking_lot = "0.12"
+
+# Type safety
+static_assertions = "1.1"
+
+# Checksums
+crc32fast = "1.4"
+
+# Platform-specific
+[target.'cfg(target_os = "linux")'.dependencies]
+io-uring = { version = "0.6", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_IO", "Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+tempfile = "3.12"
+proptest = "1.5"
+criterion = "0.5"
+rand = "0.8"
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+heed = { path = "../heed" }
+
+[features]
+default = ["io_uring"]
+io_uring = ["dep:io-uring"]
+simd = [] # Will use portable SIMD when stable
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "benchmarks"
+# harness = false
+
+[[example]]
+name = "simple"
