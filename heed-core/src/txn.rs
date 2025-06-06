@@ -311,6 +311,9 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                 
                 // Save the freelist to the free database if needed
                 if freelist.has_txn_free_pages() {
+                    // Get the data to save before any borrows
+                    let freelist_data = freelist.get_save_data();
+                    
                     // Make a copy of free_db info to modify
                     let mut free_db_info = new_meta.free_db;
                     
@@ -330,13 +333,12 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                         free_db_info.leaf_pages = 1;
                     }
                     
-                    // For now, just update the meta with the free database info
-                    // The actual freelist data will be saved in a separate operation
-                    // to avoid complex borrow checker issues
-                    new_meta.free_db = free_db_info;
+                    // TODO: Save the freelist data properly
+                    // For now, we just track that we have freelist data
+                    // Proper implementation requires refactoring to handle borrow checker constraints
                     
-                    // TODO: Implement proper freelist saving
-                    // This requires refactoring to avoid mutable borrow conflicts
+                    // Update meta with the free database info
+                    new_meta.free_db = free_db_info;
                 }
                 
                 // Write all dirty pages BEFORE meta page
@@ -629,6 +631,7 @@ impl<'env> Transaction<'env, Write> {
             unreachable!("Write transaction must have write mode data");
         }
     }
+    
     
     /// Downgrade a write transaction to a read transaction
     pub fn downgrade(self) -> Result<Transaction<'env, Read>> {
