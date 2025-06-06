@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~84% Complete
+## Current Status: ~86% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -101,11 +101,12 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
    - No put/delete through cursors
    - Limited range queries
 
-3. **Free Page Management**
-   - Free list structure exists but not integrated
-   - No page recycling
-   - No garbage collection of old pages
-   - Memory usage grows without reuse
+3. **Free Page Management** (Partially Complete)
+   - Free list structure implemented with reader tracking
+   - Basic page freeing and allocation from freelist
+   - Reader-aware page recycling logic implemented
+   - Missing: Persistence of freelist to database
+   - Missing: Proper integration with transaction commit
 
 4. **Nested Transactions**
    - No sub-transaction support
@@ -137,7 +138,7 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 | DUPSORT | ✅ | ⚠️ | Basic implementation |
 | Cursors | ✅ | ⚠️ | Read-only, limited |
 | MVCC | ✅ | ⚠️ | Partially implemented |
-| Free Page Reuse | ✅ | ❌ | Not implemented |
+| Free Page Reuse | ✅ | ⚠️ | Partially implemented |
 | Nested Transactions | ✅ | ❌ | Not implemented |
 | Custom Comparators | ✅ | ❌ | Not implemented |
 | Fixed-Size Values | ✅ | ❌ | Not implemented |
@@ -148,14 +149,15 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 1. **Complete Copy-on-Write for MVCC**
    - ✅ Basic COW page modification implemented
    - ✅ Transaction sees copied pages
-   - ❌ Fix overflow page handling with COW
-   - ❌ Ensure proper page version tracking
+   - ✅ Fix overflow page handling with COW
+   - ✅ Ensure proper page version tracking
 
-2. **Complete Free Page Management**
-   - Integrate free list with page allocation
-   - Implement page recycling
-   - Add garbage collection for old versions
-   - Track page references properly
+2. **Complete Free Page Management** (Partially Complete)
+   - ✅ Integrate free list with page allocation
+   - ✅ Implement basic page recycling logic
+   - ✅ Add reader-aware garbage collection
+   - ❌ Persist freelist to database
+   - ❌ Handle complex borrow checker constraints
 
 3. **Finish Cursor Operations**
    - Implement previous() for backward navigation
@@ -221,7 +223,7 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **84% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **86% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog

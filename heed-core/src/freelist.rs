@@ -21,6 +21,8 @@ pub struct FreeList {
     txn_free_pages: BTreeMap<TransactionId, Vec<PageId>>,
     /// Oldest reader transaction ID (pages can only be reused after this)
     oldest_reader: TransactionId,
+    /// Track if the freelist needs to be saved
+    needs_save: bool,
 }
 
 impl FreeList {
@@ -31,6 +33,7 @@ impl FreeList {
             pending_pages: BTreeSet::new(),
             txn_free_pages: BTreeMap::new(),
             oldest_reader: TransactionId(0),
+            needs_save: false,
         }
     }
     
@@ -125,6 +128,7 @@ impl FreeList {
             let pages: Vec<PageId> = self.pending_pages.iter().cloned().collect();
             self.txn_free_pages.insert(txn_id, pages);
             self.pending_pages.clear();
+            self.needs_save = true;
         }
         
         // Check which pages can be made available for reuse
@@ -132,7 +136,7 @@ impl FreeList {
     }
     
     /// Update the free pages based on the oldest reader
-    fn update_free_pages(&mut self) {
+    pub fn update_free_pages(&mut self) {
         // Remove transactions that are safe to reuse
         let mut safe_txns = Vec::new();
         
@@ -215,6 +219,11 @@ impl FreeList {
     /// Check if there are any transaction free pages
     pub fn has_txn_free_pages(&self) -> bool {
         !self.txn_free_pages.is_empty()
+    }
+    
+    /// Check if the freelist needs to be saved
+    pub fn needs_save(&self) -> bool {
+        self.needs_save
     }
 }
 

@@ -178,8 +178,19 @@ impl<'env> Transaction<'env, Write> {
         };
         
         // Load the free list from the last committed state
-        let freelist = FreeList::load(&temp_read_txn, &meta.free_db)
+        let mut freelist = FreeList::load(&temp_read_txn, &meta.free_db)
             .unwrap_or_else(|_| FreeList::new());
+        
+        // Update freelist with current reader state
+        if let Some(oldest_reader) = inner.readers.oldest_reader() {
+            freelist.set_oldest_reader(oldest_reader);
+        } else {
+            // No active readers
+            freelist.set_oldest_reader(TransactionId(0));
+        }
+        
+        // Update free pages based on reader state
+        freelist.update_free_pages();
         
         Ok(Self {
             data: TxnData {
@@ -256,7 +267,8 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                 Ok(())
             }
             ModeData::Write { ref mut dirty, ref mut freelist, ref mut next_pgno, .. } => {
-                if dirty.pages.is_empty() {
+                
+                if dirty.pages.is_empty() && freelist.pending_len() == 0 {
                     // No changes, nothing to commit
                     return Ok(());
                 }
@@ -268,8 +280,7 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                     freelist.set_oldest_reader(oldest_reader);
                 }
                 
-                // Commit pending free pages with current transaction ID
-                freelist.commit_pending(self.data.id);
+                // Don't commit here - we'll do it after updating reader state
                 
                 // Get current meta page and determine which meta page to write to
                 let current_meta = inner.meta()?;
@@ -319,12 +330,13 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                         free_db_info.leaf_pages = 1;
                     }
                     
-                    // Note: We can't save the freelist here because we're in generic commit
-                    // The freelist will be saved in the next transaction
-                    // For now, just ensure the free database exists
-                    
-                    // Update meta with new free database info
+                    // For now, just update the meta with the free database info
+                    // The actual freelist data will be saved in a separate operation
+                    // to avoid complex borrow checker issues
                     new_meta.free_db = free_db_info;
+                    
+                    // TODO: Implement proper freelist saving
+                    // This requires refactoring to avoid mutable borrow conflicts
                 }
                 
                 // Write all dirty pages BEFORE meta page
