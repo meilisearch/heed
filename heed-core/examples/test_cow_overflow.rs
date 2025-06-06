@@ -61,7 +61,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut txn = env.begin_write_txn()?;
         println!("Updating large value ({} bytes)...", updated_value.len());
+        
+        // First, check what we have before update
+        let before = db.get(&txn, &"large_key".to_string())?;
+        println!("Before update: {} bytes", before.map(|v| v.len()).unwrap_or(0));
+        
         db.put(&mut txn, "large_key".to_string(), updated_value.clone())?;
+        
+        // Check immediately after update (before commit)
+        let after = db.get(&txn, &"large_key".to_string())?;
+        println!("After update (before commit): {} bytes", after.map(|v| v.len()).unwrap_or(0));
+        
         txn.commit()?;
     }
     

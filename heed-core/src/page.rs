@@ -703,7 +703,7 @@ impl<'a> NodeDataMut<'a> {
         
         // Check if new value fits
         let old_value_size = header.value_size() as usize;
-        if new_value.len() != old_value_size && !header.flags.contains(NodeFlags::OVERFLOW) {
+        if new_value.len() != old_value_size && !header.flags.contains(NodeFlags::BIGDATA) {
             return Err(Error::InvalidParameter("Cannot change value size without reallocation"));
         }
         
@@ -728,7 +728,7 @@ impl<'a> NodeDataMut<'a> {
         let header = unsafe { &mut *node_ptr };
         
         // Update flags
-        header.flags.insert(NodeFlags::OVERFLOW);
+        header.flags.insert(NodeFlags::BIGDATA);
         
         // Store overflow page ID as value
         let val_offset = self.offset as usize - PageHeader::SIZE + NodeHeader::SIZE + header.ksize as usize;

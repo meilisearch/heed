@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~82% Complete
+## Current Status: ~84% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -89,11 +89,11 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
 
 ### Critical Missing Features
 
-1. **Full MVCC (Multi-Version Concurrency Control)**
-   - Copy-on-write page management partially implemented
-   - Basic COW for page modifications working
-   - Issues with overflow page handling in COW
-   - Read transactions see consistent snapshots for non-overflow data
+1. **Full MVCC (Multi-Version Concurrency Control)** ✅
+   - Copy-on-write page management fully implemented
+   - COW for page modifications working correctly
+   - Overflow page handling in COW fixed
+   - Read transactions see consistent snapshots for all data
 
 2. **Complete Cursor Operations**
    - No previous() navigation
@@ -221,7 +221,7 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **82% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **84% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog
@@ -229,7 +229,7 @@ heed-core is approximately **82% complete** and provides a functional pure Rust 
 - ✅ Reader tracking and basic MVCC foundation
 - ✅ DUPSORT functionality for multiple values per key
 - ⚠️ Limited cursor functionality (read-only)
-- ⚠️ Partial Copy-on-Write implementation (basic COW working, overflow pages need fixing)
+- ✅ Full Copy-on-Write implementation (COW working correctly with overflow pages)
 - ❌ No page recycling (memory grows without reuse)
 - ❌ No nested transactions
 

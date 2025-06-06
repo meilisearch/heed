@@ -271,7 +271,9 @@ impl BTree {
                             // For split, we'll handle overflow as a special case
                             Self::split_leaf_page_with_overflow(txn, page_id, key, overflow_id)
                         }
-                        Err(e) => Err(e),
+                        Err(e) => {
+                            Err(e)
+                        },
                     }
                 } else {
                     // Try to add the node normally
@@ -1207,6 +1209,7 @@ impl BTree {
             page.search_key(key)?
         };
         
+        
         match search_result {
             SearchResult::Found { index } => {
                 // Key exists - need to update with COW
@@ -1221,10 +1224,8 @@ impl BTree {
                     }
                 };
                 
-                // Free old overflow if any (do this before getting COW page)
-                if let Some(overflow_id) = old_overflow {
-                    crate::overflow::free_overflow_chain(txn, overflow_id)?;
-                }
+                // Don't free old overflow pages yet - they're still referenced by the old page
+                // The freelist will handle this when the old page is freed
                 
                 // Check if we need overflow for new value (do this before getting COW page)
                 let needs_overflow = crate::overflow::needs_overflow(key.len(), value.len());
@@ -1257,7 +1258,14 @@ impl BTree {
                 // Key doesn't exist - check if we need to split
                 let needs_split = {
                     let page = txn.get_page(page_id)?;
-                    let key_value_size = key.len() + value.len() + 8; // approximate overhead
+                    // Calculate size needed - for overflow values, we only store 8 bytes + key
+                    let needs_overflow = crate::overflow::needs_overflow(key.len(), value.len());
+                    let key_value_size = if needs_overflow {
+                        key.len() + 8 + 8  // key + overflow page ID + overhead
+                    } else {
+                        key.len() + value.len() + 8  // key + value + overhead
+                    };
+                    let free_space = page.header.free_space();
                     page.header.free_space() < key_value_size
                 };
                 

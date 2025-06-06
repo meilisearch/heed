@@ -198,6 +198,18 @@ pub fn free_overflow_chain(
     Ok(())
 }
 
+/// Copy overflow pages for Copy-on-Write
+pub fn copy_overflow_chain(
+    txn: &mut Transaction<'_, crate::txn::Write>,
+    old_first_page_id: PageId,
+) -> Result<PageId> {
+    // Read the entire value from the old overflow chain
+    let value = read_overflow_value(txn, old_first_page_id)?;
+    
+    // Write it to new overflow pages
+    write_overflow_value(txn, &value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -434,16 +434,44 @@ impl<'env> Transaction<'env, Write> {
     /// Get a mutable page with Copy-on-Write semantics
     /// Returns the page ID (which may be new) and a mutable reference to the page
     pub fn get_page_cow(&mut self, page_id: PageId) -> Result<(PageId, &mut Page)> {
-        if let ModeData::Write { ref mut dirty, ref mut freelist, ref mut next_pgno, .. } = self.mode_data {
-            // Check if already dirty in this transaction
+        // Check if already dirty in this transaction
+        if let ModeData::Write { ref dirty, .. } = self.mode_data {
             if dirty.pages.contains_key(&page_id) {
-                return Ok((page_id, dirty.pages.get_mut(&page_id).unwrap()));
+                if let ModeData::Write { ref mut dirty, .. } = self.mode_data {
+                    return Ok((page_id, dirty.pages.get_mut(&page_id).unwrap()));
+                }
             }
-            
-            // Page is not dirty - need to copy it (Copy-on-Write)
-            let inner = self.data.env.inner();
-            let original_page = inner.io.read_page(page_id)?;
-            
+        }
+        
+        // Page is not dirty - need to copy it (Copy-on-Write)
+        let inner = self.data.env.inner();
+        let original_page = inner.io.read_page(page_id)?;
+        
+        // Check if this is a leaf page with overflow references that need copying
+        let overflow_updates = if original_page.header.flags.contains(PageFlags::LEAF) && original_page.header.num_keys > 0 {
+            let mut updates = Vec::new();
+            for i in 0..original_page.header.num_keys as usize {
+                if let Ok(node) = original_page.node(i) {
+                    if let Ok(Some(overflow_id)) = node.overflow_page() {
+                        updates.push((i, overflow_id));
+                    }
+                } else {
+                }
+            }
+            updates
+        } else {
+            Vec::new()
+        };
+        
+        // Copy overflow chains if needed
+        let mut overflow_mappings = Vec::new();
+        for (node_idx, old_overflow_id) in overflow_updates {
+            let new_overflow_id = crate::overflow::copy_overflow_chain(self, old_overflow_id)?;
+            overflow_mappings.push((node_idx, new_overflow_id));
+        }
+        
+        // Now create the new page with updated overflow references
+        if let ModeData::Write { ref mut dirty, ref mut freelist, ref mut next_pgno, .. } = self.mode_data {
             // Allocate a new page for the copy
             let new_page_id = if let Some(free_page_id) = freelist.alloc_page() {
                 free_page_id
@@ -467,6 +495,26 @@ impl<'env> Transaction<'env, Write> {
                 },
                 data: original_page.data,
             });
+            
+            // Update overflow references in the new page
+            // Only update if we have overflow mappings
+            if !overflow_mappings.is_empty() {
+                // We need to be careful here - the node indices from the original page
+                // should still be valid in the copied page since we copied the data array as-is
+                for (node_idx, new_overflow_id) in overflow_mappings {
+                    // Double-check that the node index is valid
+                    if node_idx >= new_page.header.num_keys as usize {
+                        return Err(Error::Corruption {
+                            details: format!("Node index {} out of bounds during COW (num_keys={})", 
+                                           node_idx, new_page.header.num_keys).into(),
+                            page_id: Some(page_id),
+                        });
+                    }
+                    
+                    let mut node_data = new_page.node_data_mut(node_idx)?;
+                    node_data.set_overflow(new_overflow_id)?;
+                }
+            }
             
             // Mark the new page as dirty and track allocation
             dirty.mark_dirty(new_page_id, new_page);
