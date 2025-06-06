@@ -122,7 +122,7 @@ impl BTree {
         }
     }
     
-    /// Insert a key-value pair into the B+Tree
+    /// Insert a key-value pair into the B+Tree with Copy-on-Write
     pub fn insert(
         txn: &mut Transaction<'_, Write>,
         root: &mut PageId,
@@ -130,8 +130,9 @@ impl BTree {
         key: &[u8],
         value: &[u8],
     ) -> Result<Option<Vec<u8>>> {
-        // Start insertion from root
-        let result = Self::insert_non_full(txn, *root, key, value)?;
+        // Start insertion from root with COW
+        let (new_root, result) = Self::insert_cow(txn, *root, key, value)?;
+        *root = new_root;
         
         match result {
             InsertResult::Updated(old_value) => Ok(old_value),
@@ -166,6 +167,24 @@ impl BTree {
                 
                 Ok(None)
             }
+        }
+    }
+    
+    /// Insert with Copy-on-Write - returns new page ID and result
+    fn insert_cow(
+        txn: &mut Transaction<'_, Write>,
+        page_id: PageId,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<(PageId, InsertResult)> {
+        let page = txn.get_page(page_id)?;
+        
+        if page.header.flags.contains(PageFlags::LEAF) {
+            // Insert into leaf page with COW
+            Self::insert_into_leaf_cow(txn, page_id, key, value)
+        } else {
+            // Insert into branch page with COW
+            Self::insert_into_branch_cow(txn, page_id, key, value)
         }
     }
     
@@ -1174,6 +1193,190 @@ impl BTree {
         
         Ok(())
     }
+    
+    /// Insert into leaf page with Copy-on-Write
+    fn insert_into_leaf_cow(
+        txn: &mut Transaction<'_, Write>,
+        page_id: PageId,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<(PageId, InsertResult)> {
+        // First check if key exists without modifying the page
+        let search_result = {
+            let page = txn.get_page(page_id)?;
+            page.search_key(key)?
+        };
+        
+        match search_result {
+            SearchResult::Found { index } => {
+                // Key exists - need to update with COW
+                let (old_value, old_overflow) = {
+                    let page = txn.get_page(page_id)?;
+                    let node = page.node(index)?;
+                    
+                    if let Some(overflow_id) = node.overflow_page()? {
+                        (Some(crate::overflow::read_overflow_value(txn, overflow_id)?), Some(overflow_id))
+                    } else {
+                        (node.value().ok().map(|v| v.into_owned()), None)
+                    }
+                };
+                
+                // Free old overflow if any (do this before getting COW page)
+                if let Some(overflow_id) = old_overflow {
+                    crate::overflow::free_overflow_chain(txn, overflow_id)?;
+                }
+                
+                // Check if we need overflow for new value (do this before getting COW page)
+                let needs_overflow = crate::overflow::needs_overflow(key.len(), value.len());
+                let new_overflow_id = if needs_overflow {
+                    Some(crate::overflow::write_overflow_value(txn, value)?)
+                } else {
+                    None
+                };
+                
+                // Now get COW page and perform modifications
+                let (new_page_id, page) = txn.get_page_cow(page_id)?;
+                
+                // Remove old entry
+                page.remove_node(index)?;
+                
+                // Insert the new value
+                if let Some(overflow_id) = new_overflow_id {
+                    match page.add_node_sorted_overflow(key, overflow_id) {
+                        Ok(_) => Ok((new_page_id, InsertResult::Updated(old_value))),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    match page.add_node_sorted(key, value) {
+                        Ok(_) => Ok((new_page_id, InsertResult::Updated(old_value))),
+                        Err(e) => Err(e),
+                    }
+                }
+            }
+            SearchResult::NotFound { insert_pos: _ } => {
+                // Key doesn't exist - check if we need to split
+                let needs_split = {
+                    let page = txn.get_page(page_id)?;
+                    let key_value_size = key.len() + value.len() + 8; // approximate overhead
+                    page.header.free_space() < key_value_size
+                };
+                
+                if needs_split {
+                    // Page will be full, handle split
+                    let needs_overflow = crate::overflow::needs_overflow(key.len(), value.len());
+                    if needs_overflow {
+                        let overflow_id = crate::overflow::write_overflow_value(txn, value)?;
+                        Self::split_leaf_page_with_overflow(txn, page_id, key, overflow_id)
+                            .map(|result| (page_id, result))
+                    } else {
+                        Self::split_leaf_page(txn, page_id, key, value)
+                            .map(|result| (page_id, result))
+                    }
+                } else {
+                    // Check if we need overflow (do this before getting COW page)
+                    let needs_overflow = crate::overflow::needs_overflow(key.len(), value.len());
+                    let overflow_id = if needs_overflow {
+                        Some(crate::overflow::write_overflow_value(txn, value)?)
+                    } else {
+                        None
+                    };
+                    
+                    // Get COW page and insert
+                    let (new_page_id, page) = txn.get_page_cow(page_id)?;
+                    
+                    if let Some(overflow_id) = overflow_id {
+                        match page.add_node_sorted_overflow(key, overflow_id) {
+                            Ok(_) => Ok((new_page_id, InsertResult::Inserted)),
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        match page.add_node_sorted(key, value) {
+                            Ok(_) => Ok((new_page_id, InsertResult::Inserted)),
+                            Err(e) => Err(e),
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Insert into branch page with Copy-on-Write
+    fn insert_into_branch_cow(
+        txn: &mut Transaction<'_, Write>,
+        page_id: PageId,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<(PageId, InsertResult)> {
+        let child_page_id = {
+            let page = txn.get_page(page_id)?;
+            crate::branch_v2::BranchPageV2::find_child(&page, key)?
+        };
+        
+        // Recursively insert into child with COW
+        let (new_child_id, child_result) = Self::insert_cow(txn, child_page_id, key, value)?;
+        
+        match child_result {
+            InsertResult::Updated(old) => {
+                if new_child_id != child_page_id {
+                    // Child page changed due to COW, update parent
+                    let (new_page_id, parent) = txn.get_page_cow(page_id)?;
+                    
+                    // Find and update the child pointer
+                    for i in 0..parent.header.num_keys as usize {
+                        // First read the current value
+                        let current_child = {
+                            let node = parent.node(i)?;
+                            node.page_number()?
+                        };
+                        
+                        if current_child == child_page_id {
+                            // Now get mutable access and update
+                            let mut node = parent.node_data_mut(i)?;
+                            node.set_value(&new_child_id.0.to_le_bytes())?;
+                            break;
+                        }
+                    }
+                    
+                    Ok((new_page_id, InsertResult::Updated(old)))
+                } else {
+                    Ok((page_id, InsertResult::Updated(old)))
+                }
+            }
+            InsertResult::Inserted => {
+                if new_child_id != child_page_id {
+                    // Child page changed due to COW, update parent
+                    let (new_page_id, parent) = txn.get_page_cow(page_id)?;
+                    
+                    // Update child pointer
+                    crate::branch_v2::BranchPageV2::update_child_pointer(parent, child_page_id, new_child_id)?;
+                    
+                    Ok((new_page_id, InsertResult::Inserted))
+                } else {
+                    Ok((page_id, InsertResult::Inserted))
+                }
+            }
+            InsertResult::Split { median_key, right_page } => {
+                // Child was split, need to add median key to this branch
+                let (new_page_id, parent) = txn.get_page_cow(page_id)?;
+                
+                // Update the old child pointer if it changed
+                if new_child_id != child_page_id {
+                    crate::branch_v2::BranchPageV2::update_child_pointer(parent, child_page_id, new_child_id)?;
+                }
+                
+                // Add the split child
+                match crate::branch_v2::BranchPageV2::add_split_child(parent, &median_key, right_page) {
+                    Ok(()) => Ok((new_page_id, InsertResult::Inserted)),
+                    Err(Error::Custom(msg)) if msg.contains("Page full") => {
+                        // This branch is also full, split it
+                        Self::split_branch_page(txn, new_page_id, median_key, right_page)
+                            .map(|result| (new_page_id, result))
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+        }
+    }
 }
 
 /// Result of an insert operation
@@ -1440,10 +1643,18 @@ mod tests {
             .unwrap();
         
         let mut txn = env.begin_write_txn().unwrap();
-        let mut root = PageId(3);
+        
+        // Properly initialize the database
+        let (root_id, root_page) = txn.alloc_page(PageFlags::LEAF).unwrap();
+        root_page.header.num_keys = 0;
+        
         let mut db_info = DbInfo::default();
-        db_info.root = root;
+        db_info.root = root_id;
         db_info.leaf_pages = 1;
+        let mut root = root_id;
+        
+        // Save initial database info
+        txn.update_db_info(None, db_info).unwrap();
         
         // Create a large value that needs overflow pages
         let large_value = vec![0xAB; 5000]; // 5KB
@@ -1457,26 +1668,38 @@ mod tests {
         BTree::insert(&mut txn, &mut root, &mut db_info, b"small1", b"value1").unwrap();
         BTree::insert(&mut txn, &mut root, &mut db_info, b"small2", b"value2").unwrap();
         
+        // Update the root in db_info after all inserts
+        db_info.root = root;
+        // Update transaction's database info
+        txn.update_db_info(None, db_info).unwrap();
+        
         txn.commit().unwrap();
         
         // Search for large value
         let txn = env.begin_txn().unwrap();
-        let result = BTree::search(&txn, root, b"large_key").unwrap();
+        let db_info = txn.db_info(None).unwrap();
+        let result = BTree::search(&txn, db_info.root, b"large_key").unwrap();
         assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&large_value[..]));
         
         // Search for normal values
-        let result = BTree::search(&txn, root, b"small1").unwrap();
+        let result = BTree::search(&txn, db_info.root, b"small1").unwrap();
         assert_eq!(result.as_ref().map(|v| v.as_ref()), Some(&b"value1"[..]));
         
         drop(txn);
         
         // Delete large value
         let mut txn = env.begin_write_txn().unwrap();
+        let mut db_info = *txn.db_info(None).unwrap();
+        let mut root = db_info.root;
         let deleted = BTree::delete(&mut txn, &mut root, &mut db_info, b"large_key").unwrap();
         assert_eq!(deleted, Some(large_value));
         
+        // Update db_info with new root
+        db_info.root = root;
+        txn.update_db_info(None, db_info).unwrap();
+        
         // Verify it's deleted
-        let result = BTree::search(&txn, root, b"large_key").unwrap();
+        let result = BTree::search(&txn, db_info.root, b"large_key").unwrap();
         assert!(result.is_none());
         
         txn.commit().unwrap();

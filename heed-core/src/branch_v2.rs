@@ -301,4 +301,39 @@ impl BranchPageV2 {
         
         Ok(())
     }
+    
+    /// Update a child pointer from old to new
+    pub fn update_child_pointer(
+        page: &mut Page,
+        old_child: PageId,
+        new_child: PageId,
+    ) -> Result<()> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        // Check if it's the leftmost child
+        let header = Self::get_header(page)?;
+        if header.leftmost_child == old_child {
+            return Self::update_leftmost_child(page, new_child);
+        }
+        
+        // Search in the regular nodes
+        for i in 0..page.header.num_keys as usize {
+            // First read the current child ID
+            let current_child = {
+                let node = page.node(i)?;
+                node.page_number()?
+            };
+            
+            if current_child == old_child {
+                // Now get mutable access and update
+                let mut node = page.node_data_mut(i)?;
+                node.set_value(&new_child.0.to_le_bytes())?;
+                return Ok(());
+            }
+        }
+        
+        Err(Error::Custom(format!("Child pointer {:?} not found in branch page", old_child).into()))
+    }
 }

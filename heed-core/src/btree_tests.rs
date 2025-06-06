@@ -245,10 +245,14 @@ mod tests {
             assert!(BTree::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), &value).unwrap().is_none());
         }
         
+        // Update db_info with final root
+        db_info.root = root;
+        txn.update_db_info(None, db_info).unwrap();
+        
         // Verify all values
         for (i, &size) in sizes.iter().enumerate() {
             let key = format!("key_{}", i);
-            let result = BTree::search(&txn, root, key.as_bytes()).unwrap();
+            let result = BTree::search(&txn, db_info.root, key.as_bytes()).unwrap();
             assert!(result.is_some());
             let value = result.unwrap();
             assert_eq!(value.len(), size);
@@ -265,6 +269,10 @@ mod tests {
             assert_eq!(old.unwrap().len(), size);
         }
         
+        // Update db_info after updates
+        db_info.root = root;
+        txn.update_db_info(None, db_info).unwrap();
+        
         // Delete large values
         for (i, _) in sizes.iter().enumerate() {
             let key = format!("key_{}", i);
@@ -272,7 +280,13 @@ mod tests {
             assert!(deleted.is_some());
         }
         
+        // Update db_info after deletes
+        db_info.root = root;
+        txn.update_db_info(None, db_info).unwrap();
+        
         assert_eq!(db_info.entries, 0);
+        
+        txn.commit().unwrap();
     }
 
     #[test]

@@ -7,7 +7,7 @@ use parking_lot::MutexGuard;
 
 use crate::error::{Error, Result, TransactionId, PageId};
 use crate::env::{Environment, state};
-use crate::page::{Page, PageFlags};
+use crate::page::{Page, PageFlags, PageHeader};
 use crate::meta::DbInfo;
 use crate::freelist::FreeList;
 
@@ -431,8 +431,60 @@ impl<'env> Transaction<'env, Read> {
 }
 
 impl<'env> Transaction<'env, Write> {
-    /// Get a mutable page
+    /// Get a mutable page with Copy-on-Write semantics
+    /// Returns the page ID (which may be new) and a mutable reference to the page
+    pub fn get_page_cow(&mut self, page_id: PageId) -> Result<(PageId, &mut Page)> {
+        if let ModeData::Write { ref mut dirty, ref mut freelist, ref mut next_pgno, .. } = self.mode_data {
+            // Check if already dirty in this transaction
+            if dirty.pages.contains_key(&page_id) {
+                return Ok((page_id, dirty.pages.get_mut(&page_id).unwrap()));
+            }
+            
+            // Page is not dirty - need to copy it (Copy-on-Write)
+            let inner = self.data.env.inner();
+            let original_page = inner.io.read_page(page_id)?;
+            
+            // Allocate a new page for the copy
+            let new_page_id = if let Some(free_page_id) = freelist.alloc_page() {
+                free_page_id
+            } else {
+                // Allocate new page from end of file
+                let id = PageId(inner.next_page_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+                *next_pgno = PageId(id.0 + 1);
+                id
+            };
+            
+            // Create new page as a copy of the original
+            let mut new_page = Box::new(Page {
+                header: PageHeader {
+                    pgno: new_page_id.0,
+                    flags: original_page.header.flags | PageFlags::DIRTY,
+                    num_keys: original_page.header.num_keys,
+                    lower: original_page.header.lower,
+                    upper: original_page.header.upper,
+                    overflow: original_page.header.overflow,
+                    checksum: 0, // Reset checksum for new page
+                },
+                data: original_page.data,
+            });
+            
+            // Mark the new page as dirty and track allocation
+            dirty.mark_dirty(new_page_id, new_page);
+            dirty.allocated.push(new_page_id);
+            
+            // Free the old page (it will be added to freelist after oldest reader)
+            freelist.free_page(page_id);
+            
+            Ok((new_page_id, dirty.pages.get_mut(&new_page_id).unwrap()))
+        } else {
+            unreachable!("Write transaction must have write mode data");
+        }
+    }
+    
+    /// Get a mutable page (for backward compatibility - uses COW internally)
     pub fn get_page_mut(&mut self, page_id: PageId) -> Result<&mut Page> {
+        // For now, keep the old behavior for compatibility
+        // TODO: Update all callers to handle the new page ID from COW
         if let ModeData::Write { ref mut dirty, .. } = self.mode_data {
             // Check if already dirty
             if dirty.pages.contains_key(&page_id) {
