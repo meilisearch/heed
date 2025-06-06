@@ -28,6 +28,7 @@ pub mod copy;
 pub mod branch;
 pub mod branch_v2;
 pub mod tree_utils;
+pub mod nested_txn;
 
 #[cfg(test)]
 mod io_test;

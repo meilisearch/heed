@@ -10,6 +10,7 @@ use crate::env::{Environment, state};
 use crate::page::{Page, PageFlags, PageHeader};
 use crate::meta::DbInfo;
 use crate::freelist::FreeList;
+pub use crate::nested_txn::NestedTransactionExt;
 
 /// Transaction mode marker traits
 pub mod mode {
@@ -46,14 +47,14 @@ impl mode::Mode for Write {
 /// Dirty page tracking for write transactions
 pub struct DirtyPages {
     /// Map of page ID to dirty page
-    pages: HashMap<PageId, Box<Page>>,
+    pub(crate) pages: HashMap<PageId, Box<Page>>,
     /// Allocated pages that need to be written
-    allocated: Vec<PageId>,
+    pub(crate) allocated: Vec<PageId>,
 }
 
 impl DirtyPages {
     /// Create new dirty page tracker
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             pages: HashMap::new(),
             allocated: Vec::new(),
@@ -61,17 +62,17 @@ impl DirtyPages {
     }
     
     /// Mark a page as dirty
-    fn mark_dirty(&mut self, page_id: PageId, page: Box<Page>) {
+    pub(crate) fn mark_dirty(&mut self, page_id: PageId, page: Box<Page>) {
         self.pages.insert(page_id, page);
     }
     
     /// Get a dirty page
-    fn get(&self, page_id: &PageId) -> Option<&Page> {
+    pub(crate) fn get(&self, page_id: &PageId) -> Option<&Page> {
         self.pages.get(page_id).map(|p| p.as_ref())
     }
     
     /// Get a mutable dirty page
-    fn get_mut(&mut self, page_id: &PageId) -> Option<&mut Page> {
+    pub(crate) fn get_mut(&mut self, page_id: &PageId) -> Option<&mut Page> {
         self.pages.get_mut(page_id).map(|p| p.as_mut())
     }
 }

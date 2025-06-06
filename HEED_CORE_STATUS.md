@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the heed-core pure Rust LMDB 
 
 **heed-core** is a pure Rust implementation of LMDB (Lightning Memory-Mapped Database) that aims to provide the same functionality as LMDB without FFI dependencies. It's part of the heed project, which also includes FFI-based wrappers for the original LMDB C library.
 
-## Current Status: ~92% Complete
+## Current Status: ~94% Complete
 
 Based on comprehensive analysis of the codebase, heed-core has implemented most core database functionality but lacks some advanced LMDB features.
 
@@ -39,6 +39,8 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
   - Page splitting when full
   - Tree traversal and iteration
   - Proper key ordering
+  - Full rebalancing on delete (borrow from siblings, merge nodes)
+  - Root shrinking when empty
 
 - **Page Management**
   - 4KB pages with proper alignment
@@ -176,10 +178,11 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
    - All operations fully implemented and tested
 
 ### Medium Priority
-4. **Add Nested Transactions**
-   - Support creating child transactions
-   - Implement partial commit/abort
-   - Maintain transaction hierarchy
+4. **Add Nested Transactions** ⚠️ (Stub implementation)
+   - ✅ Added stub implementation that returns error
+   - ❌ Full implementation requires significant refactoring
+   - ❌ Need to track transaction hierarchy
+   - ❌ Need separate dirty page tracking per level
 
 5. **Optimize DUPSORT** ✅ (Completed!)
    - ✅ Added single value optimization
@@ -188,9 +191,10 @@ Based on comprehensive analysis of the codebase, heed-core has implemented most 
    - ✅ Fixed cursor integration
 
 6. **Performance Optimizations**
-   - Implement B+Tree rebalancing
+   - ✅ B+Tree rebalancing already implemented
    - Add page prefetching
    - Optimize key comparisons
+   - Consider B*-tree style rebalancing (2/3 full guarantee)
 
 ### Low Priority
 7. **Advanced Features**
@@ -234,7 +238,7 @@ cargo run --example test_catalog
 
 ## 📈 Progress Summary
 
-heed-core is approximately **92% complete** and provides a functional pure Rust LMDB implementation with:
+heed-core is approximately **94% complete** and provides a functional pure Rust LMDB implementation with:
 - ✅ Full database engine with persistence and crash recovery
 - ✅ ACID transactions with multiple durability modes
 - ✅ Named database support with persistent catalog
