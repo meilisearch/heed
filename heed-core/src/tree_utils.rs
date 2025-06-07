@@ -3,9 +3,6 @@
 use crate::error::{Error, Result, PageId};
 use crate::page::{PageFlags, Page};
 use crate::txn::{Transaction, Write};
-use crate::btree::BTree;
-use crate::meta::DbInfo;
-use crate::comparator::LexicographicComparator;
 use std::collections::VecDeque;
 
 /// Traverse a B+Tree and collect all page IDs
@@ -29,7 +26,7 @@ pub fn collect_tree_pages<'txn>(
         
         if page.header.flags.contains(PageFlags::BRANCH) {
             // Branch page - add leftmost child first
-            let leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(page)?;
+            let leftmost = crate::branch::BranchPage::get_leftmost_child(page)?;
             queue.push_back(leftmost);
             
             // Add all other children
@@ -127,7 +124,7 @@ where
         
         if page.header.flags.contains(PageFlags::BRANCH) {
             // Branch page - add leftmost child first
-            let leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(page)?;
+            let leftmost = crate::branch::BranchPage::get_leftmost_child(page)?;
             queue.push_back(leftmost);
             
             // Add all other children
@@ -148,6 +145,7 @@ mod tests {
     use crate::env::EnvBuilder;
     use crate::btree::BTree;
     use crate::meta::DbInfo;
+    use crate::comparator::LexicographicComparator;
     use tempfile::TempDir;
     
     #[test]
@@ -192,28 +190,34 @@ mod tests {
             .unwrap();
         
         let mut txn = env.begin_write_txn().unwrap();
-        let mut root = PageId(3);
+        
+        // Allocate a new page for our test tree instead of using the main DB root
+        let (root, _) = txn.alloc_page(PageFlags::LEAF).unwrap();
         let mut db_info = DbInfo::default();
         db_info.root = root;
         db_info.leaf_pages = 1;
         
         // Create a tree with some data
+        let mut current_root = root;
         for i in 0..50 {
             let key = format!("key_{:04}", i);
             let value = format!("value_{:04}", i);
-            BTree::<LexicographicComparator>::insert(&mut txn, &mut root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
+            BTree::<LexicographicComparator>::insert(&mut txn, &mut current_root, &mut db_info, key.as_bytes(), value.as_bytes()).unwrap();
         }
         
         // Collect pages before freeing
-        let pages_before = collect_tree_pages(&txn, root).unwrap();
+        let pages_before = collect_tree_pages(&txn, current_root).unwrap();
         let page_count = pages_before.len();
         
         // Free the tree
-        free_tree(&mut txn, root).unwrap();
+        free_tree(&mut txn, current_root).unwrap();
         
         // Check that pages were marked for freeing
         if let crate::txn::ModeData::Write { ref freelist, .. } = txn.mode_data {
-            assert_eq!(freelist.pending_len(), page_count);
+            let pending = freelist.pending_len();
+            // We should have freed all pages in the tree
+            assert_eq!(pending, page_count, 
+                    "Expected {} pending pages, got {}", page_count, pending);
         }
     }
 }

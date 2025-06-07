@@ -232,11 +232,21 @@ impl<K: Key, V: Value, C: Comparator> Database<K, V, C> {
     pub fn get<'txn, M: Mode>(&self, txn: &Transaction<'txn, M>, key: &K) -> Result<Option<V>> {
         let key_bytes = key.encode()?;
         
-        // Get current database info from transaction
-        let db_info = txn.db_info(self.name.as_deref())?;
+        // Try to get the latest database info from the transaction first
+        // This is important for consistency within a transaction
+        let db_info = match txn.db_info(self.name.as_deref()) {
+            Ok(info) => info,
+            Err(_) => {
+                // Not in transaction cache, use our cached info
+                // Note: For read transactions from a reopened environment,
+                // the entries count may be stale, but the root page is correct
+                &self.info
+            }
+        };
         
-        // If the database is empty, return None
-        if db_info.entries == 0 || db_info.root == crate::error::PageId(0) {
+        // Don't check entries count for read transactions as it may be stale
+        // Just check if we have a valid root page
+        if db_info.root == crate::error::PageId(0) {
             return Ok(None);
         }
         
@@ -547,6 +557,11 @@ impl Environment<state::Open> {
             return Ok(Database::new(self.inner().clone(), name.map(String::from), *info));
         }
         
+        // Check environment cache
+        if let Some(info) = self.inner().databases.read().unwrap().get(&name.map(String::from)) {
+            return Ok(Database::new(self.inner().clone(), name.map(String::from), *info));
+        }
+        
         // For named databases, look in the main database
         if let Some(db_name) = name {
             let main_db_info = txn.db_info(None)?;
@@ -554,10 +569,13 @@ impl Environment<state::Open> {
                 Some(value) => {
                     // Try to deserialize using Catalog format
                     if let Ok(info) = crate::catalog::Catalog::deserialize_db_info(&value) {
+                        // Cache in the environment
+                        self.inner().databases.write().unwrap().insert(Some(db_name.to_string()), info);
                         return Ok(Database::new(self.inner().clone(), Some(db_name.to_string()), info));
                     }
                 }
-                None => {}
+                None => {
+                }
             }
         }
         
