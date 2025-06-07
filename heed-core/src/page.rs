@@ -191,7 +191,7 @@ impl Page {
         
         // For branch pages using branch_v2, we need to skip the branch header
         let offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };
@@ -210,7 +210,7 @@ impl Page {
         
         // For branch pages using branch_v2, we need to skip the branch header
         let offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };
@@ -381,7 +381,7 @@ impl Page {
         
         // For branch pages using branch_v2, we need to skip the branch header
         let offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };
@@ -473,7 +473,7 @@ impl Page {
         
         // Calculate new lower bound, accounting for branch header if present
         let header_offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };
@@ -492,7 +492,7 @@ impl Page {
         
         // For branch pages using branch_v2, we need to skip the branch header
         let offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };
@@ -525,7 +525,7 @@ impl Page {
         
         // Calculate initial lower bound, accounting for branch header if present
         let header_offset = if self.header.flags.contains(PageFlags::BRANCH) {
-            crate::branch_v2::BranchHeader::SIZE
+            crate::branch::BranchHeader::SIZE
         } else {
             0
         };

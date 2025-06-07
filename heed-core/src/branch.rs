@@ -1,22 +1,32 @@
-//! Branch page operations for B+Tree
+//! Improved branch page implementation for B+Tree
 //! 
-//! In a B+Tree, branch (internal) pages contain:
-//! - n keys that act as separators
-//! - n+1 child pointers
+//! This implementation uses a more standard approach where branch pages
+//! explicitly store n keys and n+1 child pointers.
 //! 
-//! The structure is:
-//! child[0] | key[0] | child[1] | key[1] | ... | key[n-1] | child[n]
-//!
-//! Where:
-//! - child[0] contains all keys < key[0]
-//! - child[i] contains all keys >= key[i-1] and < key[i]  
-//! - child[n] contains all keys >= key[n-1]
+//! Layout:
+//! - First child pointer (8 bytes) at fixed offset
+//! - Followed by n pairs of (key, child_pointer)
+//! 
+//! This allows for efficient navigation without special cases for empty keys.
 
 use crate::error::{Error, Result, PageId};
-use crate::page::{Page, PageFlags, PageHeader};
-use crate::txn::{Transaction, Write};
+use crate::page::{Page, PageFlags, PageHeader, NodeHeader};
+use crate::comparator::{Comparator, LexicographicComparator};
+use std::mem::size_of;
 
-/// Branch page structure that properly handles n keys and n+1 children
+/// Branch page header stored at the beginning of page data
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct BranchHeader {
+    /// The leftmost child pointer
+    pub leftmost_child: PageId,
+}
+
+impl BranchHeader {
+    pub const SIZE: usize = size_of::<Self>();
+}
+
+/// Branch page operations
 pub struct BranchPage;
 
 impl BranchPage {
@@ -33,99 +43,105 @@ impl BranchPage {
         page.header.lower = PageHeader::SIZE as u16;
         page.header.upper = crate::page::PAGE_SIZE as u16;
         
-        // In B+Tree branch pages, we store n keys and n+1 children
-        // For a root with 2 children, we need 1 key
-        // We'll use a special marker to indicate the leftmost child
+        // Write branch header with leftmost child
+        let header = BranchHeader {
+            leftmost_child: left_child,
+        };
         
-        // Add a node with empty key pointing to left child
-        // Empty key ensures it sorts before any real key
-        let empty_key = b"";
-        page.add_node(empty_key, &left_child.0.to_le_bytes())?;
-        
-        // Add the median key pointing to right child
-        page.add_node(median_key, &right_child.0.to_le_bytes())?;
-        
-        // Verify the branch page was initialized correctly
-        let test_left = Self::get_leftmost_child(page)?;
-        if test_left.0 != left_child.0 {
-            return Err(Error::Corruption {
-                details: format!("Branch page initialization failed: expected left child {:?}, got {:?}", left_child, test_left).into(),
-                page_id: Some(PageId(page.header.pgno)),
-            });
+        unsafe {
+            let header_ptr = page.data.as_mut_ptr() as *mut BranchHeader;
+            *header_ptr = header;
         }
+        
+        // Adjust lower to account for branch header
+        page.header.lower += BranchHeader::SIZE as u16;
+        
+        // Add the median key with right child
+        // In branch pages, we store the child page ID as the "value"
+        page.add_node(median_key, &right_child.0.to_le_bytes())?;
         
         Ok(())
     }
     
-    /// Get the leftmost child (child[0])
-    pub fn get_leftmost_child(page: &Page) -> Result<PageId> {
+    /// Get the branch header
+    fn get_header(page: &Page) -> Result<&BranchHeader> {
         if !page.header.flags.contains(PageFlags::BRANCH) {
             return Err(Error::InvalidOperation("Not a branch page"));
         }
         
-        // The leftmost child is stored as the first node with empty key
-        if page.header.num_keys > 0 {
-            let first_node = page.node(0)?;
-            let key = first_node.key()?;
-            if key.is_empty() {
-                // This is our leftmost child marker
-                return first_node.page_number();
-            }
+        unsafe {
+            Ok(&*(page.data.as_ptr() as *const BranchHeader))
+        }
+    }
+    
+    /// Get the leftmost child of a branch page
+    pub fn get_leftmost_child(page: &Page) -> Result<PageId> {
+        let header = Self::get_header(page)?;
+        Ok(header.leftmost_child)
+    }
+    
+    /// Get the child at a specific index
+    /// Index 0 returns the child after the first key
+    pub fn get_child_at(page: &Page, index: usize) -> Result<PageId> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
         }
         
-        // If we don't find an empty key node, something is wrong
-        Err(Error::Corruption {
-            details: "Branch page missing leftmost child".into(),
-            page_id: Some(PageId(page.header.pgno)),
-        })
+        // Get the node at this index
+        let node = page.node(index)?;
+        node.page_number()
     }
     
     /// Find the appropriate child for a given key
     pub fn find_child(page: &Page, search_key: &[u8]) -> Result<PageId> {
+        Self::find_child_with_comparator::<LexicographicComparator>(page, search_key)
+    }
+    
+    /// Find the appropriate child for a given key with a custom comparator
+    pub fn find_child_with_comparator<C: Comparator>(page: &Page, search_key: &[u8]) -> Result<PageId> {
         if !page.header.flags.contains(PageFlags::BRANCH) {
             return Err(Error::InvalidOperation("Not a branch page"));
         }
         
-        // Special case: empty branch page (shouldn't happen)
+        let header = Self::get_header(page)?;
+        
+        // If no keys, return leftmost child
         if page.header.num_keys == 0 {
-            return Err(Error::Corruption {
-                details: "Empty branch page".into(),
-                page_id: Some(PageId(page.header.pgno)),
-            });
+            return Ok(header.leftmost_child);
         }
         
-        // Check if first node is the leftmost child marker (empty key)
-        let has_leftmost_marker = {
-            let first_node = page.node(0)?;
-            first_node.key()?.is_empty()
-        };
+        // Binary search through keys
+        let mut left = 0;
+        let mut right = page.header.num_keys as usize;
         
-        // Search through the keys to find the right child
-        for i in 0..page.header.num_keys as usize {
-            let node = page.node(i)?;
+        while left < right {
+            let mid = left + (right - left) / 2;
+            let node = page.node(mid)?;
             let node_key = node.key()?;
             
-            // Skip empty key (leftmost child marker)
-            if node_key.is_empty() {
-                continue;
-            }
-            
-            // If search key is less than this node's key, we found our position
-            if search_key < node_key {
-                if i == 0 || (i == 1 && has_leftmost_marker) {
-                    // Use leftmost child
-                    return Self::get_leftmost_child(page);
-                } else {
-                    // Use the previous node's child
-                    let prev_node = page.node(i - 1)?;
-                    return prev_node.page_number();
+            match C::compare(search_key, node_key) {
+                std::cmp::Ordering::Less => {
+                    right = mid;
+                }
+                std::cmp::Ordering::Greater => {
+                    left = mid + 1;
+                }
+                std::cmp::Ordering::Equal => {
+                    // Key found, return the corresponding child
+                    return node.page_number();
                 }
             }
         }
         
-        // Key is greater than all keys, use the last child
-        let last_node = page.node(page.header.num_keys as usize - 1)?;
-        last_node.page_number()
+        // Key not found
+        if left == 0 {
+            // Less than all keys, use leftmost child
+            Ok(header.leftmost_child)
+        } else {
+            // Use the child of the previous key
+            let node = page.node(left - 1)?;
+            node.page_number()
+        }
     }
     
     /// Add a new key and right child after a split
@@ -134,8 +150,196 @@ impl BranchPage {
         key: &[u8],
         right_child: PageId,
     ) -> Result<()> {
-        // Simply add as a normal node
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        // Add as a normal node (key -> child page ID)
         page.add_node_sorted(key, &right_child.0.to_le_bytes())?;
         Ok(())
+    }
+    
+    /// Split a branch page
+    pub fn split(page: &Page) -> Result<(Vec<(Vec<u8>, PageId)>, Vec<u8>, PageId)> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        let _header = Self::get_header(page)?;
+        let mid_idx = page.header.num_keys as usize / 2;
+        
+        // Get the median key
+        let median_node = page.node(mid_idx)?;
+        let median_key = median_node.key()?.to_vec();
+        let median_child = median_node.page_number()?;
+        
+        // Collect entries for the right page
+        let mut right_entries = Vec::new();
+        
+        // The right page's leftmost child is the median's child
+        let right_leftmost = median_child;
+        
+        // Collect keys and children after the median
+        for i in (mid_idx + 1)..page.header.num_keys as usize {
+            let node = page.node(i)?;
+            let key = node.key()?.to_vec();
+            let child = node.page_number()?;
+            right_entries.push((key, child));
+        }
+        
+        Ok((right_entries, median_key, right_leftmost))
+    }
+    
+    /// Initialize a branch page from split data
+    pub fn init_from_split(
+        page: &mut Page,
+        leftmost_child: PageId,
+        entries: &[(Vec<u8>, PageId)],
+    ) -> Result<()> {
+        // Ensure it's a branch page
+        page.header.flags = PageFlags::BRANCH;
+        page.header.num_keys = 0;
+        page.header.lower = PageHeader::SIZE as u16;
+        page.header.upper = crate::page::PAGE_SIZE as u16;
+        
+        // Write branch header
+        let header = BranchHeader { leftmost_child };
+        unsafe {
+            let header_ptr = page.data.as_mut_ptr() as *mut BranchHeader;
+            *header_ptr = header;
+        }
+        
+        // Adjust lower
+        page.header.lower += BranchHeader::SIZE as u16;
+        
+        // Add all entries
+        for (key, child) in entries {
+            page.add_node(key, &child.0.to_le_bytes())?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Update a child pointer for a given key
+    pub fn update_child(
+        page: &mut Page,
+        key: &[u8],
+        new_child: PageId,
+    ) -> Result<()> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        // Find the key
+        for i in 0..page.header.num_keys as usize {
+            let node = page.node(i)?;
+            if node.key()? == key {
+                // Update the child pointer (stored as "value")
+                let mut node_mut = page.node_data_mut(i)?;
+                node_mut.set_value(&new_child.0.to_le_bytes())?;
+                return Ok(());
+            }
+        }
+        
+        Err(Error::KeyNotFound)
+    }
+    
+    /// Replace a key in a branch page (for rebalancing)
+    pub fn replace_key(
+        page: &mut Page,
+        old_key: &[u8],
+        new_key: &[u8],
+    ) -> Result<()> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        // Find the old key
+        for i in 0..page.header.num_keys as usize {
+            let node = page.node(i)?;
+            if node.key()? == old_key {
+                // If key sizes are the same, update in place
+                if old_key.len() == new_key.len() {
+                    // Get node offset
+                    let ptr = page.ptrs()[i];
+                    let node_offset = ptr as usize - PageHeader::SIZE + NodeHeader::SIZE;
+                    
+                    // Update key in place
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            new_key.as_ptr(),
+                            page.data.as_mut_ptr().add(node_offset),
+                            new_key.len()
+                        );
+                    }
+                    return Ok(());
+                } else {
+                    // Different sizes, need to remove and re-add
+                    // Get the child pointer
+                    let child = node.page_number()?;
+                    
+                    // Remove the old entry
+                    page.remove_node(i)?;
+                    
+                    // Add the new entry with the same child
+                    page.add_node_sorted(new_key, &child.0.to_le_bytes())?;
+                    return Ok(());
+                }
+            }
+        }
+        
+        Err(Error::KeyNotFound)
+    }
+    
+    /// Update the leftmost child pointer
+    pub fn update_leftmost_child(
+        page: &mut Page,
+        new_leftmost: PageId,
+    ) -> Result<()> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        unsafe {
+            let header_ptr = page.data.as_mut_ptr() as *mut BranchHeader;
+            (*header_ptr).leftmost_child = new_leftmost;
+        }
+        
+        Ok(())
+    }
+    
+    /// Update a child pointer from old to new
+    pub fn update_child_pointer(
+        page: &mut Page,
+        old_child: PageId,
+        new_child: PageId,
+    ) -> Result<()> {
+        if !page.header.flags.contains(PageFlags::BRANCH) {
+            return Err(Error::InvalidOperation("Not a branch page"));
+        }
+        
+        // Check if it's the leftmost child
+        let header = Self::get_header(page)?;
+        if header.leftmost_child == old_child {
+            return Self::update_leftmost_child(page, new_child);
+        }
+        
+        // Search in the regular nodes
+        for i in 0..page.header.num_keys as usize {
+            // First read the current child ID
+            let current_child = {
+                let node = page.node(i)?;
+                node.page_number()?
+            };
+            
+            if current_child == old_child {
+                // Now get mutable access and update
+                let mut node = page.node_data_mut(i)?;
+                node.set_value(&new_child.0.to_le_bytes())?;
+                return Ok(());
+            }
+        }
+        
+        Err(Error::Custom(format!("Child pointer {:?} not found in branch page", old_child).into()))
     }
 }

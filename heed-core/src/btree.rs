@@ -6,7 +6,6 @@ use crate::txn::{Transaction, Write};
 use crate::meta::DbInfo;
 use crate::comparator::{Comparator, LexicographicComparator};
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::marker::PhantomData;
 
 /// Maximum number of keys per page (B+Tree order)
@@ -61,16 +60,16 @@ impl<C: Comparator> BTree<C> {
                         }
                     } else {
                         // In branch page, follow the child pointer
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+                        current_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
-                SearchResult::NotFound { insert_pos } => {
+                SearchResult::NotFound { insert_pos: _ } => {
                     if page.header.flags.contains(PageFlags::LEAF) {
                         // Not found in leaf
                         return Ok(None);
                     } else {
                         // In branch page, use the branch helper
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+                        current_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
             }
@@ -100,8 +99,8 @@ impl<C: Comparator> BTree<C> {
                         if new_value.len() > max_value_size {
                             // Need overflow pages
                             // Drop the mutable borrow of page before calling write_overflow_value
-                            drop(node_data);
-                            drop(page);
+                            let _ = node_data;
+                            let _ = page;
                             
                             let overflow_id = crate::overflow::write_overflow_value(txn, new_value)?;
                             
@@ -117,16 +116,16 @@ impl<C: Comparator> BTree<C> {
                         return Ok(());
                     } else {
                         // In branch page, follow the child
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+                        current_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
-                SearchResult::NotFound { insert_pos } => {
+                SearchResult::NotFound { insert_pos: _ } => {
                     if page.header.flags.contains(PageFlags::LEAF) {
                         // Key not found in leaf
                         return Err(Error::KeyNotFound);
                     } else {
                         // In branch page, use the branch helper
-                        current_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+                        current_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
                     }
                 }
             }
@@ -164,7 +163,7 @@ impl<C: Comparator> BTree<C> {
                 }
                 
                 // Initialize the new root with the split information
-                crate::branch_v2::BranchPageV2::init_root(
+                crate::branch::BranchPage::init_root(
                     new_root,
                     &median_key,
                     *root,        // left child (old root)
@@ -320,7 +319,7 @@ impl<C: Comparator> BTree<C> {
         }
         
         // Find child to insert into using the branch page logic
-        let child_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+        let child_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
         
         // Sanity check: child page ID should never be 0
         if child_page_id.0 == 0 {
@@ -341,7 +340,7 @@ impl<C: Comparator> BTree<C> {
                 let page = txn.get_page_mut(page_id)?;
                 
                 // Use branch_v2 to add the split child
-                match crate::branch_v2::BranchPageV2::add_split_child(page, &median_key, right_page) {
+                match crate::branch::BranchPage::add_split_child(page, &median_key, right_page) {
                     Ok(()) => Ok(InsertResult::Inserted),
                     Err(Error::Custom(msg)) if msg.contains("Page full") => {
                         // This branch is also full, split it
@@ -406,13 +405,13 @@ impl<C: Comparator> BTree<C> {
         let page = txn.get_page(page_id)?;
         
         // Use branch_v2 split method
-        let (right_entries, median_key, right_leftmost) = crate::branch_v2::BranchPageV2::split(&page)?;
+        let (right_entries, median_key, right_leftmost) = crate::branch::BranchPage::split(&page)?;
         
         // Allocate new right page
         let (right_page_id, right_page) = txn.alloc_page(PageFlags::BRANCH)?;
         
         // Initialize right page with the split data
-        crate::branch_v2::BranchPageV2::init_from_split(
+        crate::branch::BranchPage::init_from_split(
             right_page,
             right_leftmost,
             &right_entries,
@@ -426,11 +425,11 @@ impl<C: Comparator> BTree<C> {
         // Determine which page to insert the new key into
         if new_key.as_slice() < median_key.as_slice() {
             // Insert into left page
-            crate::branch_v2::BranchPageV2::add_split_child(left_page, &new_key, new_page)?;
+            crate::branch::BranchPage::add_split_child(left_page, &new_key, new_page)?;
         } else {
             // Insert into right page
             let right_page = txn.get_page_mut(right_page_id)?;
-            crate::branch_v2::BranchPageV2::add_split_child(right_page, &new_key, new_page)?;
+            crate::branch::BranchPage::add_split_child(right_page, &new_key, new_page)?;
         }
         
         Ok(InsertResult::Split {
@@ -543,7 +542,7 @@ impl<C: Comparator> BTree<C> {
         key: &[u8],
     ) -> Result<DeleteResult> {
         // First, search for the key and get node info
-        let (search_result, num_keys, pgno) = {
+        let (search_result, _num_keys, pgno) = {
             let page = txn.get_page(page_id)?;
             (page.search_key_with_comparator::<C>(key)?, page.header.num_keys, page.header.pgno)
         };
@@ -604,7 +603,7 @@ impl<C: Comparator> BTree<C> {
         let page = txn.get_page(page_id)?;
         
         // Find child to delete from using branch_v2 logic
-        let child_page_id = crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?;
+        let child_page_id = crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?;
         
         // We need to track which child index we're using for rebalancing
         // This is a bit tricky with branch_v2's structure
@@ -657,7 +656,7 @@ impl<C: Comparator> BTree<C> {
         // Get necessary information from parent
         let (child_id, left_sibling_id, right_sibling_id, _parent_num_keys) = if child_index == usize::MAX {
             // Leftmost child
-            let child_id = crate::branch_v2::BranchPageV2::get_leftmost_child(&parent)?;
+            let child_id = crate::branch::BranchPage::get_leftmost_child(&parent)?;
             let right_sibling_id = if parent.header.num_keys > 0 {
                 Some(parent.node(0)?.page_number()?)
             } else {
@@ -670,7 +669,7 @@ impl<C: Comparator> BTree<C> {
             
             let left_sibling_id = if child_index == 0 {
                 // The left sibling of the first key's right child is the leftmost child
-                Some(crate::branch_v2::BranchPageV2::get_leftmost_child(&parent)?)
+                Some(crate::branch::BranchPage::get_leftmost_child(&parent)?)
             } else {
                 Some(parent.node(child_index - 1)?.page_number()?)
             };
@@ -793,21 +792,21 @@ impl<C: Comparator> BTree<C> {
             
             // Update separator in parent to be the new first key of child
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &borrowed_key)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &borrowed_key)?
         } else {
             // For branch nodes, we need to handle the child pointers carefully
             let child = txn.get_page_mut(child_id)?;
             
             // The borrowed child becomes the new leftmost child of the right node
-            let old_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(child)?;
-            crate::branch_v2::BranchPageV2::update_leftmost_child(child, borrowed_child.unwrap())?;
+            let old_leftmost = crate::branch::BranchPage::get_leftmost_child(child)?;
+            crate::branch::BranchPage::update_leftmost_child(child, borrowed_child.unwrap())?;
             
             // Insert separator with the old leftmost as its child
             child.add_node_sorted(&separator_key, &old_leftmost.0.to_le_bytes())?;
             
             // Update separator in parent to be the borrowed key
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &borrowed_key)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &borrowed_key)?
         }
         
         Ok(true)
@@ -853,7 +852,7 @@ impl<C: Comparator> BTree<C> {
                 )
             } else {
                 // For branch pages, we need the leftmost child and the first node's child
-                let leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(right_sibling)?;
+                let leftmost = crate::branch::BranchPage::get_leftmost_child(right_sibling)?;
                 let first_child = node.page_number()?;
                 (
                     node.key()?.to_vec(),
@@ -870,7 +869,7 @@ impl<C: Comparator> BTree<C> {
             let right_sibling = txn.get_page_mut(right_sibling_id)?;
             right_sibling.remove_node(0)?;
             if let Some(new_leftmost) = right_new_leftmost {
-                crate::branch_v2::BranchPageV2::update_leftmost_child(right_sibling, new_leftmost)?;
+                crate::branch::BranchPage::update_leftmost_child(right_sibling, new_leftmost)?;
             }
         }
         
@@ -889,7 +888,7 @@ impl<C: Comparator> BTree<C> {
             
             // Update the separator key in parent
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &new_separator)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &new_separator)?
         } else {
             // For branch nodes, separator goes down to child with borrowed leftmost as its child
             let child = txn.get_page_mut(child_id)?;
@@ -898,7 +897,7 @@ impl<C: Comparator> BTree<C> {
             
             // Update separator in parent to be the borrowed key
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &borrowed_key)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &borrowed_key)?
         }
         
         Ok(true)
@@ -926,8 +925,8 @@ impl<C: Comparator> BTree<C> {
         
         if is_branch {
             // For branch pages, we need to handle the leftmost child pointer
-            let left_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(txn.get_page(left_id)?)?;
-            let right_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(txn.get_page(right_id)?)?;
+            let left_leftmost = crate::branch::BranchPage::get_leftmost_child(txn.get_page(left_id)?)?;
+            let right_leftmost = crate::branch::BranchPage::get_leftmost_child(txn.get_page(right_id)?)?;
             
             // Collect entries from both pages
             let mut all_entries = Vec::new();
@@ -960,7 +959,7 @@ impl<C: Comparator> BTree<C> {
                 left_page.header.flags = PageFlags::BRANCH;
                 
                 // Set leftmost child
-                crate::branch_v2::BranchPageV2::update_leftmost_child(left_page, left_leftmost)?;
+                crate::branch::BranchPage::update_leftmost_child(left_page, left_leftmost)?;
                 
                 // Add all entries
                 for (key, child) in all_entries {
@@ -1073,21 +1072,21 @@ impl<C: Comparator> BTree<C> {
             
             // Update separator in parent to be the new first key of right sibling
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &borrowed_key)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &borrowed_key)?
         } else {
             // For branch nodes, we need to handle the child pointers carefully
             let right_sibling = txn.get_page_mut(right_sibling_id)?;
             
             // The borrowed child becomes the new leftmost child of the right sibling
-            let old_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(right_sibling)?;
-            crate::branch_v2::BranchPageV2::update_leftmost_child(right_sibling, borrowed_child.unwrap())?;
+            let old_leftmost = crate::branch::BranchPage::get_leftmost_child(right_sibling)?;
+            crate::branch::BranchPage::update_leftmost_child(right_sibling, borrowed_child.unwrap())?;
             
             // Insert separator with the old leftmost as its child
             right_sibling.add_node_sorted(&separator_key, &old_leftmost.0.to_le_bytes())?;
             
             // Update separator in parent to be the borrowed key
             let parent = txn.get_page_mut(parent_id)?;
-            crate::branch_v2::BranchPageV2::replace_key(parent, &separator_key, &borrowed_key)?
+            crate::branch::BranchPage::replace_key(parent, &separator_key, &borrowed_key)?
         }
         
         Ok(true)
@@ -1114,8 +1113,8 @@ impl<C: Comparator> BTree<C> {
         
         if is_branch {
             // For branch pages, handle the leftmost child pointers
-            let left_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(txn.get_page(leftmost_id)?)?;
-            let right_leftmost = crate::branch_v2::BranchPageV2::get_leftmost_child(txn.get_page(right_id)?)?;
+            let left_leftmost = crate::branch::BranchPage::get_leftmost_child(txn.get_page(leftmost_id)?)?;
+            let right_leftmost = crate::branch::BranchPage::get_leftmost_child(txn.get_page(right_id)?)?;
             
             // Collect all entries
             let mut all_entries = Vec::new();
@@ -1148,7 +1147,7 @@ impl<C: Comparator> BTree<C> {
                 leftmost_page.header.flags = PageFlags::BRANCH;
                 
                 // Set leftmost child
-                crate::branch_v2::BranchPageV2::update_leftmost_child(leftmost_page, left_leftmost)?;
+                crate::branch::BranchPage::update_leftmost_child(leftmost_page, left_leftmost)?;
                 
                 // Add all entries
                 for (key, child) in all_entries {
@@ -1192,13 +1191,13 @@ impl<C: Comparator> BTree<C> {
             let parent = txn.get_page_mut(parent_id)?;
             
             // Get the new leftmost child (what was the first key's right child)
-            let new_leftmost = parent.node(0)?.page_number()?;
+            let _new_leftmost = parent.node(0)?.page_number()?;
             
             // Remove the first key
             parent.remove_node(0)?;
             
             // Update leftmost child in parent
-            crate::branch_v2::BranchPageV2::update_leftmost_child(parent, leftmost_id)?;
+            crate::branch::BranchPage::update_leftmost_child(parent, leftmost_id)?;
         }
         
         // Free right page
@@ -1224,7 +1223,7 @@ impl<C: Comparator> BTree<C> {
         match search_result {
             SearchResult::Found { index } => {
                 // Key exists - need to update with COW
-                let (old_value, old_overflow) = {
+                let (old_value, _old_overflow) = {
                     let page = txn.get_page(page_id)?;
                     let node = page.node(index)?;
                     
@@ -1276,7 +1275,7 @@ impl<C: Comparator> BTree<C> {
                     } else {
                         key.len() + value.len() + 8  // key + value + overhead
                     };
-                    let free_space = page.header.free_space();
+                    let _free_space = page.header.free_space();
                     page.header.free_space() < key_value_size
                 };
                 
@@ -1328,7 +1327,7 @@ impl<C: Comparator> BTree<C> {
     ) -> Result<(PageId, InsertResult)> {
         let child_page_id = {
             let page = txn.get_page(page_id)?;
-            crate::branch_v2::BranchPageV2::find_child_with_comparator::<C>(&page, key)?
+            crate::branch::BranchPage::find_child_with_comparator::<C>(&page, key)?
         };
         
         // Recursively insert into child with COW
@@ -1367,7 +1366,7 @@ impl<C: Comparator> BTree<C> {
                     let (new_page_id, parent) = txn.get_page_cow(page_id)?;
                     
                     // Update child pointer
-                    crate::branch_v2::BranchPageV2::update_child_pointer(parent, child_page_id, new_child_id)?;
+                    crate::branch::BranchPage::update_child_pointer(parent, child_page_id, new_child_id)?;
                     
                     Ok((new_page_id, InsertResult::Inserted))
                 } else {
@@ -1380,11 +1379,11 @@ impl<C: Comparator> BTree<C> {
                 
                 // Update the old child pointer if it changed
                 if new_child_id != child_page_id {
-                    crate::branch_v2::BranchPageV2::update_child_pointer(parent, child_page_id, new_child_id)?;
+                    crate::branch::BranchPage::update_child_pointer(parent, child_page_id, new_child_id)?;
                 }
                 
                 // Add the split child
-                match crate::branch_v2::BranchPageV2::add_split_child(parent, &median_key, right_page) {
+                match crate::branch::BranchPage::add_split_child(parent, &median_key, right_page) {
                     Ok(()) => Ok((new_page_id, InsertResult::Inserted)),
                     Err(Error::Custom(msg)) if msg.contains("Page full") => {
                         // This branch is also full, split it

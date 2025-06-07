@@ -26,7 +26,6 @@ pub mod io;
 pub mod catalog;
 pub mod copy;
 pub mod branch;
-pub mod branch_v2;
 pub mod tree_utils;
 pub mod nested_txn;
 pub mod comparator;

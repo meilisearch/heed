@@ -157,7 +157,7 @@ impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
                 position.pages.push(current_page_id);
                 position.indices.push(usize::MAX); // Use MAX to represent "before first key"
                 
-                current_page_id = crate::branch_v2::BranchPageV2::get_leftmost_child(&page)?;
+                current_page_id = crate::branch::BranchPage::get_leftmost_child(&page)?;
             }
         }
     }
@@ -269,7 +269,7 @@ impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
                 
                 if position.indices[level] < page.header.num_keys as usize {
                     // Found a branch with more children
-                    let mut current_page_id = crate::branch_v2::BranchPageV2::get_child_at(&page, position.indices[level])?;
+                    let mut current_page_id = crate::branch::BranchPage::get_child_at(&page, position.indices[level])?;
                 
                     loop {
                         let page = Self::get_page_raw(self.txn, self.is_write, current_page_id)?;
@@ -287,7 +287,7 @@ impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
                             position.pages.push(current_page_id);
                             position.indices.push(usize::MAX); // Start at leftmost child
                             
-                            current_page_id = crate::branch_v2::BranchPageV2::get_leftmost_child(&page)?;
+                            current_page_id = crate::branch::BranchPage::get_leftmost_child(&page)?;
                         }
                     }
                 }
@@ -333,7 +333,7 @@ impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
             let leaf_page_id = position.pages[leaf_idx];
             let new_index = position.indices[leaf_idx];
             // Drop mutable borrow before calling get_page
-            drop(position);
+            let _ = position;
             
             let leaf_page = self.get_page(leaf_page_id)?;
             let node = leaf_page.node(new_index)?;
@@ -362,7 +362,7 @@ impl<'txn, K, V, C: Comparator> Cursor<'txn, K, V, C> {
                     // For branch pages, handle the special case when index is 0
                     if position.indices[level] == 0 {
                         // Use leftmost child
-                        crate::branch_v2::BranchPageV2::get_leftmost_child(&page)?
+                        crate::branch::BranchPage::get_leftmost_child(&page)?
                     } else {
                         // Get the child before this key
                         let node = page.node(position.indices[level] - 1)?;
@@ -710,7 +710,6 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C: Comparator> Cursor<'txn, K
         
         // Get current key
         let current_key = {
-            let txn = self.txn::<crate::txn::Read>();
             let leaf_page_id = position.pages[position.pages.len() - 1];
             let leaf_index = position.indices[position.indices.len() - 1];
             let page = self.get_page(leaf_page_id)?;
@@ -817,7 +816,7 @@ impl<'txn, K: crate::db::Key, V: crate::db::Value, C: Comparator> Cursor<'txn, K
                     // Branch page, go to leftmost child
                     dup_position.pages.push(current_page_id);
                     dup_position.indices.push(usize::MAX);
-                    current_page_id = crate::branch_v2::BranchPageV2::get_leftmost_child(&page)?;
+                    current_page_id = crate::branch::BranchPage::get_leftmost_child(&page)?;
                 }
             }
         } else {
