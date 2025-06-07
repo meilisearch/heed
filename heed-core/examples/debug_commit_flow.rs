@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Now test with Database::open approach
     println!("\n\nTesting with Database::open...");
     {
-        let db2: Database<String, String> = Database::open(&env, Some("test_db2"), DatabaseFlags::CREATE)?;
+        let _db2: Database<String, String> = Database::open(&env, Some("test_db2"), DatabaseFlags::CREATE)?;
         println!("Created test_db2 with Database::open");
         
         // Check state

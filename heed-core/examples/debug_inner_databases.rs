@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         // Manually trace what EnvBuilder::open does
         let data_path = db_path.join("data.mdb");
-        let mut io: Box<dyn IoBackend> = Box::new(MmapBackend::with_options(&data_path, 10 * 1024 * 1024)?);
+        let io: Box<dyn IoBackend> = Box::new(MmapBackend::with_options(&data_path, 10 * 1024 * 1024)?);
         
         // Check if it's a new database
         let is_new_db = match io.read_page(META_PAGE_1) {

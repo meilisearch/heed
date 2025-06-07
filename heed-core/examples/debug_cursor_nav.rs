@@ -2,8 +2,8 @@
 
 use heed_core::env::EnvBuilder;
 use heed_core::db::Database;
-use heed_core::page::{Page, PageFlags};
-use heed_core::branch_v2::BranchHeader;
+use heed_core::page::PageFlags;
+use heed_core::branch::BranchHeader;
 use std::sync::Arc;
 use tempfile::TempDir;
 
