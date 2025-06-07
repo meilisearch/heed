@@ -43,7 +43,7 @@ windows-sys = { version = "0.59", features = ["Win32_System_IO", "Win32_Storage_
 [dev-dependencies]
 tempfile = "3.12"
 proptest = "1.5"
-criterion = "0.5"
+criterion = { version = "0.5", features = ["html_reports"] }
 rand = "0.8"
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
@@ -53,6 +53,10 @@ redb = "2.1"
 anyhow = "1.0"
 sled = "0.34"
 
+# Profiling tools
+pprof = { version = "0.13", features = ["flamegraph", "criterion"] }
+flamegraph = "0.6"
+
 [features]
 default = ["io_uring"]
 io_uring = ["dep:io-uring"]
@@ -60,6 +64,14 @@ simd = [] # Will use portable SIMD when stable
 
 [[bench]]
 name = "db_comparison"
+harness = false
+
+[[bench]]
+name = "btree_ops"
+harness = false
+
+[[bench]]
+name = "page_alloc"
 harness = false
 
 [[example]]

@@ -1,0 +1,42 @@
+# Performance optimization configuration for heed-core
+
+[build]
+# Use native CPU features for better performance
+rustflags = ["-C", "target-cpu=native"]
+
+[profile.release]
+# Maximum optimization
+opt-level = 3
+# Link-time optimization for better inlining
+lto = "fat"
+# Single codegen unit for better optimization
+codegen-units = 1
+# Remove panic unwinding for smaller binary
+panic = "abort"
+# Strip debug symbols
+strip = true
+
+[profile.bench]
+# Keep some debug info for profiling
+opt-level = 3
+lto = "thin"
+debug = true
+codegen-units = 1
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+
+# Platform-specific optimizations
+[target.'cfg(target_os = "linux")']
+rustflags = [
+    "-C", "target-cpu=native",
+    "-C", "link-arg=-fuse-ld=lld",  # Use faster linker
+    "-C", "link-arg=-Wl,--as-needed",
+]
+
+[target.'cfg(all(target_arch = "x86_64", target_feature = "avx2"))']
+rustflags = [
+    "-C", "target-cpu=native",
+    "-C", "target-feature=+avx2,+bmi2,+fma",
+]
