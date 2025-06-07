@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::io::{IoBackend, MmapBackend};
     use crate::page::{Page, PageFlags};
     use crate::error::PageId;

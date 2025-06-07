@@ -224,7 +224,7 @@ mod tests {
         // Create some pages
         let mut page1 = Page::new(PageId(1), PageFlags::LEAF);
         let mut page2 = Page::new(PageId(2), PageFlags::BRANCH);
-        let mut page3 = Page::new(PageId(3), PageFlags::LEAF);
+        let page3 = Page::new(PageId(3), PageFlags::LEAF);
         
         // Update checksums for page1 and page2
         page1.update_checksum();

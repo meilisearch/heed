@@ -4,7 +4,7 @@
 //! When all keys have the same size, we can use more efficient storage and comparison.
 
 use crate::error::{Error, Result};
-use crate::page::{Page, PageFlags};
+use crate::page::Page;
 use std::mem::size_of;
 
 /// Trait for fixed-size types that can be stored directly

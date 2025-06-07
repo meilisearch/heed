@@ -331,7 +331,7 @@ impl DupSort {
                 }
                 
                 // Also get leftmost child if it's a branch_v2 page
-                if let Ok(leftmost) = crate::branch_v2::BranchPageV2::get_leftmost_child(&page) {
+                if let Ok(leftmost) = crate::branch::BranchPage::get_leftmost_child(&page) {
                     stack.push(leftmost);
                 }
             }
@@ -476,7 +476,7 @@ impl<'txn, M: crate::txn::mode::Mode> DupCursor<'txn, M> {
 mod tests {
     use super::*;
     use crate::env::EnvBuilder;
-    use crate::db::{Database, DatabaseFlags};
+    use crate::db::DatabaseFlags;
     use tempfile::TempDir;
     use std::sync::Arc;
     

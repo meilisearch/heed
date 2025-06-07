@@ -7,7 +7,6 @@ use crate::error::{Error, Result, PageId};
 use crate::meta::DbInfo;
 use crate::btree::BTree;
 use crate::txn::{Transaction, Write};
-use crate::db::DatabaseFlags;
 use crate::comparator::LexicographicComparator;
 
 /// Database catalog stored in the main database

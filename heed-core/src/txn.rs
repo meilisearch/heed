@@ -313,7 +313,7 @@ impl<'env, M: mode::Mode> Transaction<'env, M> {
                 // Save the freelist to the free database if needed
                 if freelist.has_txn_free_pages() {
                     // Get the data to save before any borrows
-                    let freelist_data = freelist.get_save_data();
+                    let _freelist_data = freelist.get_save_data();
                     
                     // Make a copy of free_db info to modify
                     let mut free_db_info = new_meta.free_db;
@@ -429,7 +429,7 @@ impl<'env> Transaction<'env, Read> {
         let inner = self.data.env.inner();
         
         // Try to acquire write lock
-        let write_guard = inner.write_lock.try_lock()
+        let _write_guard = inner.write_lock.try_lock()
             .ok_or(Error::Conflict(crate::error::ConflictDetails {
                 txn_id: self.data.id,
                 conflicting_page: PageId(0),

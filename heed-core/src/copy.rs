@@ -240,9 +240,9 @@ fn copy_compact<W: Write>(
             // Remap page IDs within page content for branch pages
             if page.header.flags.contains(crate::page::PageFlags::BRANCH) {
                 // Update leftmost child in branch_v2 header
-                if let Some(new_id) = page_map.get(&crate::branch_v2::BranchPageV2::get_leftmost_child(page).unwrap().0) {
+                if let Some(new_id) = page_map.get(&crate::branch::BranchPage::get_leftmost_child(page).unwrap().0) {
                     unsafe {
-                        let header_ptr = page.data.as_mut_ptr() as *mut crate::branch_v2::BranchHeader;
+                        let header_ptr = page.data.as_mut_ptr() as *mut crate::branch::BranchHeader;
                         (*header_ptr).leftmost_child = crate::error::PageId(*new_id);
                     }
                 }
@@ -365,7 +365,7 @@ pub fn copy_with_callback<C: BackupCallback>(
 mod tests {
     use super::*;
     use crate::env::EnvBuilder;
-    use crate::db::{Database, DatabaseFlags};
+    use crate::db::Database;
     use tempfile::TempDir;
     use std::sync::Arc;
     

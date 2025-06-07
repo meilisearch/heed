@@ -5,9 +5,8 @@
 
 use crate::error::{Error, Result, PageId, TransactionId};
 use crate::page::{Page, PageFlags, PAGE_SIZE};
-use crate::txn::{Transaction, Write};
+use crate::txn::Transaction;
 use crate::meta::DbInfo;
-use crate::btree::BTree;
 use std::collections::{BTreeSet, BTreeMap};
 
 /// Free list manager
@@ -535,7 +534,7 @@ mod tests {
             let (free_root_id, free_root) = txn.alloc_page(PageFlags::LEAF).unwrap();
             free_root.header.num_keys = 0;
             
-            let mut free_db = DbInfo {
+            let free_db = DbInfo {
                 flags: 0,
                 root: free_root_id,
                 entries: 0,
