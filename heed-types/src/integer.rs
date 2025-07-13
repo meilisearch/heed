@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::mem::size_of;
 
@@ -11,8 +11,12 @@ pub struct U8;
 impl BytesEncode<'_> for U8 {
     type EItem = u8;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-        Ok(Cow::from([*item].to_vec()))
+    type ReturnBytes = [u8; 1];
+
+    type Error = Infallible;
+
+    fn bytes_encode(item: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+        Ok([*item])
     }
 }
 
@@ -30,8 +34,12 @@ pub struct I8;
 impl BytesEncode<'_> for I8 {
     type EItem = i8;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-        Ok(Cow::from([*item as u8].to_vec()))
+    type ReturnBytes = [u8; 1];
+
+    type Error = Infallible;
+
+    fn bytes_encode(item: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+        Ok([*item as u8])
     }
 }
 
@@ -54,10 +62,14 @@ macro_rules! define_type {
         impl<O: ByteOrder> BytesEncode<'_> for $name<O> {
             type EItem = $native;
 
-            fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
-                let mut buf = vec![0; size_of::<Self::EItem>()];
+            type ReturnBytes = [u8; size_of::<$native>()];
+
+            type Error = Infallible;
+
+            fn bytes_encode(item: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+                let mut buf = [0; size_of::<$native>()];
                 O::$write_method(&mut buf, *item);
-                Ok(Cow::from(buf))
+                Ok(buf)
             }
         }
 

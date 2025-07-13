@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use heed_traits::{BoxedError, BytesDecode, BytesEncode};
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +12,24 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError> {
-        bincode::serialize(item).map(Cow::Owned).map_err(Into::into)
+    type ReturnBytes = Vec<u8>;
+
+    type Error = bincode::Error;
+
+    fn zero_copy(_item: &Self::EItem) -> bool {
+        false
+    }
+
+    fn bytes_encode(item: &Self::EItem) -> Result<Self::ReturnBytes, Self::Error> {
+        bincode::serialize(item)
+    }
+
+    fn bytes_encode_into_writer<W: std::io::Write>(
+        item: &'a Self::EItem,
+        writer: W,
+    ) -> Result<(), BoxedError> {
+        bincode::serialize_into(writer, item)?;
+        Ok(())
     }
 }
 

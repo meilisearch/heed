@@ -9,9 +9,9 @@
 
 #![warn(missing_docs)]
 
-use std::borrow::Cow;
 use std::cmp::{Ord, Ordering};
 use std::error::Error as StdError;
+use std::io;
 
 /// A boxed `Send + Sync + 'static` error.
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
@@ -21,8 +21,48 @@ pub trait BytesEncode<'a> {
     /// The type to encode.
     type EItem: ?Sized + 'a;
 
+    /// The type containing the encoded bytes.
+    type ReturnBytes: Into<Vec<u8>> + AsRef<[u8]> + 'a;
+
+    /// The error type to return when decoding goes wrong.
+    type Error: StdError + Send + Sync + 'static;
+
+    /// This function can be used to hint callers of the
+    /// [`bytes_encode`][BytesEncode::bytes_encode] function to use
+    /// [`bytes_encode_into_writer`][BytesEncode::bytes_encode_into_writer] instead, if the latter
+    /// runs faster (for example if it needs less heap allocations).
+    ///
+    /// The default implementation returns `true` because the default implementation of
+    /// [`bytes_encode_into_writer`][BytesEncode::bytes_encode_into_writer] forwards to
+    /// [`bytes_encode`][BytesEncode::bytes_encode].
+    fn zero_copy(item: &Self::EItem) -> bool {
+        // This is preferred to renaming the function parameter (to _item) because IDEs can
+        // autofill trait implementations, which will default the paramter name to _item then and
+        // this could probably also mess with clippy's renamed_function_params lint.
+        let _ = item;
+
+        true
+    }
+
     /// Encode the given item as bytes.
-    fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError>;
+    fn bytes_encode(item: &'a Self::EItem) -> Result<Self::ReturnBytes, Self::Error>;
+
+    /// Encode the given item as bytes and write it into the writer.
+    ///
+    /// When implementing this, also take a look at [`zero_copy`][BytesEncode::zero_copy]'s
+    /// documentation.
+    ///
+    /// The default implementation forwards to [`bytes_encode`][BytesEncode::bytes_encode].
+    fn bytes_encode_into_writer<W: io::Write>(
+        item: &'a Self::EItem,
+        mut writer: W,
+    ) -> Result<(), BoxedError> {
+        let bytes = Self::bytes_encode(item)?;
+
+        writer.write_all(bytes.as_ref())?;
+
+        Ok(())
+    }
 }
 
 /// A trait that represents a decoding structure.
