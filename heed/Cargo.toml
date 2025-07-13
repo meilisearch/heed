@@ -30,6 +30,10 @@ tempfile = "3.18.0"
 [target.'cfg(windows)'.dependencies]
 url = "2.5.4"
 
+[lints.clippy]
+# this lint triggers on code unrelated to this pull request (since Rust 1.88.0)
+uninlined_format_args = "allow"
+
 [features]
 # The `serde` feature makes some types serializable,
 # like the `EnvOpenOptions` struct.
