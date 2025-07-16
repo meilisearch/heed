@@ -16,7 +16,10 @@ impl<'txn> RoCursor<'txn> {
         let mut cursor: *mut ffi::MDB_cursor = ptr::null_mut();
         let mut txn = txn.txn_ptr();
         unsafe { mdb_result(ffi::mdb_cursor_open(txn.as_mut(), dbi, &mut cursor))? }
-        Ok(RoCursor { cursor: NonNull::new(cursor).unwrap(), _marker: marker::PhantomData })
+        Ok(RoCursor {
+            cursor: unsafe { NonNull::new_unchecked(cursor) },
+            _marker: marker::PhantomData,
+        })
     }
 
     pub fn current(&mut self) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
