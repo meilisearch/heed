@@ -26,7 +26,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor on the first database key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 ffi::cursor_op::MDB_GET_CURRENT,
@@ -53,7 +53,7 @@ impl<'txn> RoCursor<'txn> {
             MoveOperation::Dup => {
                 unsafe {
                     mdb_result(ffi::mdb_cursor_get(
-                        self.cursor.as_mut(),
+                        self.cursor.as_ptr(),
                         ptr::null_mut(),
                         &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
                         ffi::cursor_op::MDB_FIRST_DUP,
@@ -67,7 +67,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor on the first database key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 flag,
@@ -94,7 +94,7 @@ impl<'txn> RoCursor<'txn> {
             MoveOperation::Dup => {
                 unsafe {
                     mdb_result(ffi::mdb_cursor_get(
-                        self.cursor.as_mut(),
+                        self.cursor.as_ptr(),
                         ptr::null_mut(),
                         &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
                         ffi::cursor_op::MDB_LAST_DUP,
@@ -108,7 +108,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor on the first database key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 flag,
@@ -132,7 +132,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor to the specified key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 &mut key_val,
                 &mut ffi::MDB_val { mv_size: 0, mv_data: ptr::null_mut() },
                 ffi::cursor_op::MDB_SET,
@@ -156,7 +156,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor to the specified key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 &mut key_val,
                 data_val.as_mut_ptr(),
                 ffi::cursor_op::MDB_SET_RANGE,
@@ -187,7 +187,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor to the previous non-dup key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 flag,
@@ -218,7 +218,7 @@ impl<'txn> RoCursor<'txn> {
         // Move the cursor to the next non-dup key
         let result = unsafe {
             mdb_result(ffi::mdb_cursor_get(
-                self.cursor.as_mut(),
+                self.cursor.as_ptr(),
                 key_val.as_mut_ptr(),
                 data_val.as_mut_ptr(),
                 flag,
@@ -239,7 +239,7 @@ impl<'txn> RoCursor<'txn> {
 
 impl Drop for RoCursor<'_> {
     fn drop(&mut self) {
-        unsafe { ffi::mdb_cursor_close(self.cursor.as_mut()) }
+        unsafe { ffi::mdb_cursor_close(self.cursor.as_ptr()) }
     }
 }
 
