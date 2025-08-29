@@ -140,9 +140,9 @@ impl<T> Env<T> {
 
         EnvInfo {
             map_addr: raw_info.me_mapaddr,
-            map_size: raw_info.me_mapsize,
-            last_page_number: raw_info.me_last_pgno,
-            last_txn_id: raw_info.me_last_txnid,
+            map_size: raw_info.me_mapsize as _,
+            last_page_number: raw_info.me_last_pgno as _,
+            last_txn_id: raw_info.me_last_txnid as _,
             maximum_number_of_readers: raw_info.me_maxreaders,
             number_of_readers: raw_info.me_numreaders,
         }
@@ -602,7 +602,7 @@ impl<T> Env<T> {
             );
             return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
         }
-        mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size) })
+        mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size as _) })
             .map_err(Into::into)
     }
 }

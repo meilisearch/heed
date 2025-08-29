@@ -25,7 +25,7 @@ impl ReservedSpace<'_> {
         let ptr = val.mv_data;
 
         ReservedSpace {
-            bytes: std::slice::from_raw_parts_mut(ptr.cast(), len),
+            bytes: std::slice::from_raw_parts_mut(ptr.cast(), len as _),
             written: 0,
             write_head: 0,
         }

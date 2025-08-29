@@ -110,7 +110,7 @@ impl<'e, T> RoTxn<'e, T> {
     /// [`RoTxn`], this corresponds to the snapshot being read;
     /// concurrent readers will frequently have the same transaction ID.
     pub fn id(&self) -> usize {
-        unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) }
+        unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) as _ }
     }
 
     /// Commit a read transaction.

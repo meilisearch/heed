@@ -446,7 +446,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                         );
                         return Err(Error::Io(io::Error::new(io::ErrorKind::InvalidInput, msg)));
                     }
-                    mdb_result(ffi::mdb_env_set_mapsize(env, size))?;
+                    mdb_result(ffi::mdb_env_set_mapsize(env, size as _))?;
                 }
 
                 if let Some(readers) = self.max_readers {

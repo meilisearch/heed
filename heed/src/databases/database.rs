@@ -985,10 +985,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
                 Ok(DatabaseStat {
                     page_size: stats.ms_psize,
                     depth: stats.ms_depth,
-                    branch_pages: stats.ms_branch_pages,
-                    leaf_pages: stats.ms_leaf_pages,
-                    overflow_pages: stats.ms_overflow_pages,
-                    entries: stats.ms_entries,
+                    branch_pages: stats.ms_branch_pages as _,
+                    leaf_pages: stats.ms_leaf_pages as _,
+                    overflow_pages: stats.ms_overflow_pages as _,
+                    entries: stats.ms_entries as _,
                 })
             }
             Err(e) => Err(e.into()),
