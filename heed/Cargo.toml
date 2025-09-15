@@ -11,24 +11,24 @@ readme = "../README.md"
 edition = "2021"
 
 [dependencies]
-bitflags = { version = "2.9.0", features = ["serde"] }
+bitflags = { version = "2.9.4", features = ["serde"] }
 byteorder = { version = "1.5.0", default-features = false }
 heed-traits = { version = "0.20.0", path = "../heed-traits" }
 heed-types = { version = "0.21.0", default-features = false, path = "../heed-types" }
-libc = "0.2.170"
+libc = "0.2.175"
 lmdb-master-sys = { version = "0.2.5", path = "../lmdb-master-sys" }
-once_cell = "1.20.3"
+once_cell = "1.21.3"
 page_size = "0.6.0"
-serde = { version = "1.0.218", features = ["derive"], optional = true }
+serde = { version = "1.0.223", features = ["derive"], optional = true }
 synchronoise = "1.0.1"
 
 [dev-dependencies]
-memchr = "2.7.4"
-serde = { version = "1.0.218", features = ["derive"] }
-tempfile = "3.18.0"
+memchr = "2.7.5"
+serde = { version = "1.0.223", features = ["derive"] }
+tempfile = "3.22.0"
 
 [target.'cfg(windows)'.dependencies]
-url = "2.5.4"
+url = "2.5.7"
 
 [features]
 # The `serde` feature makes some types serializable,
