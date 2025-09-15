@@ -9,7 +9,7 @@ pub enum Unit {}
 impl BytesEncode<'_> for Unit {
     type EItem = ();
 
-    fn bytes_encode(_item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(_item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
         Ok(Cow::Borrowed(&[]))
     }
 }

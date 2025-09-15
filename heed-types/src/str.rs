@@ -9,7 +9,7 @@ pub enum Str {}
 impl BytesEncode<'_> for Str {
     type EItem = str;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
         Ok(Cow::Borrowed(item.as_bytes()))
     }
 }

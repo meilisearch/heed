@@ -1,6 +1,4 @@
 use std::ffi::CString;
-#[cfg(windows)]
-use std::ffi::OsStr;
 use std::io::ErrorKind::NotFound;
 use std::marker::PhantomData;
 #[cfg(unix)]
