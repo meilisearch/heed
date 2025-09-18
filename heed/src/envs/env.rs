@@ -865,7 +865,7 @@ mod tests {
             // We really need this env to be dropped before the read-only access.
             let env = unsafe {
                 EnvOpenOptions::new()
-                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .map_size(10 * 1024 * 1024) // 10MB
                     .max_dbs(32)
                     .open(dir.path())
                     .unwrap()
@@ -885,7 +885,7 @@ mod tests {
             // Open now we do a read-only opening
             let env = unsafe {
                 EnvOpenOptions::new()
-                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .map_size(10 * 1024 * 1024) // 10MB
                     .max_dbs(32)
                     .open(dir.path())
                     .unwrap()
@@ -915,7 +915,7 @@ mod tests {
             // Open now we do a read-only opening
             let env = unsafe {
                 EnvOpenOptions::new()
-                    .map_size(16 * 1024 * 1024 * 1024) // 10MB
+                    .map_size(10 * 1024 * 1024) // 10MB
                     .max_dbs(32)
                     .open(dir.path())
                     .unwrap()
