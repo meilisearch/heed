@@ -24,13 +24,13 @@ name = "lmdb_master3_sys"
 doctest = false
 
 [dependencies]
-libc = "0.2.170"
+libc = "0.2.175"
 
 [build-dependencies]
 bindgen = { version = "0.71.1", default-features = false, optional = true, features = [
     "runtime",
 ] }
-cc = "1.2.16"
+cc = "1.2.37"
 doxygen-rs = "0.4.2"
 
 [dev-dependencies]

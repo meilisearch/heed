@@ -103,7 +103,9 @@ impl<T> EncryptedEnv<T> {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> EncryptedDatabaseOpenOptions<T, Unspecified, Unspecified> {
+    pub fn database_options(
+        &self,
+    ) -> EncryptedDatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
         EncryptedDatabaseOpenOptions::new(self)
     }
 
@@ -174,7 +176,7 @@ impl<T> EncryptedEnv<T> {
     /// If another write transaction is initiated, while another write transaction exists
     /// the thread initiating the new one will wait on a mutex upon completion of the previous
     /// transaction.
-    pub fn write_txn(&self) -> Result<RwTxn> {
+    pub fn write_txn(&self) -> Result<RwTxn<'_>> {
         self.inner.write_txn()
     }
 
@@ -215,7 +217,7 @@ impl<T> EncryptedEnv<T> {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn read_txn(&self) -> Result<RoTxn<T>> {
+    pub fn read_txn(&self) -> Result<RoTxn<'_, T>> {
         self.inner.read_txn()
     }
 

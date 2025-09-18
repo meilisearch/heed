@@ -195,7 +195,7 @@ impl<T> Env<T> {
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<T, Unspecified, Unspecified> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
         DatabaseOpenOptions::new(self)
     }
 
@@ -331,7 +331,7 @@ impl<T> Env<T> {
     /// If another write transaction is initiated, while another write transaction exists
     /// the thread initiating the new one will wait on a mutex upon completion of the previous
     /// transaction.
-    pub fn write_txn(&self) -> Result<RwTxn> {
+    pub fn write_txn(&self) -> Result<RwTxn<'_>> {
         RwTxn::new(self)
     }
 
@@ -372,7 +372,7 @@ impl<T> Env<T> {
     ///   map must be resized
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
-    pub fn read_txn(&self) -> Result<RoTxn<T>> {
+    pub fn read_txn(&self) -> Result<RoTxn<'_, T>> {
         RoTxn::new(self)
     }
 
@@ -594,7 +594,7 @@ impl<T> Env<T> {
     /// it is okay to call `mdb_env_set_mapsize` for an open environment as long as no transactions are active,
     /// but the library does not check for this condition, so the caller must ensure it explicitly.
     pub unsafe fn resize(&self, new_size: usize) -> Result<()> {
-        if new_size % page_size::get() != 0 {
+        if !new_size.is_multiple_of(page_size::get()) {
             let msg = format!(
                 "map size ({}) must be a multiple of the system page size ({})",
                 new_size,

@@ -14,7 +14,7 @@ where
 {
     type EItem = T;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
         serde_json::to_vec(item).map(Cow::Owned).map_err(Into::into)
     }
 }

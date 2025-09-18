@@ -11,7 +11,7 @@ pub struct U8;
 impl BytesEncode<'_> for U8 {
     type EItem = u8;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
         Ok(Cow::from([*item].to_vec()))
     }
 }
@@ -30,7 +30,7 @@ pub struct I8;
 impl BytesEncode<'_> for I8 {
     type EItem = i8;
 
-    fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+    fn bytes_encode(item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
         Ok(Cow::from([*item as u8].to_vec()))
     }
 }
@@ -54,7 +54,7 @@ macro_rules! define_type {
         impl<O: ByteOrder> BytesEncode<'_> for $name<O> {
             type EItem = $native;
 
-            fn bytes_encode(item: &Self::EItem) -> Result<Cow<[u8]>, BoxedError> {
+            fn bytes_encode(item: &Self::EItem) -> Result<Cow<'_, [u8]>, BoxedError> {
                 let mut buf = vec![0; size_of::<Self::EItem>()];
                 O::$write_method(&mut buf, *item);
                 Ok(Cow::from(buf))

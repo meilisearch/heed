@@ -135,6 +135,10 @@ fn main() {
         .flag_if_supported("-Wbad-function-cast")
         .flag_if_supported("-Wuninitialized");
 
+    // On Windows, link explicitly advapi32 for security functions
+    #[cfg(target_os = "windows")]
+    println!("cargo:rustc-link-lib=advapi32");
+
     if cfg!(feature = "posix-sem") {
         builder.define("MDB_USE_POSIX_SEM", None);
     }
