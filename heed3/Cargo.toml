@@ -26,9 +26,10 @@ synchronoise = "1.0.1"
 
 [dev-dependencies]
 argon2 = { version = "0.5.3", features = ["std"] }
-memchr = "2.7.4"
-serde = { version = "1.0.217", features = ["derive"] }
 chacha20poly1305 = "0.10.1"
+memchr = "2.7.4"
+rayon = "1.10.0"
+serde = { version = "1.0.217", features = ["derive"] }
 tempfile = "3.15.0"
 
 [target.'cfg(windows)'.dependencies]
@@ -115,6 +116,9 @@ name = "prev-snapshot"
 
 [[example]]
 name = "heed3-encrypted"
+
+[[example]]
+name = "heed3-encrypted-parallel-read"
 
 [[example]]
 name = "heed3-all-types"
