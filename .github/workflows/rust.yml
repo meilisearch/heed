@@ -198,6 +198,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          components: clippy
       - name: Run the examples
         run: |
           cargo clippy --all-targets -- --deny warnings
