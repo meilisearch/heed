@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::marker;
 
-use types::LazyDecode;
+use types::{Lazy, LazyDecode};
 
 use crate::iteration_method::{IterationMethod, MoveBetweenKeys, MoveThroughDuplicateValues};
 use crate::*;
@@ -434,6 +434,185 @@ where
 impl<KC, DC, IM> fmt::Debug for RwIter<'_, KC, DC, IM> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwIter").finish()
+    }
+}
+
+pub struct RwIterItem<'a, 'txn, KC, DC, IM = MoveThroughDuplicateValues> {
+    iter: &'a mut RwIter<'txn, KC, DC, IM>,
+    key: &'txn [u8],
+    data: &'txn [u8],
+}
+
+impl<'a, 'txn, KC, DC, IM> RwIterItem<'a, 'txn, KC, DC, IM> {
+    /// Get the key at the current cursor, which is valid for at least as long
+    /// as the `RwIterItem` exists.
+    pub fn key<'b>(&'b self) -> Lazy<'b, KC>
+    where
+        KC: 'static,
+    {
+        LazyDecode::<KC>::bytes_decode(self.key).unwrap()
+    }
+
+    /// Get the data at the current cursor, which is valid for at least as long
+    /// as the `RwIterItem` exists.
+    pub fn data<'b>(&'b self) -> Lazy<'b, DC>
+    where
+        DC: 'static,
+    {
+        LazyDecode::<DC>::bytes_decode(self.data).unwrap()
+    }
+
+    /// Keep the entry the cursor is currently pointing to.
+    /// Returns the key and data at the current cursor, which are valid until
+    /// the end of the transaction.
+    pub fn keep(self) -> (Lazy<'txn, KC>, Lazy<'txn, DC>)
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let key = LazyDecode::<KC>::bytes_decode(self.key).unwrap();
+        let data = LazyDecode::<DC>::bytes_decode(self.data).unwrap();
+        (key, data)
+    }
+
+    /// Delete the entry the cursor is currently pointing to.
+    ///
+    /// Returns `true`` if the entry was successfully deleted.
+    pub fn delete(self) -> Result<bool> {
+        // SAFETY: It is not possible to keep reference to the current value
+        // after deleting, because this method takes `self` by value, and
+        // the current key / value are only available for the lifetime of
+        // `self`.
+        unsafe { self.iter.del_current() }
+    }
+
+    /// Write a new value to the current entry. The entry is written with the specified flags.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    pub fn put_reserved_with_flags<F>(
+        mut self,
+        flags: PutFlags,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<Self>
+    where
+        F: FnOnce(&mut ReservedSpace<'_>) -> io::Result<()>,
+    {
+        let key_owned: Vec<u8> = self.key.to_owned();
+        // SAFETY: The key is owned, and `write_func` cannot use a reference
+        // from this entry while modifying it, because this method takes `self`
+        // by value, and the current key / value are only available for the
+        // lifetime of `self`.
+        if unsafe {
+            self.iter.cursor.put_current_reserved_with_flags(
+                flags,
+                key_owned.as_slice(),
+                data_size,
+                write_func,
+            )
+        }? {
+            let (key, data) = self.iter.cursor.current()?.ok_or(Error::Mdb(MdbError::NotFound))?;
+            self.key = key;
+            self.data = data;
+            Ok(self)
+        } else {
+            Err(Error::Mdb(MdbError::NotFound))
+        }
+    }
+
+    /// Insert a key-value pair in this database.
+    /// The entry is written with the specified flags and data codec.
+    pub fn put_with_options<'b, NDC>(
+        mut self,
+        flags: PutFlags,
+        data: &'b NDC::EItem,
+    ) -> Result<Self>
+    where
+        NDC: BytesEncode<'b>,
+    {
+        let key_owned: Vec<u8> = self.key.to_owned();
+        let data_bytes: Cow<[u8]> = NDC::bytes_encode(data).map_err(Error::Encoding)?;
+        // SAFETY: The key is owned, and `data` cannot use a reference
+        // from this entry while modifying it, because this method takes `self`
+        // by value, and the current key / value are only available for the
+        // lifetime of `self`.
+        let () = unsafe {
+            self.iter.cursor.put_current_with_flags(flags, key_owned.as_slice(), &data_bytes)
+        }?;
+        let (key, data) = self.iter.cursor.current()?.ok_or(Error::Mdb(MdbError::NotFound))?;
+        self.key = key;
+        self.data = data;
+        Ok(self)
+    }
+
+    /// Write a new value to the current entry.
+    ///
+    /// > This is intended to be used when the new data is the same size as the old.
+    /// > Otherwise it will simply perform a delete of the old record followed by an insert.
+    pub fn put<'b>(mut self, data: &'b DC::EItem) -> Result<Self>
+    where
+        DC: BytesEncode<'b>,
+    {
+        let key_owned: Vec<u8> = self.key.to_owned();
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        // SAFETY: The key is owned, and `data` cannot use a reference
+        // from this entry while modifying it, because this method takes `self`
+        // by value, and the current key / value are only available for the
+        // lifetime of `self`.
+        if unsafe { self.iter.cursor.put_current(key_owned.as_slice(), &data_bytes) }? {
+            let (key, data) = self.iter.cursor.current()?.ok_or(Error::Mdb(MdbError::NotFound))?;
+            self.key = key;
+            self.data = data;
+            Ok(self)
+        } else {
+            Err(Error::Mdb(MdbError::NotFound))
+        }
+    }
+}
+
+impl<'txn, KC, DC, IM> RwIter<'txn, KC, DC, IM> {
+    /// Advance the iterator to the next item.
+    pub fn next<'a>(&'a mut self) -> Option<Result<RwIterItem<'a, 'txn, KC, DC, IM>>>
+    where
+        IM: IterationMethod,
+    {
+        let result = if self.move_on_first {
+            self.move_on_first = false;
+            self.cursor.move_on_first(IM::MOVE_OPERATION)
+        } else {
+            self.cursor.move_on_next(IM::MOVE_OPERATION)
+        };
+
+        match result {
+            Ok(Some((key, data))) => Some(Ok(RwIterItem { iter: self, key, data })),
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    /// Advance the iterator to the last item.
+    pub fn last<'a>(&'a mut self) -> Option<Result<RwIterItem<'a, 'txn, KC, DC, IM>>>
+    where
+        IM: IterationMethod,
+    {
+        let result = if self.move_on_first {
+            self.cursor.move_on_last(IM::MOVE_OPERATION)
+        } else {
+            match (self.cursor.current(), self.cursor.move_on_last(IM::MOVE_OPERATION)) {
+                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
+                    Ok(Some((key, data)))
+                }
+                (Ok(_), Ok(_)) => Ok(None),
+                (Err(e), _) | (_, Err(e)) => Err(e),
+            }
+        };
+
+        match result {
+            Ok(Some((key, data))) => Some(Ok(RwIterItem { iter: self, key, data })),
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        }
     }
 }
 
