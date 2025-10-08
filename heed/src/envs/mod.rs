@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::fs::{File, Metadata};
+use std::fs::File;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, BorrowedFd, RawFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::abort;
@@ -12,7 +12,7 @@ use std::time::Duration;
 #[cfg(windows)]
 use std::{
     ffi::OsStr,
-    os::windows::io::{AsRawHandle as _, BorrowedHandle, RawHandle},
+    os::windows::io::{AsRawHandle as _, RawHandle},
 };
 use std::{fmt, io};
 
@@ -129,22 +129,6 @@ fn get_file_fd(file: &File) -> RawFd {
 #[cfg(windows)]
 fn get_file_fd(file: &File) -> RawHandle {
     file.as_raw_handle()
-}
-
-#[cfg(unix)]
-/// Get metadata from a file descriptor.
-unsafe fn metadata_from_fd(raw_fd: RawFd) -> io::Result<Metadata> {
-    let fd = BorrowedFd::borrow_raw(raw_fd);
-    let owned = fd.try_clone_to_owned()?;
-    File::from(owned).metadata()
-}
-
-#[cfg(windows)]
-/// Get metadata from a file descriptor.
-unsafe fn metadata_from_fd(raw_fd: RawHandle) -> io::Result<Metadata> {
-    let fd = BorrowedHandle::borrow_raw(raw_fd);
-    let owned = fd.try_clone_to_owned()?;
-    File::from(owned).metadata()
 }
 
 /// A helper function that transforms the LMDB types into Rust types (`MDB_val` into slices)

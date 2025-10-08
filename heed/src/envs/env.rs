@@ -12,8 +12,8 @@ use heed_traits::Comparator;
 use synchronoise::SignalEvent;
 
 use super::{
-    custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvClosingEvent,
-    EnvInfo, FlagSetMode, IntegerComparator, OPENED_ENV,
+    custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
+    IntegerComparator, OPENED_ENV,
 };
 use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
@@ -63,11 +63,27 @@ impl<T> Env<T> {
     /// # Ok(()) }
     /// ```
     pub fn real_disk_size(&self) -> Result<u64> {
+        Ok(self.try_clone_inner_file()?.metadata()?.len())
+    }
+
+    /// Try cloning the inner file used in the environment and return a `File`
+    /// corresponding to the environment file.
+    ///
+    /// # Safety
+    ///
+    /// This function is safe as we are creating a cloned fd of the inner file the file
+    /// is. Doing write operations on the file descriptor can lead to undefined behavior
+    /// and only read-only operations while no write operations are in progress is safe.
+    pub fn try_clone_inner_file(&self) -> Result<File> {
         let mut fd = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr().as_mut(), fd.as_mut_ptr()))? };
-        let fd = unsafe { fd.assume_init() };
-        let metadata = unsafe { metadata_from_fd(fd)? };
-        Ok(metadata.len())
+        let raw_fd = unsafe { fd.assume_init() };
+        #[cfg(unix)]
+        let fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(raw_fd) };
+        #[cfg(windows)]
+        let fd = unsafe { std::os::windows::io::BorrowedHandle::borrow_raw(raw_fd) };
+        let owned = fd.try_clone_to_owned()?;
+        Ok(File::from(owned))
     }
 
     /// Return the raw flags the environment was opened with.
