@@ -7,6 +7,7 @@
 //! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
 //! - [Use Custom Key Comparator](#use-custom-key-comparator)
 //! - [Use Custom Dupsort Comparator](#use-custom-dupsort-comparator)
+//! - [Use Bytes as Cursor Ranges](#use-bytes-as-cursor-ranges)
 //!
 //! # Decode Values on Demand
 //!
@@ -579,6 +580,74 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! # Use Bytes as Cursor Ranges
+//!
+//! When working with databases that have sorted keys, you might want to iterate over a specific range
+//! of keys starting from a particular key. Heed provides the [`Database::range`] method that accepts
+//! any type implementing [`RangeBounds`].
+//!
+//! Specifically, if your keys are of type [`Bytes`] and you have a `Vec<u8>` as your starting key
+//! you can use that in in a [`Database::range`] call like this:
+//!
+//! ```
+//! use std::error::Error;
+//! use std::fs;
+//! use std::path::Path;
+//!
+//! use heed::byteorder::NativeEndian;
+//! use heed::types::*;
+//! use heed::{Database, DatabaseFlags, EnvOpenOptions};
+//!
+//! struct BytesRange(Vec<u8>);
+//!
+//! impl std::ops::RangeBounds<[u8]> for BytesRange {
+//!     fn start_bound(&self) -> std::ops::Bound<&[u8]> {
+//!         std::ops::Bound::Included(&self.0)
+//!     }
+//!
+//!     fn end_bound(&self) -> std::ops::Bound<&[u8]> {
+//!         std::ops::Bound::Unbounded
+//!     }
+//! }
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let path = tempfile::tempdir()?;
+//!
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(1 << 34)
+//!             .max_dbs(8)
+//!             .open(&path)?
+//!     };
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!
+//!     let db = env
+//!         .database_options()
+//!         .types::<Bytes, U64<NativeEndian>>()
+//!         .name("index")
+//!         .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
+//!         .create(&mut wtxn)?;
+//!
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 3], &55555u64)?;
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 4], &66666u64)?;
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 5], &77777u64)?;
+//!
+//!     wtxn.commit()?;
+//!
+//!     let txn = env.read_txn()?;
+//!     let key: Vec<u8> = vec![1, 2, 3, 4];
+//!
+//!     for result in db.range(&txn, &BytesRange(key))? {
+//!         let (k, v) = result?;
+//!         println!("Key: {:?}, Value: {}", k, v);
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //!
 
 // To let cargo generate doc links
