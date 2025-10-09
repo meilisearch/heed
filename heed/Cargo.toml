@@ -1,6 +1,6 @@
 [package]
 name = "heed"
-version = "0.22.1-nested-rtxns"
+version = "0.22.1-nested-rtxns-2"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB (mdb.master) wrapper with minimum overhead"
 license = "MIT"
