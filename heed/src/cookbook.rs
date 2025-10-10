@@ -592,12 +592,10 @@
 //!
 //! ```
 //! use std::error::Error;
-//! use std::fs;
-//! use std::path::Path;
 //!
 //! use heed::byteorder::NativeEndian;
 //! use heed::types::*;
-//! use heed::{Database, DatabaseFlags, EnvOpenOptions};
+//! use heed::EnvOpenOptions;
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -626,7 +624,7 @@
 //!     let txn = env.read_txn()?;
 //!     let key: Vec<u8> = vec![1, 2, 3, 4];
 //!
-//!     for res in db
+//!     for result in db
 //!         .range(
 //!             &txn,
 //!             &(
