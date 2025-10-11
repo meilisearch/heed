@@ -7,6 +7,7 @@
 //! - [Advanced Multithreaded Access of Entries](#advanced-multithreaded-access-of-entries)
 //! - [Use Custom Key Comparator](#use-custom-key-comparator)
 //! - [Use Custom Dupsort Comparator](#use-custom-dupsort-comparator)
+//! - [Use Bytes as Cursor Ranges](#use-bytes-as-cursor-ranges)
 //!
 //! # Decode Values on Demand
 //!
@@ -579,6 +580,66 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! # Use Bytes as Cursor Ranges
+//!
+//! When working with databases that have sorted keys, you might want to iterate over a specific range
+//! of keys starting from a particular key. Heed provides the [`Database::range`] method that accepts
+//! any type implementing [`std::ops::RangeBounds`].
+//!
+//! Specifically, if your keys are of type [`heed::types::Bytes`] and you have a `Vec<u8>` as your starting key,
+//! because a tuple of [`std::ops::Bound`] implements such trait you can just use that:
+//!
+//! ```
+//! use std::error::Error;
+//!
+//! use heed::byteorder::NativeEndian;
+//! use heed::types::*;
+//! use heed::EnvOpenOptions;
+//!
+//! fn main() -> Result<(), Box<dyn Error>> {
+//!     let path = tempfile::tempdir()?;
+//!
+//!     let env = unsafe {
+//!         EnvOpenOptions::new()
+//!             .map_size(1 << 34)
+//!             .max_dbs(1)
+//!             .open(&path)?
+//!     };
+//!
+//!     let mut wtxn = env.write_txn()?;
+//!
+//!     let db = env
+//!         .database_options()
+//!         .types::<Bytes, U64<NativeEndian>>()
+//!         .name("index")
+//!         .create(&mut wtxn)?;
+//!
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 3], &55555u64)?;
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 4], &66666u64)?;
+//!     db.put(&mut wtxn, &vec![1, 2, 3, 5], &77777u64)?;
+//!
+//!     wtxn.commit()?;
+//!
+//!     let txn = env.read_txn()?;
+//!     let key: Vec<u8> = vec![1, 2, 3, 4];
+//!
+//!     for result in db
+//!         .range(
+//!             &txn,
+//!             &(
+//!                 std::ops::Bound::Included(key.as_slice()),
+//!                 std::ops::Bound::Unbounded,
+//!             ),
+//!         )? {
+//!         let (k, v) = result?;
+//!         println!("Key: {:?}, Value: {}", k, v);
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //!
 
 // To let cargo generate doc links
