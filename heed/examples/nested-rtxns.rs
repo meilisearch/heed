@@ -1,5 +1,5 @@
 use heed::types::*;
-use heed::{Database, EnvOpenOptions};
+use heed::{Database, EnvFlags, EnvOpenOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use roaring::RoaringBitmap;
@@ -7,8 +7,10 @@ use roaring::RoaringBitmap;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let env = unsafe {
-        EnvOpenOptions::new()
-            .read_txn_without_tls()
+        let mut options = EnvOpenOptions::new().read_txn_without_tls();
+        #[cfg(not(windows))]
+        options.flags(EnvFlags::WRITE_MAP);
+        options
             .map_size(2 * 1024 * 1024 * 1024) // 2 GiB
             .open(dir.path())?
     };
