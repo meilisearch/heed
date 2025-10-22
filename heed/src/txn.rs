@@ -111,7 +111,12 @@ impl<'e, T> RoTxn<'e, T> {
         unsafe {
             // Note that we open a write transaction here and this is the (current)
             // ugly way to trick LMDB and let me create multiple write txn.
-            mdb_result(ffi::mdb_txn_begin(env.env_mut_ptr().as_mut(), parent_ptr, 0, &mut txn))?
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr().as_mut(),
+                parent_ptr,
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
         };
 
         // Note that we wrap the write txn into a RoTxn so it's
