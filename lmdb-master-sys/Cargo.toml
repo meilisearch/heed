@@ -1,7 +1,7 @@
 [package]
 name = "lmdb-master-sys"
 # NB: When modifying, also modify html_root_url in lib.rs
-version = "0.2.6-nested-rtxns-3"
+version = "0.2.6-nested-rtxns-4"
 authors = [
     "Kerollmops <clement@meilisearch.com>",
     "Dan Burkert <dan@danburkert.com>",
