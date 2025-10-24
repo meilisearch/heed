@@ -1,6 +1,6 @@
 [package]
 name = "heed"
-version = "0.22.1-nested-rtxns-4"
+version = "0.22.1-nested-rtxns-5"
 authors = ["Kerollmops <renault.cle@gmail.com>"]
 description = "A fully typed LMDB (mdb.master) wrapper with minimum overhead"
 license = "MIT"
@@ -16,7 +16,7 @@ byteorder = { version = "1.5.0", default-features = false }
 heed-traits = { version = "0.20.0", path = "../heed-traits" }
 heed-types = { version = "0.21.0", default-features = false, path = "../heed-types" }
 libc = "0.2.175"
-lmdb-master-sys = { version = "0.2.6-nested-rtxns-4", path = "../lmdb-master-sys" }
+lmdb-master-sys = { version = "0.2.6-nested-rtxns-5", path = "../lmdb-master-sys" }
 once_cell = "1.21.3"
 page_size = "0.6.0"
 serde = { version = "1.0.223", features = ["derive"], optional = true }
