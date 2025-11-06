@@ -12,7 +12,7 @@ Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Databa
 
 ## Simple Example Usage
 
-Here is an example on how to store and read entries into LMDB in a safe and ACID way. For usage examples, see [examples/](examples/). To see more advanced usage techniques go check our [Cookbook](https://docs.rs/heed/latest/heed/cookbook/index.html).
+Here is an example on how to store and read entries into LMDB in a safe and ACID way. For usage examples, see [heed/examples/](heed/examples/). To see more advanced usage techniques go check our [Cookbook](https://docs.rs/heed/latest/heed/cookbook/index.html).
 
 ```rust
 use std::fs;
