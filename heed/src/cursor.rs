@@ -145,6 +145,27 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
+    pub fn move_on_key_value(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
+        let mut key_val = unsafe { crate::into_val(key) };
+        let mut data_val = unsafe { crate::into_val(data) };
+
+        // Move the cursor to the specified (key, value)
+        let result = unsafe {
+            mdb_result(ffi::mdb_cursor_get(
+                self.cursor,
+                &mut key_val,
+                &mut data_val,
+                ffi::cursor_op::MDB_GET_BOTH,
+            ))
+        };
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e.not_found() => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn move_on_key_greater_than_or_equal_to(
         &mut self,
         key: &[u8],

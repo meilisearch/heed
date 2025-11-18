@@ -386,6 +386,80 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         }
     }
 
+    /// Retrieves the value associated with a (key, value) according to the comparison function of
+    /// those types. If the comparison function on the value only takes into account part of the
+    /// value this can be used to look up the rest of the value from that part.
+    ///
+    /// If the key does not exist, then `None` is returned.
+    ///
+    /// ```
+    /// # use std::fs;
+    /// # use std::path::Path;
+    /// # use heed::EnvOpenOptions;
+    /// use heed::Database;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use heed::{DatabaseFlags, IntegerComparator};
+    /// let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?
+    /// # };
+    /// type BEI32 = U32<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Bytes> = env.database_options().flags(DatabaseFlags::DUP_SORT).dup_sort_comparator::<IntegerComparator>().name("test").types().create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    ///
+    /// let mut val1 = 42_usize.to_ne_bytes().to_vec();
+    /// val1.extend_from_slice(&[1,2,3,4,5]);
+    /// db.put(&mut wtxn, &1, &val1)?;
+    ///
+    /// let mut val2 = 21_usize.to_ne_bytes().to_vec();
+    /// val2.extend_from_slice(&[0,1,0,1,0]);
+    /// db.put(&mut wtxn, &1, &val2)?;
+    ///
+    /// let ret = db.get_duplicate(&wtxn, &1, 42_usize.to_ne_bytes().as_slice())?;
+    /// assert_eq!(ret, Some(val1.as_slice()));
+    ///
+    /// let ret = db.get_duplicate(&wtxn, &1, 21_usize.to_ne_bytes().as_slice())?;
+    /// assert_eq!(ret, Some(val2.as_slice()));
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn get_duplicate<'a, 'txn>(
+        &self,
+        txn: &'txn RoTxn,
+        key: &'a KC::EItem,
+        data: &'a DC::EItem,
+    ) -> Result<Option<DC::DItem>>
+    where
+        KC: BytesEncode<'a>,
+        DC: BytesEncode<'a> + BytesDecode<'txn>,
+    {
+        assert_eq_env_db_txn!(self, txn);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Decoding)?;
+
+        let mut cursor = RoCursor::new(txn, self.dbi)?;
+
+        cursor.move_on_key_value(&key_bytes, &data_bytes)?;
+
+        match cursor.current()? {
+            Some((_, data)) => {
+                let data = DC::bytes_decode(data).map_err(Error::Decoding)?;
+                Ok(Some(data))
+            }
+            None => Ok(None),
+        }
+    }
+
     /// Returns an iterator over all of the values of a single key.
     ///
     /// You can make this iterator `Send`able between threads by opening
