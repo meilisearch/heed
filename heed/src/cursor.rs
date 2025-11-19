@@ -145,7 +145,7 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
-    pub fn move_on_key_value(&mut self, key: &[u8], data: &[u8]) -> Result<bool> {
+    pub fn move_on_key_value(&mut self, key: &[u8], data: &[u8]) -> Result<Option<&'txn [u8]>> {
         let mut key_val = unsafe { crate::into_val(key) };
         let mut data_val = unsafe { crate::into_val(data) };
 
@@ -160,8 +160,8 @@ impl<'txn> RoCursor<'txn> {
         };
 
         match result {
-            Ok(()) => Ok(true),
-            Err(e) if e.not_found() => Ok(false),
+            Ok(()) => Ok(Some(unsafe { crate::from_val(data_val) })),
+            Err(e) if e.not_found() => Ok(None),
             Err(e) => Err(e.into()),
         }
     }

@@ -402,7 +402,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # use heed::{DatabaseFlags, IntegerComparator};
-    /// let dir = tempfile::tempdir()?;
+    /// # let dir = tempfile::tempdir()?;
     /// # let env = unsafe { EnvOpenOptions::new()
     /// #     .map_size(10 * 1024 * 1024) // 10MB
     /// #     .max_dbs(3000)
@@ -411,7 +411,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// type BEI32 = U32<BigEndian>;
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Bytes> = env.database_options().flags(DatabaseFlags::DUP_SORT).dup_sort_comparator::<IntegerComparator>().name("test").types().create(&mut wtxn)?;
+    /// let db: Database<BEI32, Bytes, _, _> = env.database_options().types().flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED).dup_sort_comparator::<IntegerComparator>().name("test").create(&mut wtxn)?;
     ///
     /// # db.clear(&mut wtxn)?;
     ///
@@ -428,6 +428,9 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     ///
     /// let ret = db.get_duplicate(&wtxn, &1, 21_usize.to_ne_bytes().as_slice())?;
     /// assert_eq!(ret, Some(val2.as_slice()));
+    ///
+    /// let ret = db.get_duplicate(&wtxn, &1, 22_usize.to_ne_bytes().as_slice())?;
+    ///  assert_eq!(ret, None);
     ///
     /// wtxn.commit()?;
     /// # Ok(()) }
@@ -449,15 +452,10 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
 
         let mut cursor = RoCursor::new(txn, self.dbi)?;
 
-        cursor.move_on_key_value(&key_bytes, &data_bytes)?;
-
-        match cursor.current()? {
-            Some((_, data)) => {
-                let data = DC::bytes_decode(data).map_err(Error::Decoding)?;
-                Ok(Some(data))
-            }
-            None => Ok(None),
-        }
+        cursor
+            .move_on_key_value(&key_bytes, &data_bytes)?
+            .map(|data| DC::bytes_decode(data).map_err(Error::Decoding))
+            .transpose()
     }
 
     /// Returns an iterator over all of the values of a single key.
