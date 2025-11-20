@@ -434,6 +434,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// drop(iter);
     ///
     /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
     /// assert_eq!(iter.last().transpose()?, Some((68, 123)));
     ///
     /// wtxn.commit()?;
