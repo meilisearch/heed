@@ -77,7 +77,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, NKC, NDC> {
+    pub fn types<NKC, NDC>(self) -> EncryptedDatabaseOpenOptions<'e, 'n, T, NKC, NDC, C, CDUP> {
         EncryptedDatabaseOpenOptions { inner: self.inner.types() }
     }
 

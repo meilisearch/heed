@@ -79,7 +79,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     ///
     /// The default types are [`Unspecified`] and require a call to [`Database::remap_types`]
     /// to use the [`Database`].
-    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, T, NKC, NDC> {
+    pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, T, NKC, NDC, C, CDUP> {
         DatabaseOpenOptions {
             env: self.env,
             types: Default::default(),
