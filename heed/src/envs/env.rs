@@ -12,8 +12,8 @@ use heed_traits::Comparator;
 use synchronoise::SignalEvent;
 
 use super::{
-    custom_key_cmp_wrapper, get_file_fd, metadata_from_fd, DefaultComparator, EnvClosingEvent,
-    EnvInfo, FlagSetMode, IntegerComparator, OPENED_ENV,
+    custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
+    IntegerComparator, OPENED_ENV,
 };
 use crate::cursor::{MoveOperation, RoCursor};
 use crate::mdb::ffi::{self, MDB_env};
@@ -22,8 +22,8 @@ use crate::mdb::lmdb_flags::AllDatabaseFlags;
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
-    CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result, RoTxn, RwTxn,
-    Unspecified, WithTls,
+    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
+    RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
@@ -63,11 +63,27 @@ impl<T> Env<T> {
     /// # Ok(()) }
     /// ```
     pub fn real_disk_size(&self) -> Result<u64> {
+        Ok(self.try_clone_inner_file()?.metadata()?.len())
+    }
+
+    /// Try cloning the inner file used in the environment and return a `File`
+    /// corresponding to the environment file.
+    ///
+    /// # Safety
+    ///
+    /// This function is safe as we are creating a cloned fd of the inner file the file
+    /// is. Doing write operations on the file descriptor can lead to undefined behavior
+    /// and only read-only operations while no write operations are in progress is safe.
+    pub fn try_clone_inner_file(&self) -> Result<File> {
         let mut fd = mem::MaybeUninit::uninit();
         unsafe { mdb_result(ffi::mdb_env_get_fd(self.env_mut_ptr().as_mut(), fd.as_mut_ptr()))? };
-        let fd = unsafe { fd.assume_init() };
-        let metadata = unsafe { metadata_from_fd(fd)? };
-        Ok(metadata.len())
+        let raw_fd = unsafe { fd.assume_init() };
+        #[cfg(unix)]
+        let fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(raw_fd) };
+        #[cfg(windows)]
+        let fd = unsafe { std::os::windows::io::BorrowedHandle::borrow_raw(raw_fd) };
+        let owned = fd.try_clone_to_owned()?;
+        Ok(File::from(owned))
     }
 
     /// Return the raw flags the environment was opened with.
@@ -343,6 +359,8 @@ impl<T> Env<T> {
     /// A parent transaction and its cursors may not issue any other operations than _commit_ and
     /// _abort_ while it has active child transactions.
     pub fn nested_write_txn<'p>(&'p self, parent: &'p mut RwTxn) -> Result<RwTxn<'p>> {
+        assert_eq_env_txn!(self, parent);
+
         RwTxn::nested(self, parent)
     }
 
@@ -604,6 +622,61 @@ impl<T> Env<T> {
         }
         mdb_result(unsafe { ffi::mdb_env_set_mapsize(self.env_mut_ptr().as_mut(), new_size) })
             .map_err(Into::into)
+    }
+}
+
+impl Env<WithoutTls> {
+    /// Create a nested read transaction that is capable of reading uncommitted changes.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// This is a custom LMDB fork feature that allows reading uncommitted changes.
+    /// It enables parallel processing of data across multiple threads through
+    /// concurrent read-only transactions. You can [read more in this PR](https://github.com/meilisearch/heed/pull/307).
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let env = unsafe {
+    ///     EnvOpenOptions::new()
+    ///         .read_txn_without_tls()
+    ///         .map_size(2 * 1024 * 1024) // 2 MiB
+    ///         .open(dir.path())?
+    /// };
+    ///
+    /// // we will open the default unnamed database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // opening a write transaction
+    /// for i in 0..1000 {
+    ///     db.put(&mut wtxn, &i, &i)?;
+    /// }
+    ///
+    /// // opening multiple read-only transactions
+    /// // to check if those values are now available
+    /// // without committing beforehand
+    /// let rtxns = (0..1000).map(|_| env.nested_read_txn(&wtxn)).collect::<heed::Result<Vec<_>>>()?;
+    ///
+    /// for (i, rtxn) in rtxns.iter().enumerate() {
+    ///     let i = i as u32;
+    ///     let ret = db.get(&rtxn, &i)?;
+    ///     assert_eq!(ret, Some(i));
+    /// }
+    ///
+    /// # Ok(()) }
+    /// ```
+    #[cfg(not(master3))]
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
+        assert_eq_env_txn!(self, parent);
+
+        RoTxn::<WithoutTls>::nested(self, parent)
     }
 }
 

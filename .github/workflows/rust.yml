@@ -159,8 +159,10 @@ jobs:
         run: |
           cargo clean
           # rmp-serde needs a feature activated, so we'll just run it separately.
-          cargo run --example 2>&1 | grep -E '^ ' | awk '!/rmp-serde/' | xargs -n1 cargo run --example
+          # We also want to run the nested-rtxns example in release.
+          cargo run --example 2>&1 | grep -E '^ ' | awk '!/rmp-serde|nested-rtxns/' | xargs -n1 cargo run --example
           cargo run --example rmp-serde --features serde-rmp
+          cargo run --release --example nested-rtxns
 
   heed3-examples:
     name: Run the heed3 examples

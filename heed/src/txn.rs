@@ -100,6 +100,33 @@ impl<'e, T> RoTxn<'e, T> {
         self.inner.txn.unwrap()
     }
 
+    #[cfg(not(master3))]
+    pub(crate) fn nested<'p>(
+        env: &'p Env<WithoutTls>,
+        parent: &'p RwTxn,
+    ) -> Result<RoTxn<'p, WithoutTls>> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { parent.txn.inner.txn.unwrap().as_mut() };
+
+        unsafe {
+            // Note that we open a write transaction here and this is the (current)
+            // ugly way to trick LMDB and let me create multiple write txn.
+            mdb_result(ffi::mdb_txn_begin(
+                env.env_mut_ptr().as_mut(),
+                parent_ptr,
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
+        };
+
+        // Note that we wrap the write txn into a RoTxn so it's
+        // safe as the user cannot do any modification with it.
+        Ok(RoTxn {
+            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
+            _tls_marker: PhantomData,
+        })
+    }
+
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
         self.inner.env.env_mut_ptr()
     }
