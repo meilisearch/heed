@@ -38,6 +38,7 @@ cstr = "0.2.12"
 
 [features]
 default = []
+no_std = []
 asan = []
 fuzzer = []
 fuzzer-no-link = []

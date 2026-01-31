@@ -85,11 +85,11 @@ pub struct MDB_val {
     pub mv_data: *mut ::libc::c_void,
 }
 #[doc = "A callback function used to compare two keys in a database"]
-pub type MDB_cmp_func = ::std::option::Option<
+pub type MDB_cmp_func = ::core::option::Option<
     unsafe extern "C" fn(a: *const MDB_val, b: *const MDB_val) -> ::libc::c_int,
 >;
 #[doc = "A callback function used to relocate a position-dependent data item\n in a fixed-address database.\n\n The **newptr** gives the item's desired address in\n the memory map, and **oldptr** gives its previous address. The item's actual\n data resides at the address in **item.** This callback is expected to walk\n through the fields of the record in **item** and modify any\n values based at the **oldptr** address to be relative to the **newptr** address.\n # Arguments\n\n* `item` (direction in, out) - The item that is to be relocated.\n * `oldptr` (direction in) - The previous address.\n * `newptr` (direction in) - The new address to relocate to.\n * `relctx` (direction in) - An application-provided context, set by #mdb_set_relctx().\n This feature is currently unimplemented."]
-pub type MDB_rel_func = ::std::option::Option<
+pub type MDB_rel_func = ::core::option::Option<
     unsafe extern "C" fn(
         item: *mut MDB_val,
         oldptr: *mut ::libc::c_void,
@@ -287,7 +287,7 @@ extern "C" {
 }
 #[doc = "A callback function for most LMDB assert() failures,\n called before printing the message and aborting.\n\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create().\n * `msg` (direction in) - The assertion message, not including newline."]
 pub type MDB_assert_func =
-    ::std::option::Option<unsafe extern "C" fn(env: *mut MDB_env, msg: *const ::libc::c_char)>;
+    ::core::option::Option<unsafe extern "C" fn(env: *mut MDB_env, msg: *const ::libc::c_char)>;
 extern "C" {
     #[doc = "Set or reset the assert() callback of the environment.\n Disabled if liblmdb is built with NDEBUG.\n > **Note:** This hack should become obsolete as lmdb's error handling matures.\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create().\n * `func` (direction in) - An #MDB_assert_func function, or 0.\n # Returns\n\nA non-zero error value on failure and 0 on success."]
     pub fn mdb_env_set_assert(env: *mut MDB_env, func: MDB_assert_func) -> ::libc::c_int;
@@ -471,7 +471,7 @@ extern "C" {
     ) -> ::libc::c_int;
 }
 #[doc = "A callback function used to print a message from the library.\n\n # Arguments\n\n* `msg` (direction in) - The string to be printed.\n * `ctx` (direction in) - An arbitrary context pointer for the callback.\n # Returns\n\n< 0 on failure, >= 0 on success."]
-pub type MDB_msg_func = ::std::option::Option<
+pub type MDB_msg_func = ::core::option::Option<
     unsafe extern "C" fn(msg: *const ::libc::c_char, ctx: *mut ::libc::c_void) -> ::libc::c_int,
 >;
 extern "C" {
