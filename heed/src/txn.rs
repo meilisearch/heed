@@ -345,6 +345,78 @@ impl<'p> RwTxn<'p> {
         self.txn.inner.env.env_mut_ptr()
     }
 
+    /// Create a nested read transaction that is capable of reading uncommitted changes.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// This is a custom LMDB fork feature that allows reading uncommitted changes.
+    /// It enables parallel processing of data across multiple threads through
+    /// concurrent read-only transactions. You can [read more in this PR](https://github.com/meilisearch/heed/pull/307).
+    ///
+    /// This method is equivalent to calling [`Env::nested_read_txn`] with this transaction as the parent.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let env = unsafe {
+    ///     EnvOpenOptions::new()
+    ///         .read_txn_without_tls()
+    ///         .map_size(2 * 1024 * 1024) // 2 MiB
+    ///         .open(dir.path())?
+    /// };
+    ///
+    /// // we will open the default unnamed database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // opening a write transaction
+    /// for i in 0..1000 {
+    ///     db.put(&mut wtxn, &i, &i)?;
+    /// }
+    ///
+    /// // opening multiple read-only transactions
+    /// // to check if those values are now available
+    /// // without committing beforehand
+    /// let rtxns = (0..1000).map(|_| wtxn.nested_read_txn()).collect::<heed::Result<Vec<_>>>()?;
+    ///
+    /// for (i, rtxn) in rtxns.iter().enumerate() {
+    ///     let i = i as u32;
+    ///     let ret = db.get(&rtxn, &i)?;
+    ///     assert_eq!(ret, Some(i));
+    /// }
+    ///
+    /// # Ok(()) }
+    /// ```
+    #[cfg(not(master3))]
+    pub fn nested_read_txn<'a>(&'a self) -> Result<RoTxn<'a, WithoutTls>> {
+        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
+        let parent_ptr: *mut ffi::MDB_txn = unsafe { self.inner.txn.unwrap().as_mut() };
+
+        unsafe {
+            // Note that we open a write transaction here and this is the (current)
+            // ugly way to trick LMDB and let me create multiple write txn.
+            mdb_result(ffi::mdb_txn_begin(
+                self.inner.env.env_mut_ptr().as_mut(),
+                parent_ptr,
+                ffi::MDB_RDONLY,
+                &mut txn,
+            ))?
+        };
+
+        // Note that we wrap the write txn into a RoTxn so it's
+        // safe as the user cannot do any modification with it.
+        Ok(RoTxn {
+            inner: RoTxnInner { txn: NonNull::new(txn), env: self.inner.env.clone() },
+            _tls_marker: PhantomData,
+        })
+    }
+
     /// Commit all the operations of a transaction into the database.
     /// The transaction is reset.
     pub fn commit(mut self) -> Result<()> {
