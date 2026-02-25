@@ -91,11 +91,11 @@ pub struct MDB_val {
     pub mv_data: *mut ::libc::c_void,
 }
 #[doc = "A callback function used to compare two keys in a database"]
-pub type MDB_cmp_func = ::std::option::Option<
+pub type MDB_cmp_func = ::core::option::Option<
     unsafe extern "C" fn(a: *const MDB_val, b: *const MDB_val) -> ::libc::c_int,
 >;
 #[doc = "A callback function used to relocate a position-dependent data item\n in a fixed-address database.\n\n The **newptr** gives the item's desired address in\n the memory map, and **oldptr** gives its previous address. The item's actual\n data resides at the address in **item.** This callback is expected to walk\n through the fields of the record in **item** and modify any\n values based at the **oldptr** address to be relative to the **newptr** address.\n # Arguments\n\n* `item` (direction in, out) - The item that is to be relocated.\n * `oldptr` (direction in) - The previous address.\n * `newptr` (direction in) - The new address to relocate to.\n * `relctx` (direction in) - An application-provided context, set by #mdb_set_relctx().\n This feature is currently unimplemented."]
-pub type MDB_rel_func = ::std::option::Option<
+pub type MDB_rel_func = ::core::option::Option<
     unsafe extern "C" fn(
         item: *mut MDB_val,
         oldptr: *mut ::libc::c_void,
@@ -104,7 +104,7 @@ pub type MDB_rel_func = ::std::option::Option<
     ),
 >;
 #[doc = "A callback function used to encrypt/decrypt pages in the env.\n\n Encrypt or decrypt the data in src and store the result in dst using the\n provided key. The result must be the same number of bytes as the input.\n # Arguments\n\n* `src` (direction in) - The input data to be transformed.\n * `dst` (direction out) - Storage for the result.\n * `key` (direction in) - An array of three values: key[0] is the encryption key,\n key[1] is the initialization vector, and key[2] is the authentication\n data, if any.\n * `encdec` (direction in) - 1 to encrypt, 0 to decrypt.\n # Returns\n\nA non-zero error value on failure and 0 on success."]
-pub type MDB_enc_func = ::std::option::Option<
+pub type MDB_enc_func = ::core::option::Option<
     unsafe extern "C" fn(
         src: *const MDB_val,
         dst: *mut MDB_val,
@@ -113,7 +113,7 @@ pub type MDB_enc_func = ::std::option::Option<
     ) -> ::libc::c_int,
 >;
 #[doc = "A callback function used to checksum pages in the env.\n\n Compute the checksum of the data in src and store the result in dst,\n An optional key may be used with keyed hash algorithms.\n # Arguments\n\n* `src` (direction in) - The input data to be transformed.\n * `dst` (direction out) - Storage for the result.\n * `key` (direction in) - An encryption key, if encryption was configured. This\n parameter will be NULL if there is no key."]
-pub type MDB_sum_func = ::std::option::Option<
+pub type MDB_sum_func = ::core::option::Option<
     unsafe extern "C" fn(src: *const MDB_val, dst: *mut MDB_val, key: *const MDB_val),
 >;
 #[doc = "< Position at first key/data item"]
@@ -310,7 +310,7 @@ extern "C" {
 }
 #[doc = "A callback function for most LMDB assert() failures,\n called before printing the message and aborting.\n\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create().\n * `msg` (direction in) - The assertion message, not including newline."]
 pub type MDB_assert_func =
-    ::std::option::Option<unsafe extern "C" fn(env: *mut MDB_env, msg: *const ::libc::c_char)>;
+    ::core::option::Option<unsafe extern "C" fn(env: *mut MDB_env, msg: *const ::libc::c_char)>;
 extern "C" {
     #[doc = "Set or reset the assert() callback of the environment.\n Disabled if liblmdb is built with NDEBUG.\n > **Note:** This hack should become obsolete as lmdb's error handling matures.\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create().\n * `func` (direction in) - An #MDB_assert_func function, or 0.\n # Returns\n\nA non-zero error value on failure and 0 on success."]
     pub fn mdb_env_set_assert(env: *mut MDB_env, func: MDB_assert_func) -> ::libc::c_int;
@@ -515,7 +515,7 @@ extern "C" {
     ) -> ::libc::c_int;
 }
 #[doc = "A callback function used to print a message from the library.\n\n # Arguments\n\n* `msg` (direction in) - The string to be printed.\n * `ctx` (direction in) - An arbitrary context pointer for the callback.\n # Returns\n\n< 0 on failure, >= 0 on success."]
-pub type MDB_msg_func = ::std::option::Option<
+pub type MDB_msg_func = ::core::option::Option<
     unsafe extern "C" fn(msg: *const ::libc::c_char, ctx: *mut ::libc::c_void) -> ::libc::c_int,
 >;
 extern "C" {
@@ -531,7 +531,7 @@ extern "C" {
     pub fn mdb_reader_check(env: *mut MDB_env, dead: *mut ::libc::c_int) -> ::libc::c_int;
 }
 #[doc = "A function for converting a string into an encryption key.\n\n # Arguments\n\n* `passwd` (direction in) - The string to be converted.\n * `key` (direction in, out) - The resulting key. The caller must\n provide the space for the key.\n # Returns\n\n0 on success, non-zero on failure."]
-pub type MDB_str2key_func = ::std::option::Option<
+pub type MDB_str2key_func = ::core::option::Option<
     unsafe extern "C" fn(passwd: *const ::libc::c_char, key: *mut MDB_val) -> ::libc::c_int,
 >;
 #[doc = "A structure for dynamically loaded crypto modules.\n\n This is the information that the command line tools expect\n in order to operate on encrypted or checksummed environments."]
@@ -549,4 +549,4 @@ pub struct MDB_crypto_funcs {
     pub mcf_sumsize: ::libc::c_int,
 }
 #[doc = "The function that returns the #MDB_crypto_funcs structure.\n\n The command line tools expect this function to be named \"MDB_crypto\".\n It must be exported by the dynamic module so that the tools can use it.\n # Returns\n\nA pointer to a #MDB_crypto_funcs structure."]
-pub type MDB_crypto_hooks = ::std::option::Option<unsafe extern "C" fn() -> *mut MDB_crypto_funcs>;
+pub type MDB_crypto_hooks = ::core::option::Option<unsafe extern "C" fn() -> *mut MDB_crypto_funcs>;

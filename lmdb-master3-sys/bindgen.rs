@@ -60,6 +60,7 @@ pub fn generate() {
         .allowlist_function("^(MDB|mdb)_.*")
         .size_t_is_usize(true)
         .ctypes_prefix("::libc")
+        .use_core()
         .blocklist_item("mode_t")
         .blocklist_item("mdb_mode_t")
         .blocklist_item("mdb_filehandle_t")
