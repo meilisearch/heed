@@ -10,7 +10,7 @@ use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::envs::EnvStat;
 use crate::mdb::ffi::{self};
-use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified, WithTls};
+use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified, WithTls, WithoutTls};
 #[allow(unused)] // fro cargo auto doc links
 use crate::{Database, EnvOpenOptions};
 
@@ -370,6 +370,77 @@ impl<T> EncryptedEnv<T> {
     /// but the library does not check for this condition, so the caller must ensure it explicitly.
     pub unsafe fn resize(&self, new_size: usize) -> Result<()> {
         self.inner.resize(new_size)
+    }
+}
+
+impl EncryptedEnv<WithoutTls> {
+    /// Create a nested read transaction that is capable of reading uncommitted changes.
+    ///
+    /// The new transaction will be a nested transaction, with the transaction indicated by parent
+    /// as its parent. Transactions may be nested to any level.
+    ///
+    /// This is a custom LMDB fork feature that allows reading uncommitted changes.
+    /// It enables parallel processing of data across multiple threads through
+    /// concurrent read-only transactions. You can [read more in this PR](https://github.com/meilisearch/heed/pull/307).
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use argon2::Argon2;
+    /// use chacha20poly1305::{ChaCha20Poly1305, Key};
+    /// use heed::{EnvOpenOptions, EncryptedDatabase};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dir = tempfile::tempdir()?;
+    /// let env = unsafe {
+    ///     EnvOpenOptions::new()
+    ///         .read_txn_without_tls()
+    ///         .map_size(2 * 1024 * 1024) // 2 MiB
+    ///         .open(dir.path())?
+    /// };
+    ///
+    /// let env_path = tempfile::tempdir()?;
+    /// let password = "This is the password that will be hashed by the argon2 algorithm";
+    /// let salt = "The salt added to the password hashes to add more security when stored";
+    ///
+    /// // We choose to use argon2 as our Key Derivation Function, but you can choose whatever you want.
+    /// // <https://github.com/RustCrypto/traits/tree/master/password-hash#supported-crates>
+    /// let mut key = Key::default();
+    /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
+    ///
+    /// // We open the environment
+    /// let env = unsafe {
+    ///     let mut options = EnvOpenOptions::new().read_txn_without_tls();
+    ///     options
+    ///         .map_size(2 * 1024 * 1024 * 1024) // 2 GiB
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
+    /// };
+    ///
+    /// // we will open the default unnamed database
+    /// let mut wtxn = env.write_txn()?;
+    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    ///
+    /// // opening a write transaction
+    /// for i in 0..1000 {
+    ///     db.put(&mut wtxn, &i, &i)?;
+    /// }
+    ///
+    /// // opening multiple read-only transactions
+    /// // to check if those values are now available
+    /// // without committing beforehand
+    /// let rtxns = (0..1000).map(|_| env.nested_read_txn(&wtxn)).collect::<heed::Result<Vec<_>>>()?;
+    ///
+    /// for (i, mut rtxn) in rtxns.into_iter().enumerate() {
+    ///     let i = i as u32;
+    ///     let ret = db.get(&mut rtxn, &i)?;
+    ///     assert_eq!(ret, Some(i));
+    /// }
+    ///
+    /// # Ok(()) }
+    /// ```
+    pub fn nested_read_txn<'p>(&'p self, parent: &'p RwTxn) -> Result<RoTxn<'p, WithoutTls>> {
+        self.inner.nested_read_txn(parent)
     }
 }
 

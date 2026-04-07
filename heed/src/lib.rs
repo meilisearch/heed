@@ -82,8 +82,9 @@ mod txn;
 use std::ffi::CStr;
 use std::{error, fmt, io, mem, result};
 
+pub use byteorder;
 use heed_traits as traits;
-pub use {byteorder, heed_types as types};
+pub use heed_types as types;
 
 use self::cursor::{RoCursor, RwCursor};
 pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
@@ -235,7 +236,8 @@ macro_rules! assert_eq_env_txn {
     };
 }
 
-pub(crate) use {assert_eq_env_db_txn, assert_eq_env_txn};
+pub(crate) use assert_eq_env_db_txn;
+pub(crate) use assert_eq_env_txn;
 
 #[cfg(test)]
 mod tests {

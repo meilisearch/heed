@@ -332,8 +332,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3_encryption::types::*;
-    /// use heed3_encryption::{EnvOpenOptions, Database};
+    /// use heed3::types::*;
+    /// use heed3::{EnvOpenOptions, EncryptedDatabase;};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -346,12 +346,12 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// Argon2::default().hash_password_into(password.as_bytes(), salt.as_bytes(), &mut key)?;
     ///
     /// // We open the environment
-    /// let mut options = EnvOpenOptions::<ChaCha20Poly1305>::new_encrypted_with(key);
+    /// let mut options = EnvOpenOptions::new();
     /// let env = unsafe {
     ///     options
     ///         .map_size(10 * 1024 * 1024) // 10MB
     ///         .max_dbs(3)
-    ///         .open(&env_path)?
+    ///         .open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)?
     /// };
     ///
     /// let key1 = "first-key";
@@ -359,7 +359,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     ///
     /// // We create the database
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    /// let db: EncryptedDatabase<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
     /// wtxn.commit()?;
     ///
     /// // Declare the read transaction as mutable because LMDB, when using encryption,
