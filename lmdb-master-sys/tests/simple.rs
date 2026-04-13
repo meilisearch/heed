@@ -2,7 +2,6 @@ use std::ffi::{c_void, CString};
 use std::fs::{self, File};
 use std::ptr;
 
-use cstr::cstr;
 use lmdb_master_sys::*;
 
 // https://github.com/victorporof/lmdb/blob/mdb.master/libraries/liblmdb/moz-test.c
@@ -55,8 +54,8 @@ fn test_simple(env_path: &str) {
         mv_data: ptr::null_mut(),
     };
     let mut txn: *mut MDB_txn = ptr::null_mut();
-    let sval = cstr!("foo").as_ptr() as *mut c_void;
-    let dval = cstr!("bar").as_ptr() as *mut c_void;
+    let sval = c"foo".as_ptr() as *mut c_void;
+    let dval = c"bar".as_ptr() as *mut c_void;
 
     unsafe {
         E!(mdb_env_create(&mut env));
@@ -65,12 +64,7 @@ fn test_simple(env_path: &str) {
         E!(mdb_env_open(env, env_path.as_ptr(), 0, 0o664));
 
         E!(mdb_txn_begin(env, ptr::null_mut(), 0, &mut txn));
-        E!(mdb_dbi_open(
-            txn,
-            cstr!("subdb").as_ptr(),
-            MDB_CREATE,
-            &mut dbi
-        ));
+        E!(mdb_dbi_open(txn, c"subdb".as_ptr(), MDB_CREATE, &mut dbi));
         E!(mdb_txn_commit(txn));
 
         key.mv_size = 3;
@@ -83,7 +77,7 @@ fn test_simple(env_path: &str) {
 
         if cfg!(feature = "longer-keys") {
             // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
-            let sval = cstr!("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.").as_ptr() as *mut c_void;
+            let sval = c"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.".as_ptr() as *mut c_void;
 
             key.mv_size = 952;
             key.mv_data = sval;
