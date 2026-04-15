@@ -16,6 +16,19 @@ keywords = ["LMDB", "database", "storage-engine", "bindings", "library"]
 categories = ["database", "external-ffi-bindings"]
 edition = "2021"
 
+# Tell docs.rs which targets to build the documentation on. Since April
+# 2026, docs.rs only builds on x86_64-unknown-linux-gnu by default; opt
+# back into the platforms this crate supports.
+# See <https://blog.rust-lang.org/2026/04/04/docsrs-only-default-targets/>.
+[package.metadata.docs.rs]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+
 # NB: Use "--features bindgen" to generate bindings.
 build = "build.rs"
 
