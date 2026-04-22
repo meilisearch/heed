@@ -33,9 +33,6 @@ bindgen = { version = "0.71.1", default-features = false, optional = true, featu
 cc = "1.2.37"
 doxygen-rs = "0.4.2"
 
-[dev-dependencies]
-cstr = "0.2.12"
-
 [features]
 default = []
 no_std = []
