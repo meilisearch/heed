@@ -2079,6 +2079,70 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         Ok(())
     }
 
+    /// Insert a key-value pair where the value can directly be written to disk, replacing any
+    /// previous value. The entry is written with the specified flags, in addition to
+    /// `MDB_RESERVE` which is always used.
+    ///
+    /// ```
+    /// # use heed::EnvOpenOptions;
+    /// use std::io::Write;
+    /// use heed::{Database, PutFlags};
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new().map_size(10 * 1024 * 1024).max_dbs(3000).open(dir.path())? };
+    /// type BEI32 = I32<BigEndian>;
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
+    /// # db.clear(&mut wtxn)?;
+    /// let value = "I am a long long long value";
+    /// db.put_reserved_with_flags(&mut wtxn, PutFlags::APPEND, &42, value.len(), |reserved| {
+    ///     reserved.write_all(value.as_bytes())
+    /// })?;
+    /// assert_eq!(db.get(&mut wtxn, &42)?, Some(value));
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn put_reserved_with_flags<'a, F>(
+        &self,
+        txn: &mut RwTxn,
+        flags: PutFlags,
+        key: &'a KC::EItem,
+        data_size: usize,
+        write_func: F,
+    ) -> Result<()>
+    where
+        KC: BytesEncode<'a>,
+        F: FnOnce(&mut ReservedSpace) -> io::Result<()>,
+    {
+        assert_eq_env_db_txn!(self, txn);
+
+        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+        let mut key_val = unsafe { crate::into_val(&key_bytes) };
+        let mut reserved = ffi::reserve_size_val(data_size);
+        let flags = flags.bits() | ffi::MDB_RESERVE;
+
+        unsafe {
+            mdb_result(ffi::mdb_put(
+                txn.txn_ptr().as_mut(),
+                self.dbi,
+                &mut key_val,
+                &mut reserved,
+                flags,
+            ))?
+        }
+
+        let mut reserved = unsafe { ReservedSpace::from_val(reserved) };
+        write_func(&mut reserved)?;
+        if reserved.remaining() == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
+        }
+    }
+
     /// Attempt to insert a key-value pair in this database, or if a value already exists for the
     /// key, returns the previous value.
     ///
