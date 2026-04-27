@@ -12,6 +12,7 @@
 use std::borrow::Cow;
 use std::cmp::{Ord, Ordering};
 use std::error::Error as StdError;
+use std::io;
 
 /// A boxed `Send + Sync + 'static` error.
 pub type BoxedError = Box<dyn StdError + Send + Sync + 'static>;
@@ -21,8 +22,24 @@ pub trait BytesEncode<'a> {
     /// The type to encode.
     type EItem: ?Sized + 'a;
 
+    fn writer_size_hint(_item: &'a Self::EItem) -> Option<usize> {
+        None
+    }
+
     /// Encode the given item as bytes.
     fn bytes_encode(item: &'a Self::EItem) -> Result<Cow<'a, [u8]>, BoxedError>;
+
+    // TODO Document and explain that it is not used when writer_size_hint returns None
+    //      That the default implementation is not very efficient
+    //      That this method is not even used when LMDB disallows using it (which flags again?)
+    fn bytes_encode_into_writer<W: io::Write>(
+        item: &'a Self::EItem,
+        mut writer: W,
+    ) -> Result<(), BoxedError> {
+        let bytes = Self::bytes_encode(item)?;
+        writer.write_all(bytes.as_ref())?;
+        Ok(())
+    }
 }
 
 /// A trait that represents a decoding structure.
