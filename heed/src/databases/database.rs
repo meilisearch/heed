@@ -317,6 +317,13 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         Database { env_ident, dbi, marker: std::marker::PhantomData }
     }
 
+    /// Retrieves the DB flags for this database.
+    pub fn flags(&self, txn: &RoTxn) -> Result<DatabaseFlags> {
+        let mut flags: u32 = 0;
+        unsafe { mdb_result(ffi::mdb_dbi_flags(txn.txn_ptr().as_ptr(), self.dbi, &mut flags)) }?;
+        Ok(DatabaseFlags::from_bits(flags).unwrap())
+    }
+
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
