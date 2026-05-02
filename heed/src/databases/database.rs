@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::{Bound, RangeBounds};
+use std::ops::{Bound, Not as _, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
 
 use heed_traits::{Comparator, LexicographicComparator};
@@ -309,6 +309,7 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 pub struct Database<KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
     pub(crate) env_ident: usize,
     pub(crate) dbi: ffi::MDB_dbi,
+    // TODO add a is_dup_sort boolean to avoid too many ffi calls
     marker: marker::PhantomData<(KC, DC, C, CDUP)>,
 }
 
@@ -321,6 +322,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     pub fn flags(&self, txn: &RoTxn) -> Result<DatabaseFlags> {
         let mut flags: u32 = 0;
         unsafe { mdb_result(ffi::mdb_dbi_flags(txn.txn_ptr().as_ptr(), self.dbi, &mut flags)) }?;
+        // safety: all flags are covered by the bitflags
         Ok(DatabaseFlags::from_bits(flags).unwrap())
     }
 
@@ -1901,21 +1903,31 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     {
         assert_eq_env_db_txn!(self, txn);
 
-        let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
-        let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
+        match DC::writer_size_hint(data) {
+            Some(data_size) if self.flags(txn)?.contains(DatabaseFlags::DUP_SORT).not() => {
+                self.put_reserved(txn, key, data_size, |reserved| {
+                    // TODO: Not particularly pretty
+                    DC::bytes_encode_into_writer(data, reserved).map_err(|e| io::Error::other(e))
+                })?;
+            }
+            _otherwise => {
+                let key_bytes: Cow<[u8]> = KC::bytes_encode(key).map_err(Error::Encoding)?;
+                let data_bytes: Cow<[u8]> = DC::bytes_encode(data).map_err(Error::Encoding)?;
 
-        let mut key_val = unsafe { crate::into_val(&key_bytes) };
-        let mut data_val = unsafe { crate::into_val(&data_bytes) };
-        let flags = 0;
+                let mut key_val = unsafe { crate::into_val(&key_bytes) };
+                let mut data_val = unsafe { crate::into_val(&data_bytes) };
+                let flags = 0;
 
-        unsafe {
-            mdb_result(ffi::mdb_put(
-                txn.txn_ptr().as_mut(),
-                self.dbi,
-                &mut key_val,
-                &mut data_val,
-                flags,
-            ))?
+                unsafe {
+                    mdb_result(ffi::mdb_put(
+                        txn.txn_ptr().as_mut(),
+                        self.dbi,
+                        &mut key_val,
+                        &mut data_val,
+                        flags,
+                    ))?
+                }
+            }
         }
 
         Ok(())
