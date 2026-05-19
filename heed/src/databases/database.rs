@@ -1914,8 +1914,12 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         Ok(())
     }
 
-    /// Insert a key-value pair where the value can directly be written to disk, replacing any
-    /// previous value.
+    /// Insert a key-value pair where the value is written directly into the space reserved
+    /// by LMDB, replacing any previous value.
+    ///
+    /// This avoids an extra copy of the value. The reserved space points into the memory
+    /// map only when the environment was opened with `MDB_WRITEMAP`; otherwise it points to
+    /// an in-memory page that LMDB later flushes to disk.
     ///
     /// ```
     /// # use std::fs;
@@ -2079,9 +2083,13 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         Ok(())
     }
 
-    /// Insert a key-value pair where the value can directly be written to disk, replacing any
-    /// previous value. The entry is written with the specified flags, in addition to
-    /// `MDB_RESERVE` which is always used.
+    /// Insert a key-value pair where the value is written directly into the space reserved
+    /// by LMDB, replacing any previous value. The entry is written with the specified flags,
+    /// in addition to `MDB_RESERVE` which is always used.
+    ///
+    /// This avoids an extra copy of the value. The reserved space points into the memory
+    /// map only when the environment was opened with `MDB_WRITEMAP`; otherwise it points to
+    /// an in-memory page that LMDB later flushes to disk.
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
@@ -2266,8 +2274,13 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         }
     }
 
-    /// Attempt to insert a key-value pair in this database, where the value can be directly
-    /// written to disk, or if a value already exists for the key, returns the previous value.
+    /// Attempt to insert a key-value pair in this database, where the value is written
+    /// directly into the space reserved by LMDB, or if a value already exists for the key,
+    /// returns the previous value.
+    ///
+    /// This avoids an extra copy of the value. The reserved space points into the memory
+    /// map only when the environment was opened with `MDB_WRITEMAP`; otherwise it points to
+    /// an in-memory page that LMDB later flushes to disk.
     ///
     /// The entry is always written with the [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and
     /// [`MDB_RESERVE`](ffi::MDB_RESERVE) flags.
@@ -2329,8 +2342,13 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
         self.get_or_put_reserved_with_flags(txn, PutFlags::empty(), key, data_size, write_func)
     }
 
-    /// Attempt to insert a key-value pair in this database, where the value can be directly
-    /// written to disk, or if a value already exists for the key, returns the previous value.
+    /// Attempt to insert a key-value pair in this database, where the value is written
+    /// directly into the space reserved by LMDB, or if a value already exists for the key,
+    /// returns the previous value.
+    ///
+    /// This avoids an extra copy of the value. The reserved space points into the memory
+    /// map only when the environment was opened with `MDB_WRITEMAP`; otherwise it points to
+    /// an in-memory page that LMDB later flushes to disk.
     ///
     /// The entry is written with the specified flags, in addition to
     /// [`NO_OVERWRITE`](PutFlags::NO_OVERWRITE) and [`MDB_RESERVE`](ffi::MDB_RESERVE)
