@@ -1069,16 +1069,16 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// db.put(&mut wtxn, &13, "i-am-thirteen")?;
     ///
     /// let mut iter = db.iter_mut(&mut wtxn)?;
-    /// assert_eq!(iter.next().transpose()?, Some((13, "i-am-thirteen")));
+    /// assert_eq!(Iterator::next(&mut iter).transpose()?, Some((13, "i-am-thirteen")));
     /// let ret = unsafe { iter.del_current()? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, Some((27, "i-am-twenty-seven")));
-    /// assert_eq!(iter.next().transpose()?, Some((42, "i-am-forty-two")));
+    /// assert_eq!(Iterator::next(&mut iter).transpose()?, Some((27, "i-am-twenty-seven")));
+    /// assert_eq!(Iterator::next(&mut iter).transpose()?, Some((42, "i-am-forty-two")));
     /// let ret = unsafe { iter.put_current(&42, "i-am-the-new-forty-two")? };
     /// assert!(ret);
     ///
-    /// assert_eq!(iter.next().transpose()?, None);
+    /// assert_eq!(Iterator::next(&mut iter).transpose()?, None);
     ///
     /// drop(iter);
     ///
