@@ -6,3 +6,7 @@
 	path = lmdb-master3-sys/lmdb
 	url = https://git.openldap.org/openldap/openldap.git
 	branch = mdb.master3
+[submodule "lmdb-sys/lmdb"]
+	path = lmdb-sys/lmdb
+	url = https://git.openldap.org/openldap/openldap.git
+	branch = mdb.RE/1.0
