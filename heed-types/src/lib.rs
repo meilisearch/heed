@@ -25,15 +25,24 @@ mod serde_json;
 #[cfg(feature = "serde-rmp")]
 mod serde_rmp;
 
+#[cfg(feature = "serde-wincode")]
+mod serde_wincode;
+
 pub use self::bytes::Bytes;
 pub use self::decode_ignore::DecodeIgnore;
 pub use self::integer::*;
 pub use self::lazy_decode::{Lazy, LazyDecode};
 #[cfg(feature = "serde-bincode")]
+#[deprecated(
+    note = "The `bincode` crate is unmaintained. Use `SerdeWincode` instead.",
+    since = "0.23.0"
+)]
 pub use self::serde_bincode::SerdeBincode;
 #[cfg(feature = "serde-json")]
 pub use self::serde_json::SerdeJson;
 #[cfg(feature = "serde-rmp")]
 pub use self::serde_rmp::SerdeRmp;
+#[cfg(feature = "serde-wincode")]
+pub use self::serde_wincode::SerdeWincode;
 pub use self::str::Str;
 pub use self::unit::Unit;

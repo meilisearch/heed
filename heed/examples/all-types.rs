@@ -32,14 +32,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, SerdeBincode<Hello>> =
-        env.create_database(&mut wtxn, Some("serde-bincode"))?;
+    let db: Database<Str, SerdeWincode<Hello>> =
+        env.create_database(&mut wtxn, Some("serde-wincode"))?;
 
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
 
     let ret: Option<Hello> = db.get(&wtxn, "hello")?;
-    println!("serde-bincode:\t{:?}", ret);
+    println!("serde-wincode:\t{:?}", ret);
 
     wtxn.commit()?;
 
