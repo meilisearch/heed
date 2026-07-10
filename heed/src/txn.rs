@@ -1,4 +1,5 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
+use std::convert::AsRef;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
@@ -131,10 +132,9 @@ impl<'e, T> RoTxn<'e, T> {
     }
 }
 
-impl<'a> Deref for RoTxn<'a, WithTls> {
-    type Target = RoTxn<'a, AnyTls>;
-
-    fn deref(&self) -> &Self::Target {
+impl<'a, T> AsRef<RoTxn<'a, AnyTls>> for RoTxn<'a, T> {
+    #[inline(always)]
+    fn as_ref(&self) -> &RoTxn<'a, AnyTls> {
         // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
         // as RoTxnInner.
         unsafe { std::mem::transmute(self) }
@@ -142,30 +142,75 @@ impl<'a> Deref for RoTxn<'a, WithTls> {
 }
 
 #[cfg(master3)]
-impl std::ops::DerefMut for RoTxn<'_, WithTls> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl<'a, T> std::convert::AsMut<RoTxn<'a, AnyTls>> for RoTxn<'a, T> {
+    fn as_mut(&mut self) -> &mut RoTxn<'a, AnyTls> {
         // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
         // as RoTxnInner.
         unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl<'a> Borrow<RoTxn<'a, AnyTls>> for RoTxn<'a, WithTls> {
+    #[inline(always)]
+    fn borrow(&self) -> &RoTxn<'a, AnyTls> {
+        self.as_ref()
+    }
+}
+
+#[cfg(master3)]
+impl<'a> std::borrow::BorrowMut<RoTxn<'a, AnyTls>> for RoTxn<'a, WithTls> {
+    #[inline(always)]
+    fn borrow_mut(&mut self) -> &mut RoTxn<'a, AnyTls> {
+        self.as_mut()
+    }
+}
+
+impl<'a> Deref for RoTxn<'a, WithTls> {
+    type Target = RoTxn<'a, AnyTls>;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+#[cfg(master3)]
+impl std::ops::DerefMut for RoTxn<'_, WithTls> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut()
+    }
+}
+
+impl<'a> Borrow<RoTxn<'a, AnyTls>> for RoTxn<'a, WithoutTls> {
+    #[inline(always)]
+    fn borrow(&self) -> &RoTxn<'a, AnyTls> {
+        self.as_ref()
+    }
+}
+
+#[cfg(master3)]
+impl<'a> std::borrow::BorrowMut<RoTxn<'a, AnyTls>> for RoTxn<'a, WithoutTls> {
+    #[inline(always)]
+    fn borrow_mut(&mut self) -> &mut RoTxn<'a, AnyTls> {
+        self.as_mut()
     }
 }
 
 impl<'a> Deref for RoTxn<'a, WithoutTls> {
     type Target = RoTxn<'a, AnyTls>;
 
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
-        // as RoTxnInner.
-        unsafe { std::mem::transmute(self) }
+        self.as_ref()
     }
 }
 
 #[cfg(master3)]
 impl std::ops::DerefMut for RoTxn<'_, WithoutTls> {
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        // SAFETY: OK because repr(transparent) means RoTxn<T> always has the same layout
-        // as RoTxnInner.
-        unsafe { std::mem::transmute(self) }
+        self.as_mut()
     }
 }
 
