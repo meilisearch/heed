@@ -397,7 +397,7 @@ impl<T> Env<T> {
     /// the thread initiating the new one will wait on a mutex upon completion of the previous
     /// transaction.
     pub fn static_write_txn(self) -> Result<RwTxn<'static>> {
-        RwTxn::static_write_txn(self)
+        RwTxn::from_owned_env(self)
     }
 
     /// Create a nested transaction with read and write access for use with the environment.
@@ -470,7 +470,7 @@ impl<T> Env<T> {
     /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
     ///   full
     pub fn static_read_txn(self) -> Result<RoTxn<'static, T>> {
-        RoTxn::static_read_txn(self)
+        RoTxn::from_owned_env(self)
     }
 
     /// Copy an LMDB environment to the specified path, with options.
