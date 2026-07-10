@@ -61,24 +61,14 @@ struct RoTxnInner<'e> {
 
 impl<'e, T> RoTxn<'e, T> {
     pub(crate) fn new(env: &'e Env<T>) -> Result<RoTxn<'e, T>> {
-        let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
-
-        unsafe {
-            mdb_result(ffi::mdb_txn_begin(
-                env.env_mut_ptr().as_mut(),
-                ptr::null_mut(),
-                ffi::MDB_RDONLY,
-                &mut txn,
-            ))?
-        };
-
-        Ok(RoTxn {
-            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
-            _tls_marker: PhantomData,
-        })
+        Self::begin(Cow::Borrowed(&env.inner))
     }
 
-    pub(crate) fn static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
+    pub(crate) fn from_owned_env(env: Env<T>) -> Result<RoTxn<'static, T>> {
+        Self::begin(Cow::Owned(env.inner))
+    }
+
+    fn begin(env: Cow<'_, Arc<EnvInner>>) -> Result<RoTxn<'_, T>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -90,10 +80,7 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn {
-            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Owned(env.inner) },
-            _tls_marker: PhantomData,
-        })
+        Ok(RoTxn { inner: RoTxnInner { txn: NonNull::new(txn), env }, _tls_marker: PhantomData })
     }
 
     pub(crate) fn txn_ptr(&self) -> NonNull<ffi::MDB_txn> {
@@ -279,6 +266,14 @@ pub struct RwTxn<'p> {
 
 impl<'p> RwTxn<'p> {
     pub(crate) fn new<T>(env: &'p Env<T>) -> Result<RwTxn<'p>> {
+        Self::begin(Cow::Borrowed(&env.inner))
+    }
+
+    pub(crate) fn from_owned_env<T>(env: Env<T>) -> Result<RwTxn<'static>> {
+        Self::begin(Cow::Owned(env.inner))
+    }
+
+    fn begin(env: Cow<'_, Arc<EnvInner>>) -> Result<RwTxn<'_>> {
         let mut txn: *mut ffi::MDB_txn = ptr::null_mut();
 
         unsafe {
@@ -292,7 +287,7 @@ impl<'p> RwTxn<'p> {
 
         Ok(RwTxn {
             txn: RoTxn {
-                inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
+                inner: RoTxnInner { txn: NonNull::new(txn), env },
                 _tls_marker: PhantomData,
             },
         })
