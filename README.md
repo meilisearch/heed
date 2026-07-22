@@ -15,9 +15,7 @@ Rust-centric [LMDB](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Databa
 Here is an example on how to store and read entries into LMDB in a safe and ACID way. For usage examples, see [heed/examples/](heed/examples/). To see more advanced usage techniques go check our [Cookbook](https://docs.rs/heed/latest/heed/cookbook/index.html).
 
 ```rust
-use std::fs;
-use std::path::Path;
-use heed::{EnvOpenOptions, Database};
+use heed::{EnvOpenOptions, Database, byteorder};
 use heed::types::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -35,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     wtxn.commit()?;
 
     // We open a read transaction to check if those values are now available
-    let mut rtxn = env.read_txn()?;
+    let rtxn = env.read_txn()?;
 
     let ret = db.get(&rtxn, "zero")?;
     assert_eq!(ret, Some(0));
