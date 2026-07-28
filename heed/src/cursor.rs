@@ -43,6 +43,17 @@ impl<'txn> RoCursor<'txn> {
         }
     }
 
+    pub fn count_duplicates(&mut self) -> Result<u64> {
+        let mut count: ffi::mdb_size_t = 0;
+        let result = unsafe { mdb_result(ffi::mdb_cursor_count(self.cursor, &mut count)) };
+
+        match result {
+            Ok(()) => Ok(count as u64),
+            Err(MdbError::Incompatible) => Ok(1),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub fn move_on_first(&mut self, op: MoveOperation) -> Result<Option<(&'txn [u8], &'txn [u8])>> {
         let mut key_val = mem::MaybeUninit::uninit();
         let mut data_val = mem::MaybeUninit::uninit();

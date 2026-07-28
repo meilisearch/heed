@@ -150,6 +150,54 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     pub fn lazily_decode_data(self) -> RoIter<'txn, KC, LazyDecode<DC>, IM> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
+
+    /// Return an O(1) count of duplicate values for the current key.
+    /// For non-DUP_SORT databases this always returns 1.
+    ///
+    /// On DUP_SORT databases it returns an error if called before the cursor
+    /// is positioned on a key (e.g., before the first [`RoIter::next`] on iterators
+    /// not obtained via [`Database::get_duplicates`]).
+    ///
+    /// ```
+    /// # use heed::EnvOpenOptions;
+    /// use heed::types::*;
+    /// use heed::byteorder::BigEndian;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let dir = tempfile::tempdir()?;
+    /// # let env = unsafe { EnvOpenOptions::new()
+    /// #     .map_size(10 * 1024 * 1024) // 10MB
+    /// #     .max_dbs(3000)
+    /// #     .open(dir.path())?
+    /// # };
+    /// type BEI64 = I64<BigEndian>;
+    ///
+    /// let mut wtxn = env.write_txn()?;
+    /// let db = env.database_options()
+    ///     .types::<BEI64, BEI64>()
+    ///     .flags(DatabaseFlags::DUP_SORT)
+    ///     .name("dup-sort")
+    ///     .create(&mut wtxn)?;
+    ///
+    /// # db.clear(&mut wtxn)?;
+    /// db.put(&mut wtxn, &68, &120)?;
+    /// db.put(&mut wtxn, &68, &121)?;
+    /// db.put(&mut wtxn, &68, &122)?;
+    /// db.put(&mut wtxn, &68, &123)?;
+    /// db.put(&mut wtxn, &35, &120)?;
+    ///
+    /// let mut iter = db.get_duplicates(&wtxn, &68)?.expect("the key exists");
+    /// assert_eq!(iter.count_duplicates()?, 4);
+    /// assert_eq!(iter.next().transpose()?, Some((68, 120)));
+    /// assert_eq!(iter.count_duplicates()?, 4);
+    /// drop(iter);
+    ///
+    /// wtxn.commit()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn count_duplicates(&mut self) -> Result<u64> {
+        self.cursor.count_duplicates()
+    }
 }
 
 impl<'txn, KC, DC, IM> Iterator for RoIter<'txn, KC, DC, IM>
