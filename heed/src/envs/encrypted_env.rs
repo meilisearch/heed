@@ -3,8 +3,8 @@ use std::fs::File;
 use std::panic::catch_unwind;
 use std::path::Path;
 
-use aead::generic_array::typenum::Unsigned;
-use aead::{AeadMutInPlace, Key, KeyInit, Nonce, Tag};
+use crypto_common::typenum::Unsigned;
+use aead::{inout::InOutBuf, AeadInOut, Key, KeyInit, Nonce, Tag};
 
 use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
@@ -455,50 +455,50 @@ impl<T> fmt::Debug for EncryptedEnv<T> {
     }
 }
 
-fn encrypt<A: AeadMutInPlace + KeyInit>(
+fn encrypt<A: AeadInOut + KeyInit>(
     key: &[u8],
     nonce: &[u8],
     aad: &[u8],
     plaintext: &[u8],
-    chipertext_out: &mut [u8],
+    ciphertext_out: &mut [u8],
     auth_out: &mut [u8],
 ) -> aead::Result<()> {
-    chipertext_out.copy_from_slice(plaintext);
-    let key: &Key<A> = key.into();
+    let key: &Key<A> = key.try_into().map_err(|_| aead::Error)?;
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
-        nonce[..A::NonceSize::USIZE].into()
+        nonce[..A::NonceSize::USIZE].try_into().map_err(|_| aead::Error)?
     } else {
         return Err(aead::Error);
     };
-    let mut aead = A::new(key);
-    let tag = aead.encrypt_in_place_detached(nonce, aad, chipertext_out)?;
+    let out = InOutBuf::new(plaintext, ciphertext_out).map_err(|_| aead::Error)?;
+    let aead = A::new(key);
+    let tag = aead.encrypt_inout_detached(nonce, aad, out)?;
     auth_out.copy_from_slice(&tag);
     Ok(())
 }
 
-fn decrypt<A: AeadMutInPlace + KeyInit>(
+fn decrypt<A: AeadInOut + KeyInit>(
     key: &[u8],
     nonce: &[u8],
     aad: &[u8],
-    chipher_text: &[u8],
+    cipher_text: &[u8],
     output: &mut [u8],
     auth_in: &[u8],
 ) -> aead::Result<()> {
-    output.copy_from_slice(chipher_text);
-    let key: &Key<A> = key.into();
+    let key: &Key<A> = key.try_into().map_err(|_| aead::Error)?;
     let nonce: &Nonce<A> = if nonce.len() >= A::NonceSize::USIZE {
-        nonce[..A::NonceSize::USIZE].into()
+        nonce[..A::NonceSize::USIZE].try_into().map_err(|_| aead::Error)?
     } else {
         return Err(aead::Error);
     };
-    let tag: &Tag<A> = auth_in.into();
-    let mut aead = A::new(key);
-    aead.decrypt_in_place_detached(nonce, aad, output, tag)
+    let out = InOutBuf::new(cipher_text, output).map_err(|_| aead::Error)?;
+    let tag: &Tag<A> = auth_in.try_into().map_err(|_| aead::Error)?;
+    let aead = A::new(key);
+    aead.decrypt_inout_detached(nonce, aad, out, tag)
 }
 
 /// The wrapper function that is called by LMDB that directly calls
 /// the Rust idiomatic function internally.
-pub(crate) unsafe extern "C" fn encrypt_func_wrapper<E: AeadMutInPlace + KeyInit>(
+pub(crate) unsafe extern "C" fn encrypt_func_wrapper<E: AeadInOut + KeyInit>(
     src: *const ffi::MDB_val,
     dst: *mut ffi::MDB_val,
     key_ptr: *const ffi::MDB_val,

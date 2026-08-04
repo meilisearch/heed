@@ -9,7 +9,10 @@ use std::sync::Arc;
 use std::{io, ptr};
 
 #[cfg(master3)]
-use aead::{generic_array::typenum::Unsigned, AeadCore, AeadMutInPlace, Key, KeyInit};
+use crypto_common::typenum::Unsigned;
+
+#[cfg(master3)]
+use aead::{AeadCore, AeadInOut, Key, KeyInit};
 use synchronoise::SignalEvent;
 
 #[cfg(master3)]
@@ -385,7 +388,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     #[cfg(master3)]
     pub unsafe fn open_encrypted<E, P>(&self, key: Key<E>, path: P) -> Result<EncryptedEnv<T>>
     where
-        E: AeadMutInPlace + KeyInit,
+        E: AeadInOut + KeyInit,
         P: AsRef<Path>,
     {
         self.raw_open_with_encryption(
