@@ -2675,21 +2675,21 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// /// List databases in an env
     #[cfg_attr(not(master3), doc = concat!(
-    "fn list_dbs<T>(env: &heed::Env, rotxn: &heed::UniqueRoTxn<'_, T>) -> heed::Result<Vec<String>> {\n",
+    "fn list_dbs<'a, U>(env: &'a heed::Env, rotxn: &U) -> heed::Result<Vec<String>> where U: heed::AsUniqueTxnRef<'a> {\n",
     "    let names_db: Database<Str, DecodeIgnore> =",
     ))]
     #[cfg_attr(master3, doc = concat!(
-    "fn list_dbs<T>(\n",
-    "    env: &heed::Env,\n",
-    "    rotxn: &heed::UniqueRoTxn<'_, T>,\n",
-    ") -> Result<Vec<String>, Box<dyn std::error::Error>> {\n",
+    "fn list_dbs<'a, U>(\n",
+    "    env: &'a heed::Env,\n",
+    "    rotxn: U,\n",
+    ") -> Result<Vec<String>, Box<dyn std::error::Error>> where U: heed::AsUniqueTxnRef<'a> {\n",
     "    // mdb-master3 uses null-terminated C strings as DB names\n",
     "    let names_db: Database<Bytes, DecodeIgnore> =",
     ))]
     ///         env.open_database(&rotxn, None)?
     ///            .expect("the unnamed database always exists");
     ///     let mut names = Vec::new();
-    ///     for item in names_db.iter(&rotxn)? {
+    ///     for item in names_db.iter(&rotxn.as_unique_txn_ref())? {
     ///         let (name, ()) = item?;
     #[cfg_attr(master3, doc = concat!(
     "        let name = std::ffi::CStr::from_bytes_with_nul(name)?.to_str()?;",

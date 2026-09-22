@@ -106,7 +106,7 @@ pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode, Comparator, LexicographicComparator};
 pub use self::txn::{
-    AnyTls, RoTxn, RwTxn, TlsUsage, UniqueRoTxn, UniqueRwTxn, WithTls, WithoutTls,
+    AnyTls, AsUniqueTxnRef, RoTxn, RwTxn, TlsUsage, UniqueRoTxn, UniqueRwTxn, WithTls, WithoutTls,
 };
 
 /// The underlying LMDB library version information.

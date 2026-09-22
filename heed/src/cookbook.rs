@@ -113,7 +113,7 @@
 //!     for result in unnamed.iter(&rtxn)? {
 //!         let (name, ()) = result?;
 //!
-//!         if let Ok(Some(_db)) = env.open_database::<Str, Bytes>(&rtxn, Some(name)) {
+//!         if let Ok(Some(_db)) = env.open_database::<Str, Bytes, _>(&rtxn, Some(name)) {
 //!             // We succeeded into opening a new database that
 //!             // contains strings associated to raw bytes.
 //!         }

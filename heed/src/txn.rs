@@ -501,6 +501,15 @@ pub trait AsUniqueTxnRef<'e> {
     fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e>;
 }
 
+impl<'e, 'a, U> AsUniqueTxnRef<'e> for &'a U
+where
+    U: AsUniqueTxnRef<'e>,
+{
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
+        U::as_unique_txn_ref(self)
+    }
+}
+
 impl<'e> AsUniqueTxnRef<'e> for UniqueRoTxn<'e, WithoutTls> {
     fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
         UniqueTxnRef { txn: &*self.txn, _lock: &self._lock }
