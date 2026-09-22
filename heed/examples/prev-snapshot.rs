@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 
     // We fill the db database with entries.
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 
     assert!(db.is_empty(&wtxn)?);
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 
     assert_eq!(db.get(&wtxn, "I am here")?, Some("to test things"));
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let rtxn = env.read_txn()?;
+    let rtxn = env.unique_read_txn()?;
     let db: Database<Str, Str> = env.open_database(&rtxn, None)?.unwrap();
 
     assert_eq!(db.get(&rtxn, "I am here")?, Some("to test things"));

@@ -93,7 +93,7 @@ bitflags! {
         /// #     .open(dir.path())?
         /// # };
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<Str, Unit>()
         ///     .flags(DatabaseFlags::REVERSE_KEY)
@@ -141,7 +141,7 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<BEI64, BEI64>()
         ///     .flags(DatabaseFlags::DUP_SORT)
@@ -207,7 +207,7 @@ bitflags! {
         /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<BEI32, BEI32>()
         ///     .flags(DatabaseFlags::INTEGER_KEY)
@@ -253,7 +253,7 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<BEI64, BEI64>()
         ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
@@ -313,7 +313,7 @@ bitflags! {
         /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<BEI32, BEI32>()
         ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::INTEGER_DUP)
@@ -374,7 +374,7 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
+        /// let mut wtxn = env.unique_write_txn()?;
         /// let db = env.database_options()
         ///     .types::<BEI64, Str>()
         ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::REVERSE_DUP)

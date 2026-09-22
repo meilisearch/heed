@@ -5,7 +5,7 @@ use std::io::Seek;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
@@ -20,6 +20,7 @@ use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
+use crate::txn::{AsUniqueTxnRef, UniqueRoTxn, UniqueRwTxn};
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
@@ -40,7 +41,15 @@ impl<T> Env<T> {
         path: PathBuf,
         signal_event: Arc<SignalEvent>,
     ) -> Self {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }), _tls_marker: PhantomData }
+        Env {
+            inner: Arc::new(EnvInner {
+                env_ptr,
+                path,
+                signal_event,
+                dbi_open_mutex: Mutex::new(()),
+            }),
+            _tls_marker: PhantomData,
+        }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -266,14 +275,15 @@ impl<T> Env<T> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open_database<KC, DC>(
-        &self,
-        rtxn: &RoTxn,
+    pub fn open_database<'e, KC, DC, U>(
+        &'e self,
+        rtxn: &U,
         name: Option<&str>,
     ) -> Result<Option<Database<KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
+        U: AsUniqueTxnRef<'e>,
     {
         let mut options = self.database_options().types::<KC, DC>();
         if let Some(name) = name {
@@ -293,7 +303,7 @@ impl<T> Env<T> {
     /// and these keys can only be read and not written.
     pub fn create_database<KC, DC>(
         &self,
-        wtxn: &mut RwTxn,
+        wtxn: &mut UniqueRwTxn,
         name: Option<&str>,
     ) -> Result<Database<KC, DC>>
     where
@@ -457,6 +467,125 @@ impl<T> Env<T> {
         RoTxn::static_read_txn(self)
     }
 
+    fn lock(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.inner.dbi_open_mutex.lock() {
+                Ok(lock) => break lock,
+                Err(_) => self.inner.dbi_open_mutex.clear_poison(),
+            }
+        }
+    }
+
+    fn try_lock(&self) -> Option<MutexGuard<'_, ()>> {
+        let lock = loop {
+            match self.inner.dbi_open_mutex.try_lock() {
+                Ok(lock) => break Some(lock),
+                Err(std::sync::TryLockError::Poisoned(_)) => {
+                    self.inner.dbi_open_mutex.clear_poison()
+                }
+                Err(std::sync::TryLockError::WouldBlock) => break None,
+            }
+        };
+        lock
+    }
+
+    /// Create a transaction with read and write access for use with the environment that can open and create databases.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// 1. Only one [`UniqueRwTxn`] or [`RwTxn`] may exist simultaneously in the current environment.
+    /// If another write transaction is initiated, while another write transaction exists
+    /// the thread initiating the new one will wait on a mutex upon completion of the previous
+    /// transaction.
+    /// 2. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exust simultaneously in the current environment.
+    /// If another unique transaction is initiated, while another unique transaction exists,
+    /// the thread initiating the new one will wait on a mutex upon completion of the previous
+    /// transaction.
+    pub fn unique_write_txn(&self) -> Result<UniqueRwTxn<'_>> {
+        UniqueRwTxn::new(self, self.lock())
+    }
+
+    /// Attempt to create a transaction with read and write access for use with the environment that can open and create databases.
+    ///
+    /// If another unique transaction already exists in the environment, return `Ok(None)`.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// 1. Only one [`UniqueRwTxn`] or [`RwTxn`] may exist simultaneously in the current environment.
+    /// If another write transaction is initiated, while another write transaction exists
+    /// the thread initiating the new one will wait on a mutex upon completion of the previous
+    /// transaction.
+    /// 2. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
+    /// Any attempt to initiate a unique transaction with this function while another unique transaction exists
+    /// will return `Ok(None)`.
+    pub fn try_unique_write_txn(&self) -> Result<Option<UniqueRwTxn<'_>>> {
+        self.try_lock().map(|lock| UniqueRwTxn::new(self, lock)).transpose()
+    }
+
+    /// Create a transaction with read-only access for use with the environment that can open databases.
+    ///
+    /// Opened databases can be made public for use by other transactions by committing this transaction.
+    ///
+    /// You can make this transaction `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// 1. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
+    /// If another unique transaction is initiated, while another unique transaction exists
+    /// the thread initiating the new one will wait on a mutex upon completion of the previous transaction.
+    /// 2. It is possible to have multiple [`RoTxn`] and a [`RwTxn`] while a [`UniqueRoTxn`] exists in the current environment.
+    ///
+    ///    But read transactions prevent reuse of pages freed by newer write transactions,
+    ///    thus the database can grow quickly. Write transactions prevent other write transactions,
+    ///    since writes are serialized.
+    ///
+    ///    So avoid long-lived read transactions.
+    ///
+    /// ## Errors
+    ///
+    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
+    ///   map must be resized
+    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
+    ///   full
+    pub fn unique_read_txn(&self) -> Result<UniqueRoTxn<'_, T>> {
+        UniqueRoTxn::new(self, self.lock())
+    }
+
+    /// Attempt to create a transaction with read-only access for use with the environment that can open databases.
+    ///
+    /// Opened databases can be made public for use by other transactions by committing this transaction.
+    ///
+    /// You can make this transaction `Send`able between threads by opening
+    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
+    /// method.
+    ///
+    /// ## LMDB Limitations
+    ///
+    /// 1. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
+    /// Any attempt to initiate another unique transaction with this method, while another unique transaction exists,
+    /// will return `Ok(None)`.
+    /// 2. It is possible to have multiple [`RoTxn`] and a [`RwTxn`] while a [`UniqueRoTxn`] exists in the current environment.
+    ///
+    ///    But read transactions prevent reuse of pages freed by newer write transactions,
+    ///    thus the database can grow quickly. Write transactions prevent other write transactions,
+    ///    since writes are serialized.
+    ///
+    ///    So avoid long-lived read transactions.
+    ///
+    /// ## Errors
+    ///
+    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
+    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
+    ///   map must be resized
+    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
+    ///   full
+    pub fn try_unique_read_txn(&self) -> Result<Option<UniqueRoTxn<'_, T>>> {
+        self.try_lock().map(|lock| UniqueRoTxn::new(self, lock)).transpose()
+    }
+
     /// Copy an LMDB environment to the specified path, with options.
     ///
     /// This function may be used to make a backup of an existing environment.
@@ -480,7 +609,7 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
     ///
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
@@ -533,7 +662,7 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
     ///
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
@@ -684,7 +813,7 @@ impl Env<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
     ///
     /// // opening a write transaction
@@ -731,6 +860,7 @@ pub(crate) struct EnvInner {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
+    dbi_open_mutex: Mutex<()>,
 }
 
 impl EnvInner {
@@ -779,7 +909,7 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -856,7 +986,7 @@ mod tests {
         unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
         let env = unsafe { envbuilder.open(dir.path()).unwrap() };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
         wtxn.commit().unwrap();
     }
@@ -880,12 +1010,12 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
         wtxn.abort();
 
-        let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        let rtxn = env.unique_read_txn().unwrap();
+        let option = env.open_database::<Str, Str, _>(&rtxn, Some("my-super-db")).unwrap();
         assert!(option.is_none());
     }
 
@@ -901,7 +1031,7 @@ mod tests {
         };
 
         // we first create a database
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
         wtxn.commit().unwrap();
 
@@ -915,8 +1045,8 @@ mod tests {
                 .unwrap()
         };
 
-        let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        let rtxn = env.unique_read_txn().unwrap();
+        let option = env.open_database::<Str, Str, _>(&rtxn, Some("my-super-db")).unwrap();
         assert!(option.is_some());
     }
 
@@ -928,7 +1058,7 @@ mod tests {
             EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
         wtxn.commit().unwrap();
 
@@ -975,7 +1105,7 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let mut wtxn = env.write_txn().unwrap();
+            let mut wtxn = env.unique_write_txn().unwrap();
             let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
 
             wtxn.commit().unwrap();
@@ -996,9 +1126,9 @@ mod tests {
                     .unwrap()
             };
             let database0 = {
-                let rtxn = env.read_txn().unwrap();
+                let rtxn = env.unique_read_txn().unwrap();
                 let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
+                    env.open_database::<Str, Str, _>(&rtxn, Some("shared0")).unwrap().unwrap();
                 // This commit is mandatory if not committed you might get
                 // Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })
                 rtxn.commit().unwrap();
@@ -1026,9 +1156,9 @@ mod tests {
                     .unwrap()
             };
             let database0 = {
-                let rtxn = env.read_txn().unwrap();
+                let rtxn = env.unique_read_txn().unwrap();
                 let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
+                    env.open_database::<Str, Str, _>(&rtxn, Some("shared0")).unwrap().unwrap();
                 // No commit it's important, dropping explicitly
                 drop(rtxn);
                 database0

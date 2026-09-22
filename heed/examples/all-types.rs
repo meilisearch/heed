@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // here the key will be an str and the data will be a slice of u8
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("kiki"))?;
 
     db.put(&mut wtxn, "hello", &[2, 3][..])?;
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, SerdeBincode<Hello>> =
         env.create_database(&mut wtxn, Some("serde-bincode"))?;
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     wtxn.commit()?;
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, SerdeJson<Hello>> = env.create_database(&mut wtxn, Some("serde-json"))?;
 
     let hello = Hello { string: "hi" };
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     // you can ignore the data
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
 
     db.put(&mut wtxn, "hello", &())?;
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // database opening and types are tested in a safe way
     //
     // we try to open a database twice with the same types
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let _db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
 
     // you can iterate over keys in order

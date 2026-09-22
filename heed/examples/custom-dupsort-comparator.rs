@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let db = env
         .database_options()
         .types::<Str, U128<BigEndian>>()

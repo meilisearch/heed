@@ -117,7 +117,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Str>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -199,7 +199,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -269,7 +269,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -363,7 +363,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -413,7 +413,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -490,7 +490,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -567,7 +567,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -639,7 +639,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 
@@ -692,7 +692,7 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
+        let mut wtxn = env.unique_write_txn().unwrap();
         let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
         wtxn.commit().unwrap();
 

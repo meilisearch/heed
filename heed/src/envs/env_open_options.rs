@@ -164,7 +164,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// // we will open the default unamed database
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
     ///
     /// // opening a write transaction

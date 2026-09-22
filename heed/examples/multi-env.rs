@@ -23,8 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env2_path)?
     };
 
-    let mut wtxn1 = env1.write_txn()?;
-    let mut wtxn2 = env2.write_txn()?;
+    let mut wtxn1 = env1.unique_write_txn()?;
+    let mut wtxn2 = env2.unique_write_txn()?;
     let db1: Database<Str, Bytes> = env1.create_database(&mut wtxn1, Some("hello"))?;
     let db2: Database<BEU32, BEU32> = env2.create_database(&mut wtxn2, Some("hello"))?;
 

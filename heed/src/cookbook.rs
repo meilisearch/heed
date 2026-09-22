@@ -35,7 +35,7 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
 //!
 //!     fill_with_data(&mut wtxn, db)?;
@@ -102,7 +102,7 @@
 //!             .open(env_path)?
 //!     };
 //!
-//!     let rtxn = env.read_txn()?;
+//!     let rtxn = env.unique_read_txn()?;
 //!     // The database names are mixed with the user entries therefore we prefer
 //!     // ignoring the values and try to open the databases one by one using the keys.
 //!     let unnamed: Database<Str, DecodeIgnore> =
@@ -241,7 +241,7 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db: Database<LogKeyCodec, Str> = env.create_database(&mut wtxn, None)?;
 //!
 //!     db.put(
@@ -303,7 +303,7 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 //!
 //!     // Ho! Crap! We don't have enough space in this environment...
@@ -324,7 +324,7 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 //!
 //!     // We now have enough space in the env to store all of our entries.
@@ -386,7 +386,7 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
 //!
 //!     fill_with_data(&mut wtxn, db)?;
@@ -483,7 +483,7 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db = env
 //!         .database_options()
 //!         .types::<Str, Unit>()
@@ -548,7 +548,7 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!     let db = env
 //!         .database_options()
 //!         .types::<Str, U128<BigEndian>>()
@@ -607,7 +607,7 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let mut wtxn = env.unique_write_txn()?;
 //!
 //!     let db = env
 //!         .database_options()

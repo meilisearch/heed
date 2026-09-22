@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, MutexGuard};
 
 use crate::envs::{Env, EnvInner};
 use crate::mdb::error::mdb_result;
@@ -111,23 +111,6 @@ impl<'e, T> RoTxn<'e, T> {
     /// concurrent readers will frequently have the same transaction ID.
     pub fn id(&self) -> usize {
         unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) }
-    }
-
-    /// Commit a read transaction.
-    ///
-    /// Synchronizing some [`Env`] metadata with the global handle.
-    ///
-    /// ## LMDB
-    ///
-    /// It's mandatory in a multi-process setup to call [`RoTxn::commit`] upon read-only database opening.
-    /// After the transaction opening, the database is dropped. The next transaction might return
-    /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
-    pub fn commit(mut self) -> Result<()> {
-        // Asserts that the transaction hasn't been already
-        // committed/aborter and ensure we cannot use it twice.
-        let mut txn = self.inner.txn.take().unwrap();
-        let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
-        result.map_err(Into::into)
     }
 }
 
@@ -345,7 +328,7 @@ impl<'p> RwTxn<'p> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
     ///
     /// // opening a write transaction
@@ -416,6 +399,165 @@ impl<'p> Deref for RwTxn<'p> {
 // TODO can't we just always implement it?
 #[cfg(master3)]
 impl std::ops::DerefMut for RwTxn<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.txn
+    }
+}
+
+/// A unique read-only transaction.
+///
+/// ## LMDB Limitations
+///
+/// It's a must to keep read transactions short-lived.
+///
+/// Active Read transactions prevent the reuse of pages freed
+/// by newer write transactions, thus the database can grow quickly.
+///
+/// ## OSX/Darwin Limitation
+///
+/// At least 10 transactions can be active at the same time in the same process, since only 10 POSIX semaphores can
+/// be active at the same time for a process. Threads are in the same process space.
+///
+/// If the process crashes in the POSIX semaphore locking section of the transaction, the semaphore will be kept locked.
+///
+/// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
+///
+/// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+pub struct UniqueRoTxn<'e, T = AnyTls> {
+    txn: RoTxn<'e, T>,
+    _lock: MutexGuard<'e, ()>,
+}
+
+impl<'e, T> UniqueRoTxn<'e, T> {
+    pub(crate) fn new(env: &'e Env<T>, lock: MutexGuard<'e, ()>) -> Result<UniqueRoTxn<'e, T>> {
+        Ok(Self { txn: RoTxn::new(env)?, _lock: lock })
+    }
+
+    /// Commit a unique read transaction.
+    ///
+    /// The main effect of the function is to make the dbi obtained from [`DatabaseOptions::Open`] public.
+    ///
+    /// Synchronizing some [`Env`] metadata with the global handle.
+    ///
+    /// ## LMDB
+    ///
+    /// It's mandatory in a multi-process setup to call [`UniqueRoTxn::commit`] upon read-only database opening.
+    /// After the transaction opening, the database is dropped. The next transaction might return
+    /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
+    pub fn commit(mut self) -> Result<()> {
+        // Asserts that the transaction hasn't been already
+        // committed/aborter and ensure we cannot use it twice.
+        let mut txn = self.txn.inner.txn.take().unwrap();
+        let result = unsafe { mdb_result(ffi::mdb_txn_commit(txn.as_mut())) };
+        result.map_err(Into::into)
+    }
+}
+
+impl<'e, T> Deref for UniqueRoTxn<'e, T> {
+    type Target = RoTxn<'e, T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.txn
+    }
+}
+
+/// A unique read-write transaction.
+///
+/// ## LMDB Limitations
+///
+/// Only one [`RwTxn`] or [`UniqueRwTxn`] may exist in the same environment at the same time.
+/// If two exist, the new one may wait on a mutex for [`RwTxn::commit`] or [`RwTxn::abort`] to
+/// be called for the first one.
+///
+/// ## OSX/Darwin Limitation
+///
+/// At least 10 transactions can be active at the same time in the same process, since only 10 POSIX semaphores can
+/// be active at the same time for a process. Threads are in the same process space.
+///
+/// If the process crashes in the POSIX semaphore locking section of the transaction, the semaphore will be kept locked.
+///
+/// Note: if your program already use POSIX semaphores, you will have less available for heed/LMDB!
+///
+/// You may increase the limit by editing it **at your own risk**: `/Library/LaunchDaemons/sysctl.plist`
+pub struct UniqueRwTxn<'e> {
+    txn: RwTxn<'e>,
+    _lock: MutexGuard<'e, ()>,
+}
+
+pub struct UniqueTxnRef<'a, 'e> {
+    txn: &'a RoTxn<'e, AnyTls>,
+    _lock: &'a MutexGuard<'e, ()>,
+}
+
+impl<'a, 'e> Deref for UniqueTxnRef<'a, 'e> {
+    type Target = RoTxn<'e>;
+
+    fn deref(&self) -> &Self::Target {
+        self.txn
+    }
+}
+
+pub trait AsUniqueTxnRef<'e> {
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e>;
+}
+
+impl<'e> AsUniqueTxnRef<'e> for UniqueRoTxn<'e, WithoutTls> {
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
+        UniqueTxnRef { txn: &*self.txn, _lock: &self._lock }
+    }
+}
+
+impl<'e> AsUniqueTxnRef<'e> for UniqueRoTxn<'e, WithTls> {
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
+        UniqueTxnRef { txn: &*self.txn, _lock: &self._lock }
+    }
+}
+
+impl<'e> AsUniqueTxnRef<'e> for UniqueRoTxn<'e, AnyTls> {
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
+        UniqueTxnRef { txn: &self.txn, _lock: &self._lock }
+    }
+}
+
+impl<'e> AsUniqueTxnRef<'e> for UniqueRwTxn<'e> {
+    fn as_unique_txn_ref(&self) -> UniqueTxnRef<'_, 'e> {
+        UniqueTxnRef { txn: &self.txn, _lock: &self._lock }
+    }
+}
+
+impl<'e> UniqueRwTxn<'e> {
+    pub(crate) fn new<T>(env: &'e Env<T>, lock: MutexGuard<'e, ()>) -> Result<UniqueRwTxn<'e>> {
+        Ok(Self { txn: RwTxn::new(env)?, _lock: lock })
+    }
+
+    /// Commit all the operations of a transaction into the database.
+    ///
+    /// All opened and created databases in this transaction will become public.
+    ///
+    /// The transaction is reset.
+    pub fn commit(self) -> Result<()> {
+        self.txn.commit()
+    }
+
+    /// Abandon all the operations of the transaction instead of saving them.
+    ///
+    /// All opened and created databases in this transaction will be invalidated.
+    ///
+    /// The transaction is reset.
+    pub fn abort(self) {
+        self.txn.abort()
+    }
+}
+
+impl<'e> Deref for UniqueRwTxn<'e> {
+    type Target = RwTxn<'e>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.txn
+    }
+}
+
+impl<'e> DerefMut for UniqueRwTxn<'e> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.txn
     }

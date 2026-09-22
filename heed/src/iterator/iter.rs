@@ -36,7 +36,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)
@@ -89,7 +89,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)

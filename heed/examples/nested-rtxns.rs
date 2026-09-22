@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // opening a write transaction
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     // we will open the default unnamed database
     let db: Database<U32<byteorder::BigEndian>, Bytes> = env.create_database(&mut wtxn, None)?;
 

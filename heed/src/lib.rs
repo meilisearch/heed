@@ -46,7 +46,7 @@
 //! let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
 //!
 //! // we will open the default unnamed database
-//! let mut wtxn = env.write_txn()?;
+//! let mut wtxn = env.unique_write_txn()?;
 //! let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
@@ -105,7 +105,9 @@ use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode, Comparator, LexicographicComparator};
-pub use self::txn::{AnyTls, RoTxn, RwTxn, TlsUsage, WithTls, WithoutTls};
+pub use self::txn::{
+    AnyTls, RoTxn, RwTxn, TlsUsage, UniqueRoTxn, UniqueRwTxn, WithTls, WithoutTls,
+};
 
 /// The underlying LMDB library version information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let mut wtxn = env.unique_write_txn()?;
     let first: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
     let second: Database<Str, Str> = env.create_database(&mut wtxn, Some("second"))?;
 

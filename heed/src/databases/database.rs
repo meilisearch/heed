@@ -11,6 +11,7 @@ use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::mdb::lmdb_flags::{AllDatabaseFlags, DatabaseFlags};
+use crate::txn::{AsUniqueTxnRef, UniqueRwTxn};
 use crate::*;
 
 /// Options and flags which can be used to configure how a [`Database`] is opened.
@@ -38,7 +39,7 @@ use crate::*;
 /// // Imagine you have an optional name
 /// let conditional_name = Some("big-endian-iter");
 ///
-/// let mut wtxn = env.write_txn()?;
+/// let mut wtxn = env.unique_write_txn()?;
 /// let mut options = env.database_options().types::<BEI64, Unit>();
 /// if let Some(name) = conditional_name {
 ///    options.name(name);
@@ -144,13 +145,15 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<Database<KC, DC, C, CDUP>>>
+    pub fn open<U>(&self, rtxn: &U) -> Result<Option<Database<KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
         CDUP: Comparator + 'static,
+        U: AsUniqueTxnRef<'e>,
     {
+        let rtxn = rtxn.as_unique_txn_ref();
         assert_eq_env_txn!(self.env, rtxn);
 
         match self.env.raw_init_database::<C, CDUP>(rtxn.txn_ptr(), self.name, self.flags) {
@@ -169,7 +172,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create(&self, wtxn: &mut RwTxn) -> Result<Database<KC, DC, C, CDUP>>
+    pub fn create(&self, wtxn: &mut UniqueRwTxn) -> Result<Database<KC, DC, C, CDUP>>
     where
         KC: 'static,
         DC: 'static,
@@ -219,7 +222,7 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.write_txn()?;
+/// let mut wtxn = env.unique_write_txn()?;
 /// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
 /// # db.clear(&mut wtxn)?;
@@ -267,7 +270,7 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.write_txn()?;
+/// let mut wtxn = env.unique_write_txn()?;
 /// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
 ///
 /// # db.clear(&mut wtxn)?;
@@ -338,7 +341,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32= U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("get-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -408,7 +411,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)
@@ -482,7 +485,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -551,7 +554,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -624,7 +627,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -696,7 +699,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -762,7 +765,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -816,7 +819,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -866,7 +869,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -909,7 +912,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -952,7 +955,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1018,7 +1021,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1060,7 +1063,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1120,7 +1123,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1164,7 +1167,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1226,7 +1229,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1267,7 +1270,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Bytes, Unit> = env.create_database(&mut wtxn, None)?;
     ///
     /// // make sure to create slices and not ref array
@@ -1343,7 +1346,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1438,7 +1441,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1516,7 +1519,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1612,7 +1615,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1670,7 +1673,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1745,7 +1748,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1803,7 +1806,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1872,7 +1875,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -1935,7 +1938,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2007,7 +2010,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI32, Str>()
     ///     .name("dup-i32")
@@ -2099,7 +2102,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2146,7 +2149,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2224,7 +2227,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2288,7 +2291,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2388,7 +2391,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2455,7 +2458,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)
@@ -2552,7 +2555,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2621,7 +2624,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2672,13 +2675,13 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// /// List databases in an env
     #[cfg_attr(not(master3), doc = concat!(
-    "fn list_dbs(env: &heed::Env, rotxn: &heed::RoTxn<'_>) -> heed::Result<Vec<String>> {\n",
+    "fn list_dbs<T>(env: &heed::Env, rotxn: &heed::UniqueRoTxn<'_, T>) -> heed::Result<Vec<String>> {\n",
     "    let names_db: Database<Str, DecodeIgnore> =",
     ))]
     #[cfg_attr(master3, doc = concat!(
-    "fn list_dbs(\n",
+    "fn list_dbs<T>(\n",
     "    env: &heed::Env,\n",
-    "    rotxn: &heed::RoTxn<'_>,\n",
+    "    rotxn: &heed::UniqueRoTxn<'_, T>,\n",
     ") -> Result<Vec<String>, Box<dyn std::error::Error>> {\n",
     "    // mdb-master3 uses null-terminated C strings as DB names\n",
     "    let names_db: Database<Bytes, DecodeIgnore> =",
@@ -2698,16 +2701,16 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     ///
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut rwtxn = env.write_txn()?;
+    /// let mut rwtxn = env.unique_write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut rwtxn, Some("iter-i32"))?;
     /// rwtxn.commit()?;
     ///
-    /// let rotxn = env.read_txn()?;
+    /// let rotxn = env.unique_read_txn()?;
     /// let db_names = list_dbs(&env, &rotxn)?;
     /// assert_eq!(db_names, vec!["iter-i32".to_owned()]);
     /// drop(rotxn);
     ///
-    /// let mut rwtxn = env.write_txn()?;
+    /// let mut rwtxn = env.unique_write_txn()?;
     /// unsafe { db.remove(&mut rwtxn)? };
     /// let db_names = list_dbs(&env, &rwtxn)?;
     /// assert!(db_names.is_empty());
@@ -2749,7 +2752,7 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
+    /// let mut wtxn = env.unique_write_txn()?;
     /// let db: Database<Unit, Unit> = env.create_database(&mut wtxn, Some("iter-i32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2814,7 +2817,7 @@ mod tests {
     fn put_overwrite() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
+        let mut txn = env.unique_write_txn()?;
         let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
 
         assert_eq!(db.get(&txn, b"hello").unwrap(), None);
@@ -2856,7 +2859,7 @@ mod tests {
 
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
+        let mut txn = env.unique_write_txn()?;
         let db = env
             .database_options()
             .types::<NEU32, NEU32>()
