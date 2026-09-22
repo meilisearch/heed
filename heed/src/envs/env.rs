@@ -224,7 +224,7 @@ impl<T> Env<T> {
         let stat = unsafe { stat.assume_init() };
         size += compute_size(stat);
 
-        let rtxn = self.read_txn()?;
+        let rtxn = self.unique_read_txn()?;
         // Open the main database
         let dbi = self.raw_open_dbi(rtxn.txn_ptr(), None, 0)?;
 
