@@ -64,6 +64,7 @@ pub struct EnvInfo {
 
 /// Statistics for an environment.
 #[derive(Debug, Clone, Copy)]
+// TODO: EnvStat is actually the DatabaseStat of the main/unnamed db
 pub struct EnvStat {
     /// Size of a database page.
     /// This is currently the same for all databases.
@@ -78,6 +79,13 @@ pub struct EnvStat {
     pub overflow_pages: usize,
     /// Number of data items.
     pub entries: usize,
+}
+
+impl EnvStat {
+    /// Size used by the unnamed db without the free pages.
+    pub fn non_free_page_size(&self) -> usize {
+        (self.leaf_pages + self.branch_pages + self.overflow_pages) * self.page_size as usize
+    }
 }
 
 /// A structure that can be used to wait for the closing event.

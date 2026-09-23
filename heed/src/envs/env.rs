@@ -15,7 +15,6 @@ use super::{
     custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
     IntegerComparator, OPENED_ENV,
 };
-use crate::cursor::{MoveOperation, RoCursor};
 use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
@@ -204,55 +203,6 @@ impl<T> Env<T> {
             overflow_pages: ms_overflow_pages,
             entries: ms_entries,
         }
-    }
-
-    /// Returns the size used by all the databases in the environment without the free pages.
-    ///
-    /// It is crucial to configure [`EnvOpenOptions::max_dbs`] with a sufficiently large value
-    /// before invoking this function. All databases within the environment will be opened
-    /// and remain so.
-    pub fn non_free_pages_size<'e, U>(&self, txn: &U) -> Result<u64>
-    where
-        U: AsUniqueTxnRef<'e>,
-    {
-        let txn = txn.as_unique_txn_ref();
-        let compute_size = |stat: ffi::MDB_stat| {
-            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
-                * stat.ms_psize as u64
-        };
-
-        let mut size = 0;
-
-        let mut stat = mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr().as_mut(), stat.as_mut_ptr()))? };
-        let stat = unsafe { stat.assume_init() };
-        size += compute_size(stat);
-
-        // Open the main database
-        let dbi = self.raw_open_dbi(txn.txn_ptr(), None, 0)?;
-
-        // We're going to iterate on the unnamed database
-        let mut cursor = RoCursor::new(&txn, dbi)?;
-
-        while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
-            if key.contains(&0) {
-                continue;
-            }
-
-            let key = String::from_utf8(key.to_vec()).unwrap();
-            // Calling `ffi::db_stat` on a database instance does not involve key comparison
-            // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) = self.raw_open_dbi(txn.txn_ptr(), Some(&key), 0) {
-                let mut stat = mem::MaybeUninit::uninit();
-                unsafe {
-                    mdb_result(ffi::mdb_stat(txn.txn_ptr().as_mut(), dbi, stat.as_mut_ptr()))?
-                };
-                let stat = unsafe { stat.assume_init() };
-                size += compute_size(stat);
-            }
-        }
-
-        Ok(size)
     }
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
