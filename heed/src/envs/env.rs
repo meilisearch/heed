@@ -3,9 +3,9 @@ use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Seek;
 use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
@@ -13,7 +13,7 @@ use synchronoise::SignalEvent;
 
 use super::{
     custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
-    IntegerComparator, OPENED_ENV,
+    IntegerComparator, PathEntry,
 };
 use crate::cursor::{MoveOperation, RoCursor};
 use crate::envs::EnvStat;
@@ -37,10 +37,10 @@ pub struct Env<T = WithTls> {
 impl<T> Env<T> {
     pub(crate) fn new(
         env_ptr: NonNull<MDB_env>,
-        path: PathBuf,
+        entry: Arc<PathEntry>,
         signal_event: Arc<SignalEvent>,
     ) -> Self {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }), _tls_marker: PhantomData }
+        Env { inner: Arc::new(EnvInner { env_ptr, entry, signal_event }), _tls_marker: PhantomData }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -597,7 +597,7 @@ impl<T> Env<T> {
 
     /// Returns the canonicalized path where this env lives.
     pub fn path(&self) -> &Path {
-        &self.inner.path
+        &self.inner.entry.path
     }
 
     /// Returns the maximum number of threads/reader slots for the environment.
@@ -723,14 +723,16 @@ unsafe impl<T> Sync for Env<T> {}
 
 impl<T> fmt::Debug for Env<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Env").field("path", &self.inner.path.display()).finish_non_exhaustive()
+        f.debug_struct("Env")
+            .field("path", &self.inner.entry.path.display())
+            .finish_non_exhaustive()
     }
 }
 
 pub(crate) struct EnvInner {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
-    pub(crate) path: PathBuf,
+    entry: Arc<PathEntry>,
 }
 
 impl EnvInner {
@@ -744,11 +746,18 @@ unsafe impl Sync for EnvInner {}
 
 impl Drop for EnvInner {
     fn drop(&mut self) {
-        let mut lock = OPENED_ENV.write().unwrap();
-        let removed = lock.remove(&self.path);
-        debug_assert!(removed.is_some());
+        // The entry's state is locked for the whole close, so a thread opening this path waits
+        // here rather than racing the teardown of this environment. Only the FFI close and the
+        // assignment run under it, neither of which can unwind, and a poisoned state is taken
+        // anyway so that dropping an environment cannot panic.
+        let mut state_guard = self.entry.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let was_open = state_guard.is_some();
         unsafe { ffi::mdb_env_close(self.env_ptr.as_mut()) };
+        *state_guard = None;
+        drop(state_guard);
+
         self.signal_event.signal();
+        debug_assert!(was_open);
     }
 }
 
