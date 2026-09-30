@@ -15,7 +15,7 @@ use synchronoise::SignalEvent;
 #[cfg(master3)]
 use super::encrypted_env::{encrypt_func_wrapper, EncryptedEnv};
 use super::env::Env;
-use super::{canonicalize_path, OPENED_ENV};
+use super::{canonicalize_path, PathEntry};
 #[cfg(windows)]
 use crate::envs::OsStrExtLmdb as _;
 use crate::mdb::error::mdb_result;
@@ -400,8 +400,6 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
         path: &Path,
         #[cfg(master3)] enc: Option<(ffi::MDB_enc_func, &[u8], u32)>,
     ) -> Result<Env<T>> {
-        let mut lock = OPENED_ENV.write().unwrap();
-
         let path = match canonicalize_path(path) {
             Err(err) => {
                 if err.kind() == NotFound && self.flags.contains(EnvFlags::NO_SUB_DIR) {
@@ -416,11 +414,15 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
             Ok(path) => path,
         };
 
-        if lock.contains_key(&path) {
+        let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
+
+        // Coordinate on this path alone. The registry is not held across the LMDB calls
+        // below, so opening a different environment does not wait on this one.
+        let entry = PathEntry::at(&path);
+        let mut state_guard = entry.state.lock().unwrap();
+        if state_guard.is_some() {
             Err(Error::EnvAlreadyOpened)
         } else {
-            let path_str = CString::new(path.as_os_str().as_bytes()).unwrap();
-
             unsafe {
                 let mut env: *mut ffi::MDB_env = ptr::null_mut();
                 mdb_result(ffi::mdb_env_create(&mut env))?;
@@ -466,9 +468,9 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                     Ok(()) => {
                         let env_ptr = NonNull::new(env).unwrap();
                         let signal_event = Arc::new(SignalEvent::manual(false));
-                        let inserted = lock.insert(path.clone(), signal_event.clone());
-                        debug_assert!(inserted.is_none());
-                        Ok(Env::new(env_ptr, path, signal_event))
+                        *state_guard = Some(signal_event.clone());
+                        drop(state_guard);
+                        Ok(Env::new(env_ptr, entry, signal_event))
                     }
                     Err(e) => {
                         ffi::mdb_env_close(env);

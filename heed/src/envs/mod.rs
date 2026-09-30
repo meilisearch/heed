@@ -7,7 +7,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::abort;
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, Weak};
 use std::time::Duration;
 #[cfg(windows)]
 use std::{
@@ -34,15 +34,59 @@ pub use env::Env;
 pub(crate) use env::EnvInner;
 pub use env_open_options::EnvOpenOptions;
 
-/// Records the current list of opened environments for tracking purposes. The canonical
-/// path of an environment is removed when either an `Env` or `EncryptedEnv` is closed.
-static OPENED_ENV: LazyLock<RwLock<HashMap<PathBuf, Arc<SignalEvent>>>> =
+/// Records the environments currently open in this process, keyed by canonical path. Each
+/// entry coordinates one path only, so opening or closing an environment never waits on work
+/// happening at a different path.
+static OPENED_ENV: LazyLock<RwLock<HashMap<PathBuf, Weak<PathEntry>>>> =
     LazyLock::new(RwLock::default);
+
+/// The registry's entry for one canonical path.
+///
+/// The state carries the event signaled once the environment at this path has been closed, and
+/// is `None` while no environment is open there. Its lock is held for the whole of
+/// `mdb_env_open` and `mdb_env_close`, so a thread opening a path that is being closed waits
+/// for the close to finish and then opens a fresh environment, while a thread opening a path
+/// that is already open gets [`Error::EnvAlreadyOpened`](crate::Error::EnvAlreadyOpened).
+pub(crate) struct PathEntry {
+    state: Mutex<Option<Arc<SignalEvent>>>,
+    path: PathBuf,
+}
+
+impl Drop for PathEntry {
+    fn drop(&mut self) {
+        // A poisoned registry is taken anyway, since dropping an entry must not panic and a stale
+        // registration is harmless: reopening the path replaces it.
+        let mut opened = OPENED_ENV.write().unwrap_or_else(PoisonError::into_inner);
+        // An entry registered at this path while this one was being dropped keeps its place, so
+        // only a registration whose entry is gone is removed.
+        if opened.get(&self.path).is_some_and(|registration| registration.strong_count() == 0) {
+            opened.remove(&self.path);
+        }
+    }
+}
+
+impl PathEntry {
+    /// The entry for `path`, registering one when no environment is open there.
+    ///
+    /// The registry lock is released before the caller locks the entry's state, so the registry is
+    /// never held across LMDB work. The registration lives as long as any handle to the entry.
+    fn at(path: &Path) -> Arc<Self> {
+        // Panic rather than open against a registry not trusted to hold one entry per path.
+        let mut opened = OPENED_ENV.write().unwrap();
+        if let Some(entry) = opened.get(path).and_then(Weak::upgrade) {
+            return entry;
+        }
+        let entry = Arc::new(Self { state: Mutex::default(), path: path.to_path_buf() });
+        opened.insert(path.to_path_buf(), Arc::downgrade(&entry));
+        entry
+    }
+}
 
 /// Returns a struct that allows to wait for the effective closing of an environment.
 pub fn env_closing_event<P: AsRef<Path>>(path: P) -> Option<EnvClosingEvent> {
-    let lock = OPENED_ENV.read().unwrap();
-    lock.get(path.as_ref()).map(|signal_event| EnvClosingEvent(signal_event.clone()))
+    let entry = OPENED_ENV.read().unwrap().get(path.as_ref()).and_then(Weak::upgrade)?;
+    let signal_event = entry.state.lock().unwrap().clone()?;
+    Some(EnvClosingEvent(signal_event))
 }
 
 /// Contains information about the environment.
@@ -289,5 +333,94 @@ impl FlagSetMode {
             Self::Enable => 1,
             Self::Disable => 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Barrier;
+    use std::thread::{scope, yield_now};
+
+    use super::*;
+    use crate::{EnvOpenOptions, Error};
+
+    const MAP: usize = 16 * 1024;
+
+    /// Whether the registry holds an entry for `path`, live or not.
+    fn has_entry(path: &Path) -> bool {
+        OPENED_ENV.read().unwrap().contains_key(path)
+    }
+
+    /// An open environment holds its path against a second open and gives it back on close, and
+    /// a failed open gives its path back too, so a process opening many paths over its lifetime
+    /// keeps no entry per path ever seen.
+    #[test]
+    fn an_env_holds_its_path_until_it_closes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().canonicalize().unwrap();
+
+        // A regular file canonicalizes, so this open registers an entry before LMDB rejects it.
+        let file = path.join("not-a-dir");
+        fs::write(&file, b"").unwrap();
+        assert!(unsafe { EnvOpenOptions::new().map_size(MAP).open(&file) }.is_err());
+        assert!(!has_entry(&file), "a failed open leaves no registry entry");
+        fs::remove_file(&file).unwrap();
+        fs::create_dir(&file).unwrap();
+        unsafe { EnvOpenOptions::new().map_size(MAP).open(&file) }
+            .expect("a failed open does not reserve the path");
+
+        let env = unsafe { EnvOpenOptions::new().map_size(MAP).open(&path).unwrap() };
+        assert!(has_entry(&path), "an open env is registered");
+        assert!(matches!(
+            unsafe { EnvOpenOptions::new().map_size(MAP).open(&path) },
+            Err(Error::EnvAlreadyOpened)
+        ));
+
+        drop(env);
+        assert!(!has_entry(&path), "a closed env leaves no registry entry");
+        unsafe { EnvOpenOptions::new().map_size(MAP).open(&path) }
+            .expect("the path opens again once its env is closed");
+    }
+
+    /// Racing opens of one path never yield two `Env`s at once. The count drops before each
+    /// close begins, so an open overlapping a close is outside what this can observe.
+    #[test]
+    fn racing_opens_of_one_path_never_overlap() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path();
+        let (live, peak) = (AtomicUsize::new(0), AtomicUsize::new(0));
+        let (opened, already) = (AtomicUsize::new(0), AtomicUsize::new(0));
+        let barrier = Barrier::new(16);
+
+        scope(|s| {
+            for _ in 0..16 {
+                s.spawn(|| {
+                    barrier.wait();
+                    for _ in 0..20 {
+                        match unsafe { EnvOpenOptions::new().map_size(MAP).open(path) } {
+                            Ok(env) => {
+                                let n = live.fetch_add(1, Ordering::SeqCst) + 1;
+                                peak.fetch_max(n, Ordering::SeqCst);
+                                opened.fetch_add(1, Ordering::SeqCst);
+                                // Widen the window in which an overlap would be visible.
+                                yield_now();
+                                live.fetch_sub(1, Ordering::SeqCst);
+                                drop(env);
+                            }
+                            Err(Error::EnvAlreadyOpened) => {
+                                already.fetch_add(1, Ordering::SeqCst);
+                            }
+                            Err(e) => panic!("unexpected error: {e}"),
+                        }
+                    }
+                });
+            }
+        });
+
+        assert!(opened.into_inner() > 0, "no thread ever won the race");
+        assert!(already.into_inner() > 0, "the opens never contended, so nothing was tested");
+        assert_eq!(peak.into_inner(), 1, "two envs were live for the same path");
     }
 }
