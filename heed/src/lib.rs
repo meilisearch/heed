@@ -93,8 +93,8 @@ pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 #[cfg(master3)]
 pub use self::envs::EncryptedEnv;
 pub use self::envs::{
-    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions, FlagSetMode, IntegerComparator,
+    env_closing_event, AbortOrCommit, CommitToken, CompactionOption, DefaultComparator, Env,
+    EnvClosingEvent, EnvInfo, EnvOpenOptions, FlagSetMode, IntegerComparator, OnCommit,
 };
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
@@ -105,9 +105,7 @@ use self::mdb::ffi::{from_val, into_val};
 pub use self::mdb::flags::{DatabaseFlags, EnvFlags, PutFlags};
 pub use self::reserved_space::ReservedSpace;
 pub use self::traits::{BoxedError, BytesDecode, BytesEncode, Comparator, LexicographicComparator};
-pub use self::txn::{
-    AnyTls, AsUniqueTxnRef, RoTxn, RwTxn, TlsUsage, UniqueRoTxn, UniqueRwTxn, WithTls, WithoutTls,
-};
+pub use self::txn::{AnyTls, RoTxn, RwTxn, TlsUsage, WithTls, WithoutTls};
 
 /// The underlying LMDB library version information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

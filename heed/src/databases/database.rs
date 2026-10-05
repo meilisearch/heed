@@ -11,7 +11,6 @@ use crate::iteration_method::MoveOnCurrentKeyDuplicates;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::mdb::lmdb_flags::{AllDatabaseFlags, DatabaseFlags};
-use crate::txn::{AsUniqueTxnRef, UniqueRwTxn};
 use crate::*;
 
 /// Options and flags which can be used to configure how a [`Database`] is opened.
@@ -145,15 +144,13 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open<U>(&self, rtxn: &U) -> Result<Option<Database<KC, DC, C, CDUP>>>
+    pub fn open<U>(&self, rtxn: &RoTxn<'_, U>) -> Result<Option<Database<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
         C: Comparator + 'static,
         CDUP: Comparator + 'static,
-        U: AsUniqueTxnRef<'e>,
     {
-        let rtxn = rtxn.as_unique_txn_ref();
         assert_eq_env_txn!(self.env, rtxn);
 
         match self.env.raw_init_database::<C, CDUP>(rtxn.txn_ptr(), self.name, self.flags) {
@@ -172,7 +169,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create(&self, wtxn: &mut UniqueRwTxn) -> Result<Database<KC, DC, C, CDUP>>
+    pub fn create(&self, wtxn: &mut RwTxn<'_>) -> Result<Database<'e, KC, DC, C, CDUP>>
     where
         KC: 'static,
         DC: 'static,
@@ -309,14 +306,14 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct Database<KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
+pub struct Database<'t, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
     pub(crate) env_ident: usize,
     pub(crate) dbi: ffi::MDB_dbi,
-    marker: marker::PhantomData<(KC, DC, C, CDUP)>,
+    marker: marker::PhantomData<(&'t (), KC, DC, C, CDUP)>,
 }
 
-impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
+    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<'t, KC, DC, C, CDUP> {
         Database { env_ident, dbi, marker: std::marker::PhantomData }
     }
 
@@ -2766,35 +2763,35 @@ impl<KC, DC, C, CDUP> Database<KC, DC, C, CDUP> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> Database<KC2, DC2, C> {
+    pub fn remap_types<KC2, DC2>(&self) -> Database<'t, KC2, DC2, C> {
         Database::new(self.env_ident, self.dbi)
     }
 
     /// Change the key codec type of this database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> Database<KC2, DC, C> {
+    pub fn remap_key_type<KC2>(&self) -> Database<'t, KC2, DC, C> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> Database<KC, DC2, C> {
+    pub fn remap_data_type<DC2>(&self) -> Database<'t, KC, DC2, C> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> Database<KC, LazyDecode<DC>, C> {
+    pub fn lazily_decode_data(&self) -> Database<'t, KC, LazyDecode<DC>, C> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<KC, DC, C, CDUP> Clone for Database<KC, DC, C, CDUP> {
-    fn clone(&self) -> Database<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> Clone for Database<'t, KC, DC, C, CDUP> {
+    fn clone(&self) -> Database<'t, KC, DC, C, CDUP> {
         *self
     }
 }
 
-impl<KC, DC, C, CDUP> Copy for Database<KC, DC, C, CDUP> {}
+impl<KC, DC, C, CDUP> Copy for Database<'_, KC, DC, C, CDUP> {}
 
-impl<KC, DC, C, CDUP> fmt::Debug for Database<KC, DC, C, CDUP> {
+impl<KC, DC, C, CDUP> fmt::Debug for Database<'_, KC, DC, C, CDUP> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Database")
             .field("key_codec", &any::type_name::<KC>())
@@ -2802,6 +2799,19 @@ impl<KC, DC, C, CDUP> fmt::Debug for Database<KC, DC, C, CDUP> {
             .field("key_comparator", &any::type_name::<C>())
             .field("dup_sort_comparator", &any::type_name::<CDUP>())
             .finish()
+    }
+}
+
+impl<'t, KC, DC, C, CDUP> OnCommit<'t> for Database<'t, KC, DC, C, CDUP> {
+    type Committed = Database<'static, KC, DC, C, CDUP>;
+
+    fn on_commit(self, _token: &CommitToken<'t>) -> Self::Committed
+    where
+        Self: 't,
+    {
+        let Database { env_ident, dbi, marker: _ } = self;
+        assert!(token.env_ident(),);
+        Database { env_ident, dbi, marker: marker::PhantomData }
     }
 }
 

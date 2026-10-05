@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Seek;
-use std::marker::PhantomData;
+use std::marker::{self, PhantomData};
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -19,7 +19,6 @@ use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
-use crate::txn::{AsUniqueTxnRef, UniqueRoTxn, UniqueRwTxn};
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
@@ -205,69 +204,71 @@ impl<T> Env<T> {
         }
     }
 
-    /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(self)
+    /// Open one or multiple databases.
+    ///
+    /// This method let you safely open databases by using a lock to
+    /// make sure a single env is opening databases at once.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let database = env.open_and_commit_databases(rtxn, |xxx| {
+    ///   let local_database = xxx.open_database(None)?;
+    ///   Ok(CommitOrAbort::Commit(local_database))
+    /// })?;
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let length = database.len(&rtxn)?;
+    /// assert_eq!(length, 0);
+    /// # Ok(()) }
+    /// ```
+    pub fn open_and_commit_databases<'e, 'a: 'e, F, D>(
+        &'a self,
+        rtxn: RoTxn<'e, T>,
+        f: F,
+    ) -> Result<AbortOrCommit<D::Committed>>
+    where
+        F: FnOnce(&MonRoTruc<'e, T>) -> Result<AbortOrCommit<D>>,
+        D: for<'x> OnCommit<'x>,
+    {
+        let _lock = self.lock();
+        let montruc = MonRoTruc { env: self, rtxn };
+        let databases = match f(&montruc)? {
+            AbortOrCommit::Commit(databases) => databases,
+            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+        };
+        let commit_token = montruc.commit()?;
+        let committed = databases.on_commit(&commit_token);
+        Ok(AbortOrCommit::Commit(committed))
     }
 
-    /// Opens a typed database that already exists in this environment.
-    ///
-    /// If the database was previously opened in this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
-    ///
-    /// ## LMDB read-only access of existing database
-    ///
-    /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
-    /// and the database handles opened and shared with the global [`Env`] handle.
-    ///
-    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
-    /// known as `EINVAL`.
-    pub fn open_database<'e, KC, DC, U>(
-        &'e self,
-        rtxn: &U,
-        name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC>>>
+    pub fn create_and_commit_databases<'e, 'a: 'e, F, D>(
+        &'a self,
+        wtxn: RwTxn<'e>,
+        f: F,
+    ) -> Result<AbortOrCommit<D::Committed>>
     where
-        KC: 'static,
-        DC: 'static,
-        U: AsUniqueTxnRef<'e>,
+        F: FnOnce(&mut MonRwTruc<'e, T>) -> Result<AbortOrCommit<D>>,
+        D: for<'x> OnCommit<'x>,
     {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.open(rtxn)
-    }
-
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened during this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
-    pub fn create_database<KC, DC>(
-        &self,
-        wtxn: &mut UniqueRwTxn,
-        name: Option<&str>,
-    ) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.create(wtxn)
+        let _lock = self.lock();
+        let mut montruc = MonRwTruc { env: self, wtxn };
+        let databases = match f(&mut montruc)? {
+            AbortOrCommit::Commit(databases) => databases,
+            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+        };
+        let commit_token = montruc.commit()?;
+        let committed = databases.on_commit(&commit_token);
+        Ok(AbortOrCommit::Commit(committed))
     }
 
     pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
@@ -427,116 +428,6 @@ impl<T> Env<T> {
                 Err(_) => self.inner.dbi_open_mutex.clear_poison(),
             }
         }
-    }
-
-    fn try_lock(&self) -> Option<MutexGuard<'_, ()>> {
-        let lock = loop {
-            match self.inner.dbi_open_mutex.try_lock() {
-                Ok(lock) => break Some(lock),
-                Err(std::sync::TryLockError::Poisoned(_)) => {
-                    self.inner.dbi_open_mutex.clear_poison()
-                }
-                Err(std::sync::TryLockError::WouldBlock) => break None,
-            }
-        };
-        lock
-    }
-
-    /// Create a transaction with read and write access for use with the environment that can open and create databases.
-    ///
-    /// ## LMDB Limitations
-    ///
-    /// 1. Only one [`UniqueRwTxn`] or [`RwTxn`] may exist simultaneously in the current environment.
-    /// If another write transaction is initiated, while another write transaction exists
-    /// the thread initiating the new one will wait on a mutex upon completion of the previous
-    /// transaction.
-    /// 2. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exust simultaneously in the current environment.
-    /// If another unique transaction is initiated, while another unique transaction exists,
-    /// the thread initiating the new one will wait on a mutex upon completion of the previous
-    /// transaction.
-    pub fn unique_write_txn(&self) -> Result<UniqueRwTxn<'_>> {
-        UniqueRwTxn::new(self, self.lock())
-    }
-
-    /// Attempt to create a transaction with read and write access for use with the environment that can open and create databases.
-    ///
-    /// If another unique transaction already exists in the environment, return `Ok(None)`.
-    ///
-    /// ## LMDB Limitations
-    ///
-    /// 1. Only one [`UniqueRwTxn`] or [`RwTxn`] may exist simultaneously in the current environment.
-    /// If another write transaction is initiated, while another write transaction exists
-    /// the thread initiating the new one will wait on a mutex upon completion of the previous
-    /// transaction.
-    /// 2. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
-    /// Any attempt to initiate a unique transaction with this function while another unique transaction exists
-    /// will return `Ok(None)`.
-    pub fn try_unique_write_txn(&self) -> Result<Option<UniqueRwTxn<'_>>> {
-        self.try_lock().map(|lock| UniqueRwTxn::new(self, lock)).transpose()
-    }
-
-    /// Create a transaction with read-only access for use with the environment that can open databases.
-    ///
-    /// Opened databases can be made public for use by other transactions by committing this transaction.
-    ///
-    /// You can make this transaction `Send`able between threads by opening
-    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
-    /// method.
-    ///
-    /// ## LMDB Limitations
-    ///
-    /// 1. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
-    /// If another unique transaction is initiated, while another unique transaction exists
-    /// the thread initiating the new one will wait on a mutex upon completion of the previous transaction.
-    /// 2. It is possible to have multiple [`RoTxn`] and a [`RwTxn`] while a [`UniqueRoTxn`] exists in the current environment.
-    ///
-    ///    But read transactions prevent reuse of pages freed by newer write transactions,
-    ///    thus the database can grow quickly. Write transactions prevent other write transactions,
-    ///    since writes are serialized.
-    ///
-    ///    So avoid long-lived read transactions.
-    ///
-    /// ## Errors
-    ///
-    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
-    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
-    ///   map must be resized
-    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
-    ///   full
-    pub fn unique_read_txn(&self) -> Result<UniqueRoTxn<'_, T>> {
-        UniqueRoTxn::new(self, self.lock())
-    }
-
-    /// Attempt to create a transaction with read-only access for use with the environment that can open databases.
-    ///
-    /// Opened databases can be made public for use by other transactions by committing this transaction.
-    ///
-    /// You can make this transaction `Send`able between threads by opening
-    /// the environment with the [`EnvOpenOptions::read_txn_without_tls`]
-    /// method.
-    ///
-    /// ## LMDB Limitations
-    ///
-    /// 1. Only one [`UniqueRwTxn`] or [`UniqueRoTxn`] may exist simultaneously in the current environment.
-    /// Any attempt to initiate another unique transaction with this method, while another unique transaction exists,
-    /// will return `Ok(None)`.
-    /// 2. It is possible to have multiple [`RoTxn`] and a [`RwTxn`] while a [`UniqueRoTxn`] exists in the current environment.
-    ///
-    ///    But read transactions prevent reuse of pages freed by newer write transactions,
-    ///    thus the database can grow quickly. Write transactions prevent other write transactions,
-    ///    since writes are serialized.
-    ///
-    ///    So avoid long-lived read transactions.
-    ///
-    /// ## Errors
-    ///
-    /// * [`crate::MdbError::Panic`]: A fatal error occurred earlier, and the environment must be shut down
-    /// * [`crate::MdbError::MapResized`]: Another process wrote data beyond this [`Env`] mapsize and this env
-    ///   map must be resized
-    /// * [`crate::MdbError::ReadersFull`]: a read-only transaction was requested, and the reader lock table is
-    ///   full
-    pub fn try_unique_read_txn(&self) -> Result<Option<UniqueRoTxn<'_, T>>> {
-        self.try_lock().map(|lock| UniqueRoTxn::new(self, lock)).transpose()
     }
 
     /// Copy an LMDB environment to the specified path, with options.
@@ -833,6 +724,218 @@ impl Drop for EnvInner {
         unsafe { ffi::mdb_env_close(self.env_ptr.as_mut()) };
         self.signal_event.signal();
     }
+}
+
+pub struct MonRoTruc<'e, T> {
+    env: &'e Env<T>,
+    rtxn: RoTxn<'e, T>,
+}
+
+impl<'e, T> MonRoTruc<'e, T> {
+    pub fn env(&self) -> &'e Env<T> {
+        self.env
+    }
+
+    pub fn read_txn(&self) -> &RoTxn<'e, T> {
+        &self.rtxn
+    }
+
+    /// Options and flags which can be used to configure how a [`Database`] is opened.
+    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
+        DatabaseOpenOptions::new(&self.env)
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    ///
+    /// ## LMDB read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
+    ///
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open_database<'s, KC, DC, U>(
+        &'s self,
+        name: Option<&str>,
+    ) -> Result<Option<Database<'s, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.open(&self.rtxn)
+    }
+
+    fn commit(self) -> Result<CommitToken<'e>> {
+        self.rtxn.commit().map(|()| CommitToken::new())
+    }
+
+    // /// Creates a typed database that can already exist in this environment.
+    // ///
+    // /// If the database was previously opened during this program run, types will be checked.
+    // ///
+    // /// ## Important Information
+    // ///
+    // /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    // /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    // /// and these keys can only be read and not written.
+    // pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
+    // where
+    //     KC: 'static,
+    //     DC: 'static,
+    // {
+    //     let mut options = self.database_options().types::<KC, DC>();
+    //     if let Some(name) = name {
+    //         options.name(name);
+    //     }
+    //     options.create(wtxn)
+    // }
+}
+
+// TODO should I impl Deref<Target=MonRoTruc>
+pub struct MonRwTruc<'e, T> {
+    env: &'e Env<T>,
+    wtxn: RwTxn<'e>,
+}
+
+impl<'e, T> MonRwTruc<'e, T> {
+    pub fn env(&self) -> &'e Env<T> {
+        self.env
+    }
+
+    pub fn read_txn(&self) -> &RoTxn<'e, WithoutTls> {
+        &self.wtxn
+    }
+
+    pub fn write_txn(&mut self) -> &mut RwTxn<'e> {
+        &mut self.wtxn
+    }
+
+    /// Options and flags which can be used to configure how a [`Database`] is opened.
+    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
+        DatabaseOpenOptions::new(&self.env)
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    ///
+    /// ## LMDB read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
+    ///
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open_database<'s, KC, DC, U>(
+        &'s self,
+        name: Option<&str>,
+    ) -> Result<Option<Database<'s, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.open(&self.wtxn)
+    }
+
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened during this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    pub fn create_database<KC, DC>(&mut self, name: Option<&str>) -> Result<Database<'e, KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let Self { env, wtxn } = self;
+        let mut options = DatabaseOpenOptions::new(env).types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.create(wtxn)
+    }
+
+    fn commit(self) -> Result<CommitToken<'e>> {
+        self.wtxn.commit().map(|()| CommitToken::new())
+    }
+}
+
+/// An aborted or a committed value.
+pub enum AbortOrCommit<T> {
+    /// `Abort`ed transaction.
+    Abort,
+    /// `Commit`ted transaction with the data inside.
+    Commit(T),
+}
+
+impl<T> AbortOrCommit<T> {
+    /// Converts from `AbortOrCommit<T, E>` to `Option<T>`.
+    #[inline]
+    pub fn commit(self) -> Option<T> {
+        match self {
+            AbortOrCommit::Commit(data) => Some(data),
+            AbortOrCommit::Abort => None,
+        }
+    }
+
+    /// Returns the contained `Commit`ted value, consuming the self value.
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_commit(self) -> T {
+        match self {
+            AbortOrCommit::Commit(data) => data,
+            AbortOrCommit::Abort => {
+                panic!("called `CommitOrAbort::unwrap_commit()` on an `Abort` value")
+            }
+        }
+    }
+}
+
+pub struct CommitToken<'l> {
+    // This makes the CommitToken invariant
+    _private: marker::PhantomData<&'l mut &'l ()>,
+}
+
+impl<'l> CommitToken<'l> {
+    fn new() -> CommitToken<'l> {
+        CommitToken { _private: marker::PhantomData }
+    }
+}
+
+pub trait OnCommit<'l> {
+    type Committed;
+
+    fn on_commit(self, token: &CommitToken<'l>) -> Self::Committed
+    where
+        Self: 'l;
 }
 
 #[cfg(test)]
