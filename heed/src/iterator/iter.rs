@@ -36,13 +36,20 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo
+    ///             .database_options()
+    ///             .types::<BEI64, BEI64>()
+    ///             .flags(DatabaseFlags::DUP_SORT)
+    ///             .name("dup-sort")
+    ///             .create(wtxn)
+    ///             .map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;
@@ -89,13 +96,20 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo
+    ///             .database_options()
+    ///             .types::<BEI64, BEI64>()
+    ///             .flags(DatabaseFlags::DUP_SORT)
+    ///             .name("dup-sort")
+    ///             .create(wtxn)
+    ///             .map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;

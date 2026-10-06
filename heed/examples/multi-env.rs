@@ -24,12 +24,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .unwrap()
     };
 
-    let mut wtxn1 = env1.write_txn()?;
-    let mut wtxn2 = env2.write_txn()?;
+    let wtxn1 = env1.write_txn()?;
+    let wtxn2 = env2.write_txn()?;
 
     let db: Database<'static, Str, Bytes> = env1
-        .create_and_commit_databases(wtxn1, |xxx| {
-            let database = xxx.create_database(Some("hello"))?;
+        .create_databases_and_commit(wtxn1, |wdo, wtxn| {
+            let database = wdo.create_database(wtxn, Some("hello"))?;
             Ok(AbortOrCommit::Commit(Kiki { env2: &env2, wtxn2, db: database }))
         })?
         .unwrap_commit();
@@ -47,15 +47,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         type Committed = Database<'static, KC, DC>;
 
-        fn on_commit<'l>(self, token: &heed::CommitToken<'l>) -> Self::Committed
-        where
-            Self: 'l,
-        {
+        fn on_commit(self, token: &heed::CommitToken) -> Self::Committed {
             let mut validate_lol = None;
             let _ = self
                 .env2
-                .create_and_commit_databases(self.wtxn2, |xxx| {
-                    let database = xxx.create_database(Some("cool"))?;
+                .create_databases_and_commit(self.wtxn2, |wdo, wtxn| {
+                    let database = wdo.create_database(wtxn, Some("cool"))?;
                     validate_lol = Some(database.on_commit(&token));
                     Ok(AbortOrCommit::<Database<Unit, Unit>>::Abort)
                 })

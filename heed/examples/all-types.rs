@@ -18,9 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // here the key will be an str and the data will be a slice of u8
     let wtxn = env.write_txn()?;
     let db: Database<Str, Bytes> = env
-        .create_and_commit_databases(wtxn, |xxx| {
-            let database = xxx.create_database(Some("kiki"))?;
-            Ok(AbortOrCommit::Commit(database))
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("kiki")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -39,8 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeBincode<Hello>> = env
-        .create_and_commit_databases(wtxn, |xxx| {
-            xxx.create_database(Some("serde-bincode")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("serde-bincode")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -55,8 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeJson<Hello>> = env
-        .create_and_commit_databases(wtxn, |xxx| {
-            xxx.create_database(Some("serde-json")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("serde-json")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -72,8 +71,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // you can ignore the data
     let wtxn = env.write_txn()?;
     let db: Database<Str, Unit> = env
-        .create_and_commit_databases(wtxn, |xxx| {
-            xxx.create_database(Some("ignored-data")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -93,8 +92,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let wtxn = env.write_txn()?;
     let db: Database<BEI64, Unit> = env
-        .create_and_commit_databases(wtxn, |xxx| {
-            xxx.create_database(Some("big-endian-iter")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 

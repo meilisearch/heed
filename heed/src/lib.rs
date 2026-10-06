@@ -38,16 +38,23 @@
 //! ```
 //! use std::fs;
 //! use std::path::Path;
-//! use heed::{EnvOpenOptions, Database};
+//! use heed::{EnvOpenOptions, Database, AbortOrCommit};
 //! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let dir = tempfile::tempdir()?;
 //! let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
 //!
+//! let rtxn = env.read_txn()?;
 //! // we will open the default unnamed database
-//! let mut wtxn = env.unique_write_txn()?;
-//! let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
+//! let db: Database<Str, U32<byteorder::NativeEndian>> = env
+//!     .open_databases_and_commit(rtxn, |rdo, rtxn| {
+//!         rdo.open_database(None).map(AbortOrCommit::Commit)
+//!     })?
+//!     .unwrap_commit()
+//!     .expect("the unnamed database to always exists");
+//!
+//! let mut wtxn = env.write_txn()?;
 //!
 //! // opening a write transaction
 //! db.put(&mut wtxn, "seven", &7)?;

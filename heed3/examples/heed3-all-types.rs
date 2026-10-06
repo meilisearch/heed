@@ -17,7 +17,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // here the key will be an str and the data will be a slice of u8
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("kiki"))?;
+    let db: Database<Str, Bytes> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("kiki")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     db.put(&mut wtxn, "hello", &[2, 3][..])?;
     let ret: Option<&[u8]> = db.get(&wtxn, "hello")?;
@@ -32,8 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, SerdeBincode<Hello>> =
-        env.create_database(&mut wtxn, Some("serde-bincode"))?;
+    let db: Database<Str, SerdeBincode<Hello>> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("serde-bincode")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
@@ -44,7 +51,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtxn.commit()?;
 
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, SerdeJson<Hello>> = env.create_database(&mut wtxn, Some("serde-json"))?;
+    let db: Database<Str, SerdeJson<Hello>> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("serde-json")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
@@ -56,7 +67,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // you can ignore the data
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
+    let db: Database<Str, Unit> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     db.put(&mut wtxn, "hello", &())?;
     let ret: Option<()> = db.get(&wtxn, "hello")?;
@@ -72,12 +87,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     //
     // we try to open a database twice with the same types
     let mut wtxn = env.write_txn()?;
-    let _db: Database<Str, Unit> = env.create_database(&mut wtxn, Some("ignored-data"))?;
+    let _db: Database<Str, Unit> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
-    let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+    let db: Database<BEI64, Unit> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     db.put(&mut wtxn, &0, &())?;
     db.put(&mut wtxn, &68, &())?;

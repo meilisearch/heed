@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Seek;
-use std::marker::{self, PhantomData};
+use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -212,7 +212,7 @@ impl<T> Env<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -221,52 +221,94 @@ impl<T> Env<T> {
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// let rtxn = env.read_txn()?;
-    /// let database = env.open_and_commit_databases(rtxn, |xxx| {
-    ///   let local_database = xxx.open_database(None)?;
-    ///   Ok(CommitOrAbort::Commit(local_database))
-    /// })?;
+    /// let database = env.open_databases_and_commit(rtxn, |rdo, rtxn| {
+    ///     let local_database = rdo.open_database::<Str, Str>(None)?;
+    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit()
+    ///   .expect("the unnamed database to always exists");
     ///
     /// let rtxn = env.read_txn()?;
     /// let length = database.len(&rtxn)?;
     /// assert_eq!(length, 0);
     /// # Ok(()) }
     /// ```
-    pub fn open_and_commit_databases<'e, 'a: 'e, F, D>(
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D>(
         &'a self,
         rtxn: RoTxn<'e, T>,
         f: F,
     ) -> Result<AbortOrCommit<D::Committed>>
     where
-        F: FnOnce(&MonRoTruc<'e, T>) -> Result<AbortOrCommit<D>>,
-        D: for<'x> OnCommit<'x>,
+        F: FnOnce(&RoDatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<AbortOrCommit<D>>,
+        D: OnCommit,
     {
         let _lock = self.lock();
-        let montruc = MonRoTruc { env: self, rtxn };
-        let databases = match f(&montruc)? {
+        let montruc = RoDatabaseOpener { env: self };
+        let databases = match f(&montruc, &rtxn)? {
             AbortOrCommit::Commit(databases) => databases,
             AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
         };
-        let commit_token = montruc.commit()?;
+        rtxn.commit()?;
+        let commit_token = CommitToken::new(self);
         let committed = databases.on_commit(&commit_token);
         Ok(AbortOrCommit::Commit(committed))
     }
 
-    pub fn create_and_commit_databases<'e, 'a: 'e, F, D>(
+    /// Create or open one or multiple databases.
+    ///
+    /// This method let you safely create or open databases
+    /// by using a lock to make sure a single env is opening
+    /// databases at once.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
+    ///
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
+    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit();
+    ///
+    /// // We can also open the databases more options
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///      wdo
+    ///         .database_options()
+    ///         .types::<Str, Str>()
+    ///         .name("my-database")
+    ///         .create(wtxn)
+    ///         .map(AbortOrCommit::Commit)
+    ///   })?
+    ///   .unwrap_commit();
+    ///
+    /// # Ok(()) }
+    /// ```
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D>(
         &'a self,
-        wtxn: RwTxn<'e>,
+        mut wtxn: RwTxn<'e>,
         f: F,
     ) -> Result<AbortOrCommit<D::Committed>>
     where
-        F: FnOnce(&mut MonRwTruc<'e, T>) -> Result<AbortOrCommit<D>>,
-        D: for<'x> OnCommit<'x>,
+        F: FnOnce(&RwDatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<AbortOrCommit<D>>,
+        D: OnCommit,
     {
         let _lock = self.lock();
-        let mut montruc = MonRwTruc { env: self, wtxn };
-        let databases = match f(&mut montruc)? {
+        let montruc = RwDatabaseOpener { env: self };
+        let databases = match f(&montruc, &mut wtxn)? {
             AbortOrCommit::Commit(databases) => databases,
             AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
         };
-        let commit_token = montruc.commit()?;
+        wtxn.commit()?;
+        let commit_token = CommitToken::new(self);
         let committed = databases.on_commit(&commit_token);
         Ok(AbortOrCommit::Commit(committed))
     }
@@ -453,7 +495,7 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
     ///
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
@@ -506,9 +548,15 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, Str> = env
+    ///     .open_databases(rtxn, |rdo, rtxn| {
+    ///         rdo.create_database(None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
     /// db.put(&mut wtxn, &"hello1", &"world1")?;
     /// db.put(&mut wtxn, &"hello2", &"world2")?;
@@ -657,9 +705,15 @@ impl Env<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .open_databases(rtxn, |rdo, rtxn| {
+    ///         rdo.create_database(None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
@@ -726,22 +780,14 @@ impl Drop for EnvInner {
     }
 }
 
-pub struct MonRoTruc<'e, T> {
+/// Used to open databases.
+pub struct RoDatabaseOpener<'e, T> {
     env: &'e Env<T>,
-    rtxn: RoTxn<'e, T>,
 }
 
-impl<'e, T> MonRoTruc<'e, T> {
-    pub fn env(&self) -> &'e Env<T> {
-        self.env
-    }
-
-    pub fn read_txn(&self) -> &RoTxn<'e, T> {
-        &self.rtxn
-    }
-
+impl<'e, T> RoDatabaseOpener<'e, T> {
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
         DatabaseOpenOptions::new(&self.env)
     }
 
@@ -763,10 +809,11 @@ impl<'e, T> MonRoTruc<'e, T> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open_database<'s, KC, DC, U>(
-        &'s self,
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn<'e, T>,
         name: Option<&str>,
-    ) -> Result<Option<Database<'s, KC, DC>>>
+    ) -> Result<Option<Database<'e, KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
@@ -775,56 +822,18 @@ impl<'e, T> MonRoTruc<'e, T> {
         if let Some(name) = name {
             options.name(name);
         }
-        options.open(&self.rtxn)
+        options.open(rtxn)
     }
-
-    fn commit(self) -> Result<CommitToken<'e>> {
-        self.rtxn.commit().map(|()| CommitToken::new())
-    }
-
-    // /// Creates a typed database that can already exist in this environment.
-    // ///
-    // /// If the database was previously opened during this program run, types will be checked.
-    // ///
-    // /// ## Important Information
-    // ///
-    // /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    // /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    // /// and these keys can only be read and not written.
-    // pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
-    // where
-    //     KC: 'static,
-    //     DC: 'static,
-    // {
-    //     let mut options = self.database_options().types::<KC, DC>();
-    //     if let Some(name) = name {
-    //         options.name(name);
-    //     }
-    //     options.create(wtxn)
-    // }
 }
 
-// TODO should I impl Deref<Target=MonRoTruc>
-pub struct MonRwTruc<'e, T> {
+/// Used to create or open databases.
+pub struct RwDatabaseOpener<'e, T> {
     env: &'e Env<T>,
-    wtxn: RwTxn<'e>,
 }
 
-impl<'e, T> MonRwTruc<'e, T> {
-    pub fn env(&self) -> &'e Env<T> {
-        self.env
-    }
-
-    pub fn read_txn(&self) -> &RoTxn<'e, WithoutTls> {
-        &self.wtxn
-    }
-
-    pub fn write_txn(&mut self) -> &mut RwTxn<'e> {
-        &mut self.wtxn
-    }
-
+impl<'e, T> RwDatabaseOpener<'e, T> {
     /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
+    pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
         DatabaseOpenOptions::new(&self.env)
     }
 
@@ -846,10 +855,11 @@ impl<'e, T> MonRwTruc<'e, T> {
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open_database<'s, KC, DC, U>(
-        &'s self,
+    pub fn open_database<KC, DC, U>(
+        &self,
+        rtxn: &RoTxn<'e>,
         name: Option<&str>,
-    ) -> Result<Option<Database<'s, KC, DC>>>
+    ) -> Result<Option<Database<'e, KC, DC>>>
     where
         KC: 'static,
         DC: 'static,
@@ -858,7 +868,7 @@ impl<'e, T> MonRwTruc<'e, T> {
         if let Some(name) = name {
             options.name(name);
         }
-        options.open(&self.wtxn)
+        options.open(rtxn)
     }
 
     /// Creates a typed database that can already exist in this environment.
@@ -870,21 +880,20 @@ impl<'e, T> MonRwTruc<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create_database<KC, DC>(&mut self, name: Option<&str>) -> Result<Database<'e, KC, DC>>
+    pub fn create_database<KC, DC>(
+        &self,
+        wtxn: &mut RwTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<Database<'e, KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
-        let Self { env, wtxn } = self;
-        let mut options = DatabaseOpenOptions::new(env).types::<KC, DC>();
+        let mut options = self.database_options().types::<KC, DC>();
         if let Some(name) = name {
             options.name(name);
         }
         options.create(wtxn)
-    }
-
-    fn commit(self) -> Result<CommitToken<'e>> {
-        self.wtxn.commit().map(|()| CommitToken::new())
     }
 }
 
@@ -906,6 +915,12 @@ impl<T> AbortOrCommit<T> {
         }
     }
 
+    /// Returns `true` if the option is a `Abort` value.
+    #[inline]
+    pub fn is_abort(&self) -> bool {
+        matches!(self, AbortOrCommit::Abort)
+    }
+
     /// Returns the contained `Commit`ted value, consuming the self value.
     #[inline]
     #[track_caller]
@@ -919,33 +934,78 @@ impl<T> AbortOrCommit<T> {
     }
 }
 
-pub struct CommitToken<'l> {
-    // This makes the CommitToken invariant
-    _private: marker::PhantomData<&'l mut &'l ()>,
+/// A provided token used to make sure databases
+/// can be used outside of the current transaction.
+pub struct CommitToken {
+    /// This is the env identifier to make sure that the env
+    /// used to commit a database
+    env_ident: usize,
 }
 
-impl<'l> CommitToken<'l> {
-    fn new() -> CommitToken<'l> {
-        CommitToken { _private: marker::PhantomData }
+impl CommitToken {
+    fn new<T>(env: &Env<T>) -> CommitToken {
+        CommitToken { env_ident: env.env_mut_ptr().as_ptr() as _ }
+    }
+
+    pub(crate) fn env_ident(&self) -> usize {
+        self.env_ident
     }
 }
 
-pub trait OnCommit<'l> {
+/// A trait that must be implemented to be able to
+/// convert databases from local ones to static ones.
+pub trait OnCommit {
+    /// The output struct after a commit use successful.
     type Committed;
 
-    fn on_commit(self, token: &CommitToken<'l>) -> Self::Committed
-    where
-        Self: 'l;
+    /// Convert a struct after the commit is successful.
+    fn on_commit(self, token: &CommitToken) -> Self::Committed;
 }
+
+impl<A: OnCommit> OnCommit for Option<A> {
+    type Committed = Option<A::Committed>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        self.map(|a| a.on_commit(token))
+    }
+}
+
+macro_rules! impl_on_commit_for_tuple {
+    ( $( $name:ident )+ ) => {
+        impl<$($name: OnCommit),+> OnCommit for ($($name,)+) {
+            type Committed = ($($name::Committed,)+);
+
+            // Allow non snake case identifier as we use the
+            // struct names, i.e. A, B, to decompose the tuple.
+            #[allow(non_snake_case)]
+            fn on_commit(self, token: &crate::CommitToken) -> Self::Committed {
+                let ($($name,)+) = self;
+                ($($name.on_commit(token),)+)
+            }
+        }
+    };
+}
+
+impl_on_commit_for_tuple! { A }
+impl_on_commit_for_tuple! { A B }
+impl_on_commit_for_tuple! { A B C }
+impl_on_commit_for_tuple! { A B C D }
+impl_on_commit_for_tuple! { A B C D E }
+impl_on_commit_for_tuple! { A B C D E F }
+impl_on_commit_for_tuple! { A B C D E F G }
+impl_on_commit_for_tuple! { A B C D E F G H }
+impl_on_commit_for_tuple! { A B C D E F G H I }
+impl_on_commit_for_tuple! { A B C D E F G H I J }
+impl_on_commit_for_tuple! { A B C D E F G H I J K }
+impl_on_commit_for_tuple! { A B C D E F G H I J K L }
 
 #[cfg(test)]
 mod tests {
-    use std::io::ErrorKind;
     use std::time::Duration;
     use std::{fs, thread};
 
     use crate::types::*;
-    use crate::{env_closing_event, EnvOpenOptions, Error};
+    use crate::{env_closing_event, AbortOrCommit, Database, EnvOpenOptions, Error};
 
     #[test]
     fn close_env() {
@@ -965,9 +1025,14 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Str, Str>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -1042,9 +1107,14 @@ mod tests {
         unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
         let env = unsafe { envbuilder.open(dir.path()).unwrap() };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
     }
 
     #[test]
@@ -1066,13 +1136,23 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.abort();
+        let wtxn = env.write_txn().unwrap();
+        let aborted = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(|_| AbortOrCommit::<Database<Str, Str>>::Abort)
+            })
+            .unwrap();
+        assert!(aborted.is_abort());
 
-        let rtxn = env.unique_read_txn().unwrap();
-        let option = env.open_database::<Str, Str, _>(&rtxn, Some("my-super-db")).unwrap();
-        assert!(option.is_none());
+        let rtxn = env.read_txn().unwrap();
+        let no_db = env
+            .open_databases_and_commit(rtxn, |rdo, wtxn| {
+                rdo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
+        assert!(no_db.is_none());
     }
 
     #[test]
@@ -1087,9 +1167,14 @@ mod tests {
         };
 
         // we first create a database
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         // Close the environement and reopen it, databases must not be loaded in memory.
         env.prepare_for_closing().wait();
@@ -1101,8 +1186,13 @@ mod tests {
                 .unwrap()
         };
 
-        let rtxn = env.unique_read_txn().unwrap();
-        let option = env.open_database::<Str, Str, _>(&rtxn, Some("my-super-db")).unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let option = env
+            .open_databases_and_commit(rtxn, |rdo, wtxn| {
+                rdo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
         assert!(option.is_some());
     }
 
@@ -1114,9 +1204,14 @@ mod tests {
             EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         let mut wtxn = env.write_txn().unwrap();
         for i in 0..64 {
@@ -1161,10 +1256,15 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let mut wtxn = env.unique_write_txn().unwrap();
-            let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
+            let wtxn = env.write_txn().unwrap();
+            let database0 = env
+                .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                    wdo.create_database::<Str, Str>(wtxn, Some("shared0"))
+                        .map(AbortOrCommit::Commit)
+                })
+                .unwrap()
+                .unwrap_commit();
 
-            wtxn.commit().unwrap();
             let mut wtxn = env.write_txn().unwrap();
             database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
             wtxn.commit().unwrap();
@@ -1181,61 +1281,20 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let database0 = {
-                let rtxn = env.unique_read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str, _>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // This commit is mandatory if not committed you might get
-                // Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })
-                rtxn.commit().unwrap();
-                database0
-            };
+            let rtxn = env.read_txn().unwrap();
+            let database0 = env
+                .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                    rdo.open_database::<Str, Str>(rtxn, Some("shared0")).map(AbortOrCommit::Commit)
+                })
+                .unwrap()
+                .unwrap_commit()
+                .unwrap();
 
             {
                 // If we didn't committed the opening it might fail with EINVAL.
                 let rtxn = env.read_txn().unwrap();
                 let value = database0.get(&rtxn, "shared0").unwrap().unwrap();
                 assert_eq!(value, expected_data0);
-            }
-
-            env.prepare_for_closing().wait();
-        }
-
-        // To avoid reintroducing the bug let's try to open again but without the commit
-        {
-            // Open now we do a read-only opening
-            let env = unsafe {
-                EnvOpenOptions::new()
-                    .map_size(10 * 1024 * 1024) // 10MB
-                    .max_dbs(32)
-                    .open(dir.path())
-                    .unwrap()
-            };
-            let database0 = {
-                let rtxn = env.unique_read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str, _>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // No commit it's important, dropping explicitly
-                drop(rtxn);
-                database0
-            };
-
-            {
-                // We didn't committed the opening we will get EINVAL.
-                let rtxn = env.read_txn().unwrap();
-                // The dbg!() is intentional in case of a change in rust-std or in lmdb related
-                // to the windows error.
-                let err = dbg!(database0.get(&rtxn, "shared0"));
-
-                // The error kind is still ErrorKind Uncategorized on windows.
-                // Behind it's a ERROR_BAD_COMMAND code 22 like EINVAL.
-                if cfg!(windows) {
-                    assert!(err.is_err());
-                } else {
-                    assert!(
-                        matches!(err, Err(Error::Io(ref e)) if e.kind() == ErrorKind::InvalidInput)
-                    );
-                }
             }
 
             env.prepare_for_closing().wait();

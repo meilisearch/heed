@@ -17,16 +17,19 @@ Here is an example on how to store and read entries into LMDB in a safe and ACID
 ```rust
 use std::fs;
 use std::path::Path;
-use heed::{EnvOpenOptions, Database};
+use heed::{AbortOrCommit, EnvOpenOptions, Database};
 use heed::types::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env = unsafe { EnvOpenOptions::new().open("my-first-db")? };
 
     // We open the default unnamed database
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, U32<byteorder::NativeEndian>> = env.open_databases_and_commit(rtxn, |rdo, rtxn| {
+        rdo.open_database(None).map(AbortOrCommit::Commit)
+    })?.unwrap_commit();
 
+    let mut wtxn = env.write_txn()?;
     // We open a write transaction
     db.put(&mut wtxn, "seven", &7)?;
     db.put(&mut wtxn, "zero", &0)?;

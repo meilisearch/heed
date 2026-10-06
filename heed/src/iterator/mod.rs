@@ -103,6 +103,8 @@ fn test_txns_are_not_send() {}
 mod tests {
     use std::ops;
 
+    use crate::AbortOrCommit;
+
     #[test]
     fn prefix_iter_last_with_byte_255() {
         use crate::types::*;
@@ -117,9 +119,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Str>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Str>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -199,11 +206,16 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
-
         type BEI32 = I32<BigEndian>;
+
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -269,11 +281,16 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
-
         type BEI32 = I32<BigEndian>;
+
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -363,9 +380,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -413,9 +435,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -490,9 +517,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -567,9 +599,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -639,11 +676,16 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<BEI32, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
-
         type BEI32 = I32<BigEndian>;
+
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -692,9 +734,14 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.unique_write_txn().unwrap();
-        let db = env.create_database::<Bytes, Unit>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();

@@ -38,7 +38,7 @@ use crate::*;
 /// // Imagine you have an optional name
 /// let conditional_name = Some("big-endian-iter");
 ///
-/// let mut wtxn = env.unique_write_txn()?;
+/// let mut wtxn = env.write_txn()?;
 /// let mut options = env.database_options().types::<BEI64, Unit>();
 /// if let Some(name) = conditional_name {
 ///    options.name(name);
@@ -206,7 +206,7 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # use std::fs;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
-/// use heed::Database;
+/// use heed::{AbortOrCommit, Database};
 /// use heed::types::*;
 /// use heed::byteorder::BigEndian;
 ///
@@ -219,9 +219,12 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.unique_write_txn()?;
-/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+///     wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+/// })?.unwrap_commit();
 ///
+/// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &68, &())?;
 /// db.put(&mut wtxn, &35, &())?;
@@ -254,7 +257,7 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # use std::fs;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
-/// use heed::Database;
+/// use heed::{AbortOrCommit, Database};
 /// use heed::types::*;
 /// use heed::byteorder::BigEndian;
 ///
@@ -267,9 +270,12 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.unique_write_txn()?;
-/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+///     wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+/// })?.unwrap_commit();
 ///
+/// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &0, &())?;
 /// db.put(&mut wtxn, &68, &())?;
@@ -325,7 +331,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -338,9 +344,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32= U32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("get-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("get-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -408,7 +417,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)
@@ -482,7 +491,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -551,7 +560,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -624,7 +633,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -696,7 +705,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEU32 = U32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEU32, Unit>(&mut wtxn, Some("get-lt-u32"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -749,7 +758,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -762,9 +771,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("first-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -803,7 +815,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -816,9 +828,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("last-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -853,7 +868,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -866,9 +881,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -896,7 +914,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -909,9 +927,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -952,9 +973,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1005,7 +1029,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1018,9 +1042,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1060,9 +1087,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1120,9 +1150,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1164,9 +1197,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1226,9 +1262,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1267,7 +1306,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db: Database<Bytes, Unit> = env.create_database(&mut wtxn, None)?;
     ///
     /// // make sure to create slices and not ref array
@@ -1343,9 +1382,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1438,9 +1480,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1516,9 +1561,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1612,9 +1660,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1670,9 +1721,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1745,9 +1799,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1803,9 +1860,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1872,9 +1932,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1935,7 +1998,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2007,7 +2070,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI32, Str>()
     ///     .name("dup-i32")
@@ -2099,9 +2162,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// assert_eq!(db.get_or_put(&mut wtxn, &42, "i-am-forty-two")?, None);
     /// assert_eq!(db.get_or_put(&mut wtxn, &42, "the meaning of life")?, Some("i-am-forty-two"));
@@ -2133,7 +2199,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PutFlags};
+    /// use heed::{AbortOrCommit, Database, PutFlags};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2146,9 +2212,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// assert_eq!(db.get_or_put_with_flags(&mut wtxn, PutFlags::empty(), &42, "i-am-forty-two")?, None);
     /// assert_eq!(db.get_or_put_with_flags(&mut wtxn, PutFlags::empty(), &42, "the meaning of life")?, Some("i-am-forty-two"));
@@ -2224,7 +2293,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2288,7 +2357,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
     ///
     /// # db.clear(&mut wtxn)?;
@@ -2375,7 +2444,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2388,9 +2457,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2455,7 +2527,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
+    /// let mut wtxn = env.write_txn()?;
     /// let db = env.database_options()
     ///     .types::<BEI64, BEI64>()
     ///     .flags(DatabaseFlags::DUP_SORT)
@@ -2539,7 +2611,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2552,9 +2624,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2608,7 +2683,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2621,9 +2696,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2698,7 +2776,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     ///
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut rwtxn = env.unique_write_txn()?;
+    /// let mut rwtxn = env.write_txn()?;
     /// let db: Database<BEI32, Str> = env.create_database(&mut rwtxn, Some("iter-i32"))?;
     /// rwtxn.commit()?;
     ///
@@ -2707,7 +2785,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// assert_eq!(db_names, vec!["iter-i32".to_owned()]);
     /// drop(rotxn);
     ///
-    /// let mut rwtxn = env.unique_write_txn()?;
+    /// let mut rwtxn = env.write_txn()?;
     /// unsafe { db.remove(&mut rwtxn)? };
     /// let db_names = list_dbs(&env, &rwtxn)?;
     /// assert!(db_names.is_empty());
@@ -2749,9 +2827,12 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<Unit, Unit> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Unit, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// // We remap the types for ease of use.
     /// let db = db.remap_types::<BEI32, Str>();
@@ -2802,15 +2883,16 @@ impl<KC, DC, C, CDUP> fmt::Debug for Database<'_, KC, DC, C, CDUP> {
     }
 }
 
-impl<'t, KC, DC, C, CDUP> OnCommit<'t> for Database<'t, KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> OnCommit for Database<'t, KC, DC, C, CDUP> {
     type Committed = Database<'static, KC, DC, C, CDUP>;
 
-    fn on_commit(self, _token: &CommitToken<'t>) -> Self::Committed
-    where
-        Self: 't,
-    {
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
         let Database { env_ident, dbi, marker: _ } = self;
-        assert!(token.env_ident(),);
+        assert_eq!(
+            token.env_ident(),
+            env_ident,
+            "The CommitToken and Database aren't coming from the same environment"
+        );
         Database { env_ident, dbi, marker: marker::PhantomData }
     }
 }
@@ -2827,9 +2909,15 @@ mod tests {
     fn put_overwrite() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.unique_write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = env.read_txn()?;
+        let db = env
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Bytes>(rtxn, None).map(AbortOrCommit::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = env.write_txn()?;
         assert_eq!(db.get(&txn, b"hello").unwrap(), None);
 
         db.put(&mut txn, b"hello", b"hi").unwrap();
@@ -2846,9 +2934,15 @@ mod tests {
     fn longer_keys() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = envs.write_txn()?;
-        let db = envs.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = envs.read_txn()?;
+        let db = env
+            .open_and_commit_databases(rtxn, |rdo, rtxn| {
+                rdo.open_database::<Bytes, Bytes>(rtxn, None).map(AbortOrCommit::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = envs.write_txn()?;
         // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
         let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";
 
@@ -2869,13 +2963,19 @@ mod tests {
 
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.unique_write_txn()?;
+        let rtxn = env.read_txn()?;
         let db = env
-            .database_options()
-            .types::<NEU32, NEU32>()
-            .key_comparator::<IntegerComparator>()
-            .create(&mut txn)?;
+            .open_databases_and_commit(rtxn, |rdo, rtxn| {
+                rdo.database_options()
+                    .types::<NEU32, NEU32>()
+                    .key_comparator::<IntegerComparator>()
+                    .open(rtxn)
+                    .map(AbortOrCommit::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = env.write_txn()?;
         let range = 1000..2000;
 
         for i in range.clone() {

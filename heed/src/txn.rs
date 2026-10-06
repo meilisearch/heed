@@ -334,7 +334,7 @@ impl<'p> RwTxn<'p> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -347,9 +347,14 @@ impl<'p> RwTxn<'p> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.unique_write_txn()?;
-    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
