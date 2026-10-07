@@ -1,10 +1,8 @@
-use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
 
-use crate::envs::{Env, EnvInner};
+use crate::envs::Env;
 use crate::mdb::error::mdb_result;
 use crate::mdb::ffi;
 use crate::Result;
@@ -49,14 +47,13 @@ use crate::Result;
 /// ```
 #[repr(transparent)]
 pub struct RoTxn<'e, T = AnyTls> {
-    inner: RoTxnInner<'e>,
+    inner: RoTxnInner,
     _tls_marker: PhantomData<&'e T>,
 }
 
-struct RoTxnInner<'e> {
+struct RoTxnInner {
     /// Makes the struct covariant and !Sync
     pub(crate) txn: Option<NonNull<ffi::MDB_txn>>,
-    env: Cow<'e, Arc<EnvInner>>,
 }
 
 impl<'e, T> RoTxn<'e, T> {
@@ -72,10 +69,7 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn {
-            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
-            _tls_marker: PhantomData,
-        })
+        Ok(RoTxn { inner: RoTxnInner { txn: NonNull::new(txn) }, _tls_marker: PhantomData })
     }
 
     pub(crate) fn static_read_txn(env: Env<T>) -> Result<RoTxn<'static, T>> {
@@ -90,10 +84,7 @@ impl<'e, T> RoTxn<'e, T> {
             ))?
         };
 
-        Ok(RoTxn {
-            inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Owned(env.inner) },
-            _tls_marker: PhantomData,
-        })
+        Ok(RoTxn { inner: RoTxnInner { txn: NonNull::new(txn) }, _tls_marker: PhantomData })
     }
 
     pub(crate) fn txn_ptr(&self) -> NonNull<ffi::MDB_txn> {
@@ -101,7 +92,8 @@ impl<'e, T> RoTxn<'e, T> {
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.inner.env.env_mut_ptr()
+        let txn = self.inner.txn.unwrap();
+        unsafe { NonNull::new(ffi::mdb_txn_env(txn.as_ptr())).unwrap() }
     }
 
     /// Return the transaction's ID.
@@ -291,10 +283,7 @@ impl<'p> RwTxn<'p> {
         };
 
         Ok(RwTxn {
-            txn: RoTxn {
-                inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
-                _tls_marker: PhantomData,
-            },
+            txn: RoTxn { inner: RoTxnInner { txn: NonNull::new(txn) }, _tls_marker: PhantomData },
         })
     }
 
@@ -307,15 +296,12 @@ impl<'p> RwTxn<'p> {
         };
 
         Ok(RwTxn {
-            txn: RoTxn {
-                inner: RoTxnInner { txn: NonNull::new(txn), env: Cow::Borrowed(&env.inner) },
-                _tls_marker: PhantomData,
-            },
+            txn: RoTxn { inner: RoTxnInner { txn: NonNull::new(txn) }, _tls_marker: PhantomData },
         })
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
-        self.txn.inner.env.env_mut_ptr()
+        self.txn.env_mut_ptr()
     }
 
     /// Create a nested read transaction that is capable of reading uncommitted changes.
@@ -372,17 +358,14 @@ impl<'p> RwTxn<'p> {
 
         unsafe {
             mdb_result(ffi::mdb_txn_begin(
-                self.inner.env.env_mut_ptr().as_mut(),
+                self.env_mut_ptr().as_mut(),
                 parent_ptr,
                 ffi::MDB_RDONLY,
                 &mut txn,
             ))?
         };
 
-        Ok(RoTxn {
-            inner: RoTxnInner { txn: NonNull::new(txn), env: self.inner.env.clone() },
-            _tls_marker: PhantomData,
-        })
+        Ok(RoTxn { inner: RoTxnInner { txn: NonNull::new(txn) }, _tls_marker: PhantomData })
     }
 
     /// Commit all the operations of a transaction into the database.
