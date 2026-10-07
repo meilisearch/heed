@@ -51,13 +51,14 @@ url = "2.5.7"
 [features]
 # The `serde` feature makes some types serializable,
 # like the `EnvOpenOptions` struct.
-default = ["serde", "serde-bincode", "serde-json"]
+default = ["serde", "serde-json", "serde-wincode"]
 serde = ["bitflags/serde", "dep:serde"]
 
-# Enable the serde en/decoders for bincode, serde_json, or rmp_serde
+# Enable the serde en/decoders for bincode, serde_json, rmp_serde, or wincode
 serde-bincode = ["heed-types/serde-bincode"]
 serde-json = ["heed-types/serde-json"]
 serde-rmp = ["heed-types/serde-rmp"]
+serde-wincode = ["heed-types/serde-wincode"]
 
 # serde_json features
 preserve_order = ["heed-types/preserve_order"]
