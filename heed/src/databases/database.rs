@@ -2818,7 +2818,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     ///             names.push(name.to_owned());
     ///         }
     ///         Ok(AbortOrCommit::<()>::Abort)
-    ///     })?.unwrap_commit();
+    ///     })?;
     ///
     ///     Ok(names)
     /// }

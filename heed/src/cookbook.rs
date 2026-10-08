@@ -92,8 +92,6 @@
 //!
 //! ```
 //! use std::error::Error;
-//! use std::fs;
-//! use std::path::Path;
 //!
 //! use heed::types::*;
 //! use heed::{AbortOrCommit, Database, EnvOpenOptions};
@@ -111,32 +109,28 @@
 //!     let rtxn = env.read_txn()?;
 //!     // The database names are mixed with the user entries therefore we prefer
 //!     // ignoring the values and try to open the databases one by one using the keys.
-//!     let unnamed: Database<Str, DecodeIgnore> = env
-//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
-//!         })?
-//!         .unwrap_commit()
-//!         .expect("the unnamed database always exists");
+//!     env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!         let unnamed: Database<Str, DecodeIgnore> = dbo.open_database(rtxn, None)?.unwrap();
 //!
-//!     // The unnamed (or main) database contains the other
-//!     // database names associated to empty values.
-//!     for result in unnamed.iter(&rtxn)? {
-//!         let (name, ()) = result?;
+//!         // The unnamed (or main) database contains the other
+//!         // database names associated to empty values.
+//!         for result in unnamed.iter(&rtxn)? {
+//!             let (name, ()) = result?;
 //!
-//!         if let Ok(Some(_db)) = env.open_database::<Str, Bytes, _>(&rtxn, Some(name)) {
-//!             // We succeeded into opening a new database that
-//!             // contains strings associated to raw bytes.
+//!             if let Ok(Some(_db)) = dbo.open_database::<Str, Bytes>(rtxn, Some(name)) {
+//!                 // We succeeded into opening a new database that
+//!                 // contains strings associated to raw bytes.
+//!             }
 //!         }
-//!     }
 //!
-//!     // When opening databases in a read-only transaction
-//!     // you must commit your read transaction to make your
-//!     // freshly opened databases globally available.
-//!     rtxn.commit()?;
+//!         // When opening databases in a read-only transaction
+//!         // you must commit your read transaction to make your
+//!         // freshly opened databases globally available.
 //!
-//!     // If you abort (or drop) your read-only transaction
-//!     // the database handle will be invalid outside
-//!     // the transaction scope.
+//!         // You must implement the OnCommit trait on a data-structure
+//!         // of your choice to be able to use the databases in your program.
+//!         Ok(AbortOrCommit::<()>::Abort)
+//!     })?;
 //!
 //!     Ok(())
 //! }
@@ -564,7 +558,7 @@
 //! use std::error::Error;
 //!
 //! use byteorder::BigEndian;
-//! use heed::{AbortOrCommit, Database, DatabaseFlags, EnvOpenOptions};
+//! use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, U128};
 //!
@@ -586,18 +580,17 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let rtxn = env.read_txn()?;
-//!     let db: Database<_, _, _, DescendingIntCmp> = env
-//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!     let wtxn = env.write_txn()?;
+//!     let db = env
+//!         .create_databases_and_commit(wtxn, |dbo, wtxn| {
 //!             dbo.database_options()
 //!                 .types::<Str, U128<BigEndian>>()
 //!                 .flags(DatabaseFlags::DUP_SORT)
 //!                 .dup_sort_comparator::<DescendingIntCmp>()
-//!                 .open(rtxn)
+//!                 .create(wtxn)
 //!                 .map(AbortOrCommit::Commit)
 //!         })?
-//!         .unwrap_commit()
-//!         .expect("the unnamed database always exists");
+//!         .unwrap_commit();
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!
@@ -611,12 +604,12 @@
 //!
 //!     // We check that the keys are in lexicographic and values in descending order.
 //!     let mut iter = db.iter(&wtxn)?;
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("0", 0)));
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 5)));
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 3)));
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 2)));
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 1)));
-//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("2", 4)));
+//!     assert_eq!(iter.next().transpose()?, Some(("0", 0)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 5)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 3)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 2)));
+//!     assert_eq!(iter.next().transpose()?, Some(("1", 1)));
+//!     assert_eq!(iter.next().transpose()?, Some(("2", 4)));
 //!     drop(iter);
 //!
 //!     Ok(())

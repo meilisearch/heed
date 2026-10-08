@@ -51,7 +51,8 @@
 //!     .open_databases_and_commit(rtxn, |dbo, rtxn| {
 //!         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!     })?
-//!     .unwrap_commit();
+//!     .unwrap_commit()
+//!     .expect("the unnamed database to always exists");
 //!
 //! let mut wtxn = env.write_txn()?;
 //!

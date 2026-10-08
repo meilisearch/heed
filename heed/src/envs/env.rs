@@ -503,8 +503,9 @@ impl<T> Env<T> {
     ///         db.put(wtxn, &"hello1", &"world1")?;
     ///         db.put(wtxn, &"hello2", &"world2")?;
     ///         db.put(wtxn, &"hello3", &"world3")?;
-    ///         Ok(AbortOrCommit::<()>::Abort)
-    ///     })?.unwrap_commit();
+    ///         Ok(AbortOrCommit::Commit(()))
+    ///     })?
+    ///     .unwrap_commit();
     ///
     /// let mut tmp_file = tempfile::tempfile()?;
     /// env.copy_to_file(&mut tmp_file, CompactionOption::Enabled)?;
@@ -709,7 +710,7 @@ impl Env<WithoutTls> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.create_database(None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");

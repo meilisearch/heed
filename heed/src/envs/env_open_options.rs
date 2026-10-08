@@ -167,9 +167,10 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, U32<byteorder::NativeEndian>> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.create_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
     ///     })?
-    ///     .unwrap_commit();
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
     /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction

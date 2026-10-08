@@ -18,8 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // here the key will be an str and the data will be a slice of u8
     let wtxn = env.write_txn()?;
     let db: Database<Str, Bytes> = env
-        .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("kiki")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("kiki")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -38,8 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeBincode<Hello>> = env
-        .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("serde-bincode")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("serde-bincode")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -54,8 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeJson<Hello>> = env
-        .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("serde-json")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("serde-json")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -71,8 +71,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // you can ignore the data
     let wtxn = env.write_txn()?;
     let db: Database<Str, Unit> = env
-        .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
@@ -87,13 +87,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{:?}", ret);
     wtxn.commit()?;
 
+    // database opening and types are tested in a safe way
+    //
+    // we try to open a database twice with the same types
+    let wtxn = env.write_txn()?;
+    let _db: Database<Str, Unit> = env
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
+
     // you can iterate over keys in order
     type BEI64 = I64<BE>;
 
     let wtxn = env.write_txn()?;
     let db: Database<BEI64, Unit> = env
-        .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit();
 
