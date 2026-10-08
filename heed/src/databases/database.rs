@@ -2813,7 +2813,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     ///         for item in names_db.iter(rtxn)? {
     ///             let (name, ()) = item?;
     #[cfg_attr(master3, doc = concat!(
-    "             let name = std::ffi::CStr::from_bytes_with_nul(name)?.to_str()?;",
+    "             let name = std::ffi::CStr::from_bytes_with_nul(name).unwrap().to_str().unwrap();",
     ))]
     ///             names.push(name.to_owned());
     ///         }

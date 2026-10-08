@@ -289,7 +289,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
     /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, Database};
+    /// use heed3::{AbortOrCommit, EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -318,8 +318,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// // We create database and write secret values in it
     /// let wtxn = env.write_txn()?;
     /// let db = env
-    ///     .open_databases(rtxn, |dbo, rtxn| {
-    ///         dbo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///
@@ -345,7 +345,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
     /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, EncryptedDatabase;};
+    /// use heed3::{AbortOrCommit, EnvOpenOptions, EncryptedDatabase};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -372,8 +372,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// // We create the database
     /// let wtxn = env.write_txn()?;
     /// let db: EncryptedDatabase<Str, Str> = env
-    ///     .open_databases(rtxn, |dbo, rtxn| {
-    ///         dbo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///

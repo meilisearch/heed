@@ -1,5 +1,5 @@
 use heed3::types::*;
-use heed3::{Database, EnvOpenOptions};
+use heed3::{AbortOrCommit, Database, EnvOpenOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use roaring::RoaringBitmap;
@@ -16,10 +16,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // opening a write transaction
-    let mut wtxn = env.write_txn()?;
+    let rtxn = env.read_txn()?;
     // we will open the default unnamed database
-    let db: Database<U32<byteorder::BigEndian>, Bytes> = env.create_database(&mut wtxn, None)?;
+    let db: Database<U32<byteorder::BigEndian>, Bytes> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .unwrap();
 
+    let mut wtxn = env.write_txn()?;
     let mut buffer = Vec::new();
     for i in 0..100 {
         let mut rng = StdRng::seed_from_u64(i as u64);
