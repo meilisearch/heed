@@ -129,7 +129,10 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<EncryptedDatabase<KC, DC, C, CDUP>>>
+    pub fn open<U>(
+        &self,
+        rtxn: &RoTxn<'_, U>,
+    ) -> Result<Option<EncryptedDatabase<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
@@ -148,7 +151,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create(&self, wtxn: &mut RwTxn) -> Result<EncryptedDatabase<KC, DC, C, CDUP>>
+    pub fn create(&self, wtxn: &mut RwTxn<'_>) -> Result<EncryptedDatabase<'e, KC, DC, C, CDUP>>
     where
         KC: 'static,
         DC: 'static,
@@ -283,12 +286,14 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct EncryptedDatabase<KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
-    inner: Database<KC, DC, C, CDUP>,
+pub struct EncryptedDatabase<'t, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
+    inner: Database<'t, KC, DC, C, CDUP>,
 }
 
-impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
-    pub(crate) fn new(inner: Database<KC, DC, C, CDUP>) -> EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    pub(crate) fn new(
+        inner: Database<'t, KC, DC, C, CDUP>,
+    ) -> EncryptedDatabase<'t, KC, DC, C, CDUP> {
         EncryptedDatabase { inner }
     }
 
@@ -2282,35 +2287,35 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<KC2, DC2, C> {
+    pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<'_, KC2, DC2, C, CDUP> {
         EncryptedDatabase::new(self.inner.remap_types::<KC2, DC2>())
     }
 
     /// Change the key codec type of this database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> EncryptedDatabase<KC2, DC, C> {
+    pub fn remap_key_type<KC2>(&self) -> EncryptedDatabase<'_, KC2, DC, C, CDUP> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> EncryptedDatabase<KC, DC2, C> {
+    pub fn remap_data_type<DC2>(&self) -> EncryptedDatabase<'_, KC, DC2, C, CDUP> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> EncryptedDatabase<KC, LazyDecode<DC>, C> {
+    pub fn lazily_decode_data(&self) -> EncryptedDatabase<'_, KC, LazyDecode<DC>, C, CDUP> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<KC, DC, C, CDUP> Clone for EncryptedDatabase<KC, DC, C, CDUP> {
-    fn clone(&self) -> EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> Clone for EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    fn clone(&self) -> EncryptedDatabase<'t, KC, DC, C, CDUP> {
         *self
     }
 }
 
-impl<KC, DC, C, CDUP> Copy for EncryptedDatabase<KC, DC, C, CDUP> {}
+impl<'t, KC, DC, C, CDUP> Copy for EncryptedDatabase<'t, KC, DC, C, CDUP> {}
 
-impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<'t, KC, DC, C, CDUP> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EncryptedDatabase")
             .field("key_codec", &any::type_name::<KC>())
@@ -2318,6 +2323,15 @@ impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
             .field("key_comparator", &any::type_name::<C>())
             .field("dup_sort_comparator", &any::type_name::<CDUP>())
             .finish()
+    }
+}
+
+impl<'t, KC, DC, C, CDUP> OnCommit for EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    type Committed = EncryptedDatabase<'static, KC, DC, C, CDUP>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        let EncryptedDatabase { inner } = self;
+        EncryptedDatabase { inner: inner.on_commit(token) }
     }
 }
 

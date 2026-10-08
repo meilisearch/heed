@@ -19,12 +19,12 @@ use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
-#[allow(unused)] // for cargo auto doc links
-use crate::EnvOpenOptions;
 use crate::{
-    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
-    RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
+    assert_eq_env_txn, CommitToken, CompactionOption, Database, DatabaseOpenOptions, EnvFlags,
+    Error, OnCommit, Result, RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
 };
+#[allow(unused)] // for cargo auto doc links
+use crate::{AbortOrCommit, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
 #[repr(transparent)]
@@ -463,7 +463,7 @@ impl<T> Env<T> {
         RoTxn::static_read_txn(self)
     }
 
-    fn lock(&self) -> MutexGuard<'_, ()> {
+    pub(crate) fn lock(&self) -> MutexGuard<'_, ()> {
         loop {
             match self.inner.dbi_open_mutex.lock() {
                 Ok(lock) => break lock,
@@ -852,116 +852,6 @@ impl<'e, T> DatabaseOpener<'e, T> {
         options.create(wtxn)
     }
 }
-
-/// An aborted or a committed value.
-pub enum AbortOrCommit<T> {
-    /// `Abort`ed transaction.
-    Abort,
-    /// `Commit`ted transaction with the data inside.
-    Commit(T),
-}
-
-impl<T> AbortOrCommit<T> {
-    /// Converts from `AbortOrCommit<T, E>` to `Option<T>`.
-    #[inline]
-    pub fn commit(self) -> Option<T> {
-        match self {
-            AbortOrCommit::Commit(data) => Some(data),
-            AbortOrCommit::Abort => None,
-        }
-    }
-
-    /// Returns `true` if the option is a `Abort` value.
-    #[inline]
-    pub fn is_abort(&self) -> bool {
-        matches!(self, AbortOrCommit::Abort)
-    }
-
-    /// Returns the contained `Commit`ted value, consuming the self value.
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_commit(self) -> T {
-        match self {
-            AbortOrCommit::Commit(data) => data,
-            AbortOrCommit::Abort => {
-                panic!("called `CommitOrAbort::unwrap_commit()` on an `Abort` value")
-            }
-        }
-    }
-}
-
-/// A provided token used to make sure databases
-/// can be used outside of the current transaction.
-pub struct CommitToken {
-    /// This is the env identifier to make sure that the env
-    /// used to commit a database
-    env_ident: usize,
-}
-
-impl CommitToken {
-    fn new<T>(env: &Env<T>) -> CommitToken {
-        CommitToken { env_ident: env.env_mut_ptr().as_ptr() as _ }
-    }
-
-    pub(crate) fn env_ident(&self) -> usize {
-        self.env_ident
-    }
-}
-
-/// A trait that must be implemented to be able to
-/// convert databases from local ones to static ones.
-pub trait OnCommit {
-    /// The output struct after a commit use successful.
-    type Committed;
-
-    /// Convert a struct after the commit is successful.
-    fn on_commit(self, token: &CommitToken) -> Self::Committed;
-}
-
-impl OnCommit for () {
-    type Committed = ();
-
-    fn on_commit(self, _token: &CommitToken) -> Self::Committed {
-        ()
-    }
-}
-
-impl<A: OnCommit> OnCommit for Option<A> {
-    type Committed = Option<A::Committed>;
-
-    fn on_commit(self, token: &CommitToken) -> Self::Committed {
-        self.map(|a| a.on_commit(token))
-    }
-}
-
-macro_rules! impl_on_commit_for_tuple {
-    ( $( $name:ident )+ ) => {
-        impl<$($name: OnCommit),+> OnCommit for ($($name,)+) {
-            type Committed = ($($name::Committed,)+);
-
-            // Allow non snake case identifier as we use the
-            // struct names, i.e. A, B, to decompose the tuple.
-            #[allow(non_snake_case)]
-            fn on_commit(self, token: &crate::CommitToken) -> Self::Committed {
-                let ($($name,)+) = self;
-                ($($name.on_commit(token),)+)
-            }
-        }
-    };
-}
-
-impl_on_commit_for_tuple! { A }
-impl_on_commit_for_tuple! { A B }
-impl_on_commit_for_tuple! { A B C }
-impl_on_commit_for_tuple! { A B C D }
-impl_on_commit_for_tuple! { A B C D E }
-impl_on_commit_for_tuple! { A B C D E F }
-impl_on_commit_for_tuple! { A B C D E F G }
-impl_on_commit_for_tuple! { A B C D E F G H }
-impl_on_commit_for_tuple! { A B C D E F G H I }
-impl_on_commit_for_tuple! { A B C D E F G H I J }
-impl_on_commit_for_tuple! { A B C D E F G H I J K }
-impl_on_commit_for_tuple! { A B C D E F G H I J K L }
 
 #[cfg(test)]
 mod tests {

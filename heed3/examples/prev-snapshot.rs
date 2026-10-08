@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed3::types::*;
-use heed3::{Database, EnvFlags, EnvOpenOptions};
+use heed3::{AbortOrCommit, Database, EnvFlags, EnvOpenOptions};
 
 // In this test we are checking that we can move to a previous environement snapshot.
 fn main() -> Result<(), Box<dyn Error>> {
@@ -14,9 +14,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, Str> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
+    let mut wtxn = env.write_txn()?;
     // We fill the db database with entries.
     db.put(&mut wtxn, "I am here", "to test things")?;
     db.put(&mut wtxn, "I am here too", "for the same purpose")?;
@@ -35,12 +41,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, Str> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
-    assert!(db.is_empty(&wtxn)?);
+    let rtxn = env.read_txn()?;
+    assert!(db.is_empty(&rtxn)?);
 
-    wtxn.abort();
+    drop(rtxn);
     env.prepare_for_closing().wait();
 
     // However, if we don't commit we can still get
@@ -52,9 +64,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(&env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, Str> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
+    let mut wtxn = env.write_txn()?;
     assert_eq!(db.get(&wtxn, "I am here")?, Some("to test things"));
     assert_eq!(db.get(&wtxn, "I am here too")?, Some("for the same purpose"));
 
@@ -75,8 +93,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let rtxn = env.read_txn()?;
-    let db: Database<Str, Str> = env.open_database(&rtxn, None)?.unwrap();
+    let db: Database<Str, Str> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
+    let rtxn = env.read_txn()?;
     assert_eq!(db.get(&rtxn, "I am here")?, Some("to test things"));
     assert_eq!(db.get(&rtxn, "I am here too")?, Some("for the same purpose"));
     assert_eq!(db.get(&rtxn, "I will fade away")?, None);
