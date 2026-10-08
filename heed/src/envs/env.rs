@@ -790,7 +790,7 @@ pub struct DatabaseOpener<'e, T> {
 impl<'e, T> DatabaseOpener<'e, T> {
     /// Options and flags which can be used to configure how a [`Database`] is opened.
     pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(&self.env)
+        DatabaseOpenOptions::new(self.env)
     }
 
     /// Opens a typed database that already exists in this environment.

@@ -31,9 +31,7 @@ pub trait OnCommit {
 impl OnCommit for () {
     type Committed = ();
 
-    fn on_commit(self, _token: &CommitToken) -> Self::Committed {
-        ()
-    }
+    fn on_commit(self, _token: &CommitToken) -> Self::Committed {}
 }
 
 impl<A: OnCommit> OnCommit for Option<A> {
