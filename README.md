@@ -25,8 +25,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // We open the default unnamed database
     let rtxn = env.read_txn()?;
-    let db: Database<Str, U32<byteorder::NativeEndian>> = env.open_databases_and_commit(rtxn, |rdo, rtxn| {
-        rdo.open_database(None).map(AbortOrCommit::Commit)
+    let db: Database<Str, U32<byteorder::NativeEndian>> = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+        dbo.open_database(None).map(AbortOrCommit::Commit)
     })?.unwrap_commit();
 
     let mut wtxn = env.write_txn()?;

@@ -282,8 +282,8 @@ impl<T> EncryptedEnv<T> {
     ///
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, Str> = env
-    ///     .open_databases_and_commit(rtxn, |rdo, rtxn| {
-    ///         rdo.create_database(None).map(AbortOrCommit::Commit)
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.create_database(None).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");

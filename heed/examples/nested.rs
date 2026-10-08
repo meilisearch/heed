@@ -16,8 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // here the key will be an str and the data will be a slice of u8
     let rtxn = env.read_txn()?;
     let db: Database<Str, Bytes> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            let db = rdo.open_database(rtxn, None)?.expect("unnamed db must exists");
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            let db = dbo.open_database(rtxn, None)?.expect("unnamed db must exists");
             Ok(AbortOrCommit::Commit(db))
         })?
         .unwrap_commit();

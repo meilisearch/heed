@@ -19,8 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // we will open the default unnamed database
     let rtxn = env.read_txn()?;
     let db: Database<U32<byteorder::BigEndian>, Bytes> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");

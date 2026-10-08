@@ -154,7 +154,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -166,11 +166,10 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// // we will open the default unamed database
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, U32<byteorder::NativeEndian>> = env
-    ///     .open_databases(rtxn, |rdo, rtxn| {
-    ///         rdo.create_database(None).map(AbortOrCommit::Commit)
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.create_database(rtxn, None).map(AbortOrCommit::Commit)
     ///     })?
-    ///     .unwrap_commit()
-    ///     .expect("the unnamed database to always exists");
+    ///     .unwrap_commit();
     ///
     /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
@@ -318,8 +317,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// // We create database and write secret values in it
     /// let wtxn = env.write_txn()?;
     /// let db = env
-    ///     .open_databases(rtxn, |rdo, rtxn| {
-    ///         rdo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
+    ///     .open_databases(rtxn, |dbo, rtxn| {
+    ///         dbo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///
@@ -372,8 +371,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// // We create the database
     /// let wtxn = env.write_txn()?;
     /// let db: EncryptedDatabase<Str, Str> = env
-    ///     .open_databases(rtxn, |rdo, rtxn| {
-    ///         rdo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
+    ///     .open_databases(rtxn, |dbo, rtxn| {
+    ///         dbo.create_database::<Str, Str>(Some("first")).map(AbortOrCommit::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///

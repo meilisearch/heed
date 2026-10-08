@@ -48,11 +48,10 @@
 //! let rtxn = env.read_txn()?;
 //! // we will open the default unnamed database
 //! let db: Database<Str, U32<byteorder::NativeEndian>> = env
-//!     .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!         rdo.open_database(None).map(AbortOrCommit::Commit)
+//!     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!     })?
-//!     .unwrap_commit()
-//!     .expect("the unnamed database to always exists");
+//!     .unwrap_commit();
 //!
 //! let mut wtxn = env.write_txn()?;
 //!

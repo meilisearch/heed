@@ -16,8 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -43,8 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -66,8 +66,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -94,8 +94,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");

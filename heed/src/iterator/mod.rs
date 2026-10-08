@@ -121,8 +121,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Str>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Str>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -210,8 +210,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -285,8 +285,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -382,8 +382,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -437,8 +437,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -519,8 +519,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -601,8 +601,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -680,8 +680,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -736,8 +736,8 @@ mod tests {
 
         let rtxn = env.read_txn().unwrap();
         let db = env
-            .open_databases_and_commit(rtxn, |rdo, rtxn| {
-                rdo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
             })
             .unwrap()
             .unwrap_commit()

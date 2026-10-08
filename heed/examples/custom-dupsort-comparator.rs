@@ -31,8 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rtxn = env.read_txn()?;
     let db = env
-        .open_databases_and_commit(rtxn, |rdo, rtxn| {
-            rdo.database_options()
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.database_options()
                 .types::<Str, U128<BigEndian>>()
                 .flags(DatabaseFlags::DUP_SORT)
                 .dup_sort_comparator::<DescendingIntCmp>()

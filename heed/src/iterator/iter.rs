@@ -23,7 +23,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -83,7 +83,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///

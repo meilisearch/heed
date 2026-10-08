@@ -37,8 +37,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, SerdeJson<StringMap>> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database must always exists");
@@ -112,8 +112,8 @@
 //!     // The database names are mixed with the user entries therefore we prefer
 //!     // ignoring the values and try to open the databases one by one using the keys.
 //!     let unnamed: Database<Str, DecodeIgnore> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database always exists");
@@ -253,8 +253,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<LogKeyCodec, Str> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -321,8 +321,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -348,8 +348,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -416,8 +416,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database must always exists");
@@ -519,8 +519,8 @@
 //!
 //!     let rtxn = env.read_txn()?;
 //!     let db = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.database_options()
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.database_options()
 //!                 .types::<Str, Unit>()
 //!                 .key_comparator::<StringAsIntCmp>()
 //!                 .open(rtxn)
@@ -564,7 +564,7 @@
 //! use std::error::Error;
 //!
 //! use byteorder::BigEndian;
-//! use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+//! use heed::{AbortOrCommit, Database, DatabaseFlags, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, U128};
 //!
@@ -587,9 +587,9 @@
 //!     };
 //!
 //!     let rtxn = env.read_txn()?;
-//!     let db = env
-//!         .open_databases_and_commit(rtxn, |rdo, rtxn| {
-//!             rdo.database_options()
+//!     let db: Database<_, _, _, DescendingIntCmp> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.database_options()
 //!                 .types::<Str, U128<BigEndian>>()
 //!                 .flags(DatabaseFlags::DUP_SORT)
 //!                 .dup_sort_comparator::<DescendingIntCmp>()
@@ -611,12 +611,12 @@
 //!
 //!     // We check that the keys are in lexicographic and values in descending order.
 //!     let mut iter = db.iter(&wtxn)?;
-//!     assert_eq!(iter.next().transpose()?, Some(("0", 0)));
-//!     assert_eq!(iter.next().transpose()?, Some(("1", 5)));
-//!     assert_eq!(iter.next().transpose()?, Some(("1", 3)));
-//!     assert_eq!(iter.next().transpose()?, Some(("1", 2)));
-//!     assert_eq!(iter.next().transpose()?, Some(("1", 1)));
-//!     assert_eq!(iter.next().transpose()?, Some(("2", 4)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("0", 0)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 5)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 3)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 2)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("1", 1)));
+//!     assert_eq!(dbg!(iter.next().transpose()?), Some(("2", 4)));
 //!     drop(iter);
 //!
 //!     Ok(())
