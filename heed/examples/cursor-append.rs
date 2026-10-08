@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{Database, EnvOpenOptions, PutFlags};
+use heed::{AbortOrCommit, Database, EnvOpenOptions, PutFlags};
 
 // In this test we are checking that we can append ordered entries in one
 // database even if there is multiple databases which already contain entries.
@@ -15,10 +15,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
-    let first: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
-    let second: Database<Str, Str> = env.create_database(&mut wtxn, Some("second"))?;
+    let wtxn = env.write_txn()?;
+    let (first, second) = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            let first: Database<Str, Str> = wdo.create_database(wtxn, Some("first"))?;
+            let second: Database<Str, Str> = wdo.create_database(wtxn, Some("second"))?;
+            Ok(AbortOrCommit::Commit((first, second)))
+        })?
+        .unwrap_commit();
 
+    let mut wtxn = env.write_txn()?;
     // We fill the first database with entries.
     first.put(&mut wtxn, "I am here", "to test things")?;
     first.put(&mut wtxn, "I am here too", "for the same purpose")?;

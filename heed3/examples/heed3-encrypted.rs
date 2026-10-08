@@ -3,7 +3,7 @@ use std::error::Error;
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
 use heed3::types::*;
-use heed3::EnvOpenOptions;
+use heed3::{AbortOrCommit, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = tempfile::tempdir()?;
@@ -30,8 +30,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let val2 = "this is another secret info";
 
     // We create database and write secret values in it
+    let wtxn = env.write_txn()?;
+    let db = env
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
+
     let mut wtxn = env.write_txn()?;
-    let db = env.create_database::<Str, Str>(&mut wtxn, Some("first"))?;
     db.put(&mut wtxn, key1, val1)?;
     db.put(&mut wtxn, key2, val2)?;
     wtxn.commit()?;
@@ -41,8 +47,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env = unsafe { options.open_encrypted::<ChaCha20Poly1305, _>(key, &env_path)? };
 
     // We check that the secret entries are correctly decrypted
+    let rtxn = env.read_txn()?;
+    let db = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.open_database::<Str, Str>(rtxn, Some("first")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .unwrap();
+
     let mut rtxn = env.read_txn()?;
-    let db = env.open_database::<Str, Str>(&rtxn, Some("first"))?.unwrap();
     let mut iter = db.iter(&mut rtxn)?;
     assert_eq!(iter.next().transpose()?, Some((key1, val1)));
     assert_eq!(iter.next().transpose()?, Some((key2, val2)));

@@ -129,7 +129,10 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     ///
     /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
     /// known as `EINVAL`.
-    pub fn open(&self, rtxn: &RoTxn) -> Result<Option<EncryptedDatabase<KC, DC, C, CDUP>>>
+    pub fn open<U>(
+        &self,
+        rtxn: &RoTxn<'_, U>,
+    ) -> Result<Option<EncryptedDatabase<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
@@ -148,7 +151,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn create(&self, wtxn: &mut RwTxn) -> Result<EncryptedDatabase<KC, DC, C, CDUP>>
+    pub fn create(&self, wtxn: &mut RwTxn<'_>) -> Result<EncryptedDatabase<'e, KC, DC, C, CDUP>>
     where
         KC: 'static,
         DC: 'static,
@@ -179,7 +182,7 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// # use std::fs;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
-/// use heed::Database;
+/// use heed::{AbortOrCommit, Database};
 /// use heed::types::*;
 /// use heed::byteorder::BigEndian;
 ///
@@ -192,9 +195,12 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.write_txn()?;
-/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+///     wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+/// })?.unwrap_commit();
 ///
+/// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &68, &())?;
 /// db.put(&mut wtxn, &35, &())?;
@@ -227,7 +233,7 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// # use std::fs;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
-/// use heed::Database;
+/// use heed::{AbortOrCommit, Database};
 /// use heed::types::*;
 /// use heed::byteorder::BigEndian;
 ///
@@ -240,9 +246,12 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// # };
 /// type BEI64 = I64<BigEndian>;
 ///
-/// let mut wtxn = env.write_txn()?;
-/// let db: Database<BEI64, Unit> = env.create_database(&mut wtxn, Some("big-endian-iter"))?;
+/// let wtxn = env.write_txn()?;
+/// let db: Database<BEI64, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+///     wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+/// })?.unwrap_commit();
 ///
+/// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &0, &())?;
 /// db.put(&mut wtxn, &68, &())?;
@@ -279,12 +288,14 @@ impl<T, KC, DC, C, CDUP> Copy for EncryptedDatabaseOpenOptions<'_, '_, T, KC, DC
 /// wtxn.commit()?;
 /// # Ok(()) }
 /// ```
-pub struct EncryptedDatabase<KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
-    inner: Database<KC, DC, C, CDUP>,
+pub struct EncryptedDatabase<'t, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
+    inner: Database<'t, KC, DC, C, CDUP>,
 }
 
-impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
-    pub(crate) fn new(inner: Database<KC, DC, C, CDUP>) -> EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    pub(crate) fn new(
+        inner: Database<'t, KC, DC, C, CDUP>,
+    ) -> EncryptedDatabase<'t, KC, DC, C, CDUP> {
         EncryptedDatabase { inner }
     }
 
@@ -296,7 +307,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -309,9 +320,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32= U32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("get-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("get-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-forty-two", &42)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -412,7 +426,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -468,7 +482,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -524,7 +538,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -580,7 +594,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -635,7 +649,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -648,9 +662,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("first-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("first-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -679,7 +696,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -692,9 +709,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("last-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("last-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -719,7 +739,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -732,9 +752,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -762,7 +785,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -775,9 +798,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -805,7 +831,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -818,9 +844,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -851,7 +880,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -864,9 +893,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -892,7 +924,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -905,9 +937,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -950,7 +985,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -963,9 +998,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -992,7 +1030,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1005,9 +1043,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1052,7 +1093,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1065,9 +1106,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1144,7 +1188,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1157,9 +1201,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1214,7 +1261,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1227,9 +1274,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1267,7 +1317,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1280,9 +1330,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1337,7 +1390,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1350,9 +1403,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1391,7 +1447,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1404,9 +1460,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1462,7 +1521,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1475,9 +1534,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1516,7 +1578,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1529,9 +1591,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, BEI32> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Str, BEI32> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, "i-am-twenty-eight", &28)?;
     /// db.put(&mut wtxn, "i-am-twenty-seven", &27)?;
@@ -1581,7 +1646,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1594,9 +1659,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -1625,7 +1693,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
     /// use std::io::Write;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1747,7 +1815,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1760,9 +1828,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// assert_eq!(db.get_or_put(&mut wtxn, &42, "i-am-forty-two")?, None);
     /// assert_eq!(db.get_or_put(&mut wtxn, &42, "the meaning of life")?, Some("i-am-forty-two"));
@@ -1794,7 +1865,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     ///
     /// ```
     /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PutFlags};
+    /// use heed::{AbortOrCommit, Database, PutFlags};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1807,9 +1878,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// assert_eq!(db.get_or_put_with_flags(&mut wtxn, PutFlags::empty(), &42, "i-am-forty-two")?, None);
     /// assert_eq!(db.get_or_put_with_flags(&mut wtxn, PutFlags::empty(), &42, "the meaning of life")?, Some("i-am-forty-two"));
@@ -1843,7 +1917,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// ```
     /// # use heed::EnvOpenOptions;
     /// use std::io::Write;
-    /// use heed::{Database, PutFlags};
+    /// use heed::{AbortOrCommit, Database, PutFlags};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1907,7 +1981,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// ```
     /// # use heed::EnvOpenOptions;
     /// use std::io::Write;
-    /// use heed::{Database, PutFlags};
+    /// use heed::{AbortOrCommit, Database, PutFlags};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1971,7 +2045,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1984,9 +2058,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2021,6 +2098,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// use heed::AbortOrCommit;
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2097,7 +2175,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2110,9 +2188,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2153,7 +2234,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2166,9 +2247,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<BEI32, Str> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<BEI32, Str> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &27, "i-am-twenty-seven")?;
@@ -2201,7 +2285,7 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2214,9 +2298,12 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Unit, Unit> = env.create_database(&mut wtxn, Some("iter-i32"))?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Unit, Unit> = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     wdo.create_database(wtxn, Some("iter-i32")).map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// // We remap the types for ease of use.
     /// let db = db.remap_types::<BEI32, Str>();
@@ -2228,35 +2315,35 @@ impl<KC, DC, C, CDUP> EncryptedDatabase<KC, DC, C, CDUP> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<KC2, DC2, C> {
+    pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<'_, KC2, DC2, C, CDUP> {
         EncryptedDatabase::new(self.inner.remap_types::<KC2, DC2>())
     }
 
     /// Change the key codec type of this database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> EncryptedDatabase<KC2, DC, C> {
+    pub fn remap_key_type<KC2>(&self) -> EncryptedDatabase<'_, KC2, DC, C, CDUP> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> EncryptedDatabase<KC, DC2, C> {
+    pub fn remap_data_type<DC2>(&self) -> EncryptedDatabase<'_, KC, DC2, C, CDUP> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> EncryptedDatabase<KC, LazyDecode<DC>, C> {
+    pub fn lazily_decode_data(&self) -> EncryptedDatabase<'_, KC, LazyDecode<DC>, C, CDUP> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
 
-impl<KC, DC, C, CDUP> Clone for EncryptedDatabase<KC, DC, C, CDUP> {
-    fn clone(&self) -> EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> Clone for EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    fn clone(&self) -> EncryptedDatabase<'t, KC, DC, C, CDUP> {
         *self
     }
 }
 
-impl<KC, DC, C, CDUP> Copy for EncryptedDatabase<KC, DC, C, CDUP> {}
+impl<'t, KC, DC, C, CDUP> Copy for EncryptedDatabase<'t, KC, DC, C, CDUP> {}
 
-impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
+impl<'t, KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<'t, KC, DC, C, CDUP> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("EncryptedDatabase")
             .field("key_codec", &any::type_name::<KC>())
@@ -2264,6 +2351,15 @@ impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
             .field("key_comparator", &any::type_name::<C>())
             .field("dup_sort_comparator", &any::type_name::<CDUP>())
             .finish()
+    }
+}
+
+impl<'t, KC, DC, C, CDUP> OnCommit for EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    type Committed = EncryptedDatabase<'static, KC, DC, C, CDUP>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        let EncryptedDatabase { inner } = self;
+        EncryptedDatabase { inner: inner.on_commit(token) }
     }
 }
 
@@ -2277,16 +2373,22 @@ mod tests {
     fn put_overwrite() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = env.read_txn()?;
+        let db = env
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Bytes>(rtxn, None).map(AbortOrCommit::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
-        assert_eq!(db.get(&txn, b"hello").unwrap(), None);
+        let mut wtxn = env.write_txn()?;
+        assert_eq!(db.get(&wtxn, b"hello").unwrap(), None);
 
-        db.put(&mut txn, b"hello", b"hi").unwrap();
-        assert_eq!(db.get(&txn, b"hello").unwrap(), Some(&b"hi"[..]));
+        db.put(&mut wtxn, b"hello", b"hi").unwrap();
+        assert_eq!(db.get(&wtxn, b"hello").unwrap(), Some(&b"hi"[..]));
 
-        db.put(&mut txn, b"hello", b"bye").unwrap();
-        assert_eq!(db.get(&txn, b"hello").unwrap(), Some(&b"bye"[..]));
+        db.put(&mut wtxn, b"hello", b"bye").unwrap();
+        assert_eq!(db.get(&wtxn, b"hello").unwrap(), Some(&b"bye"[..]));
 
         Ok(())
     }
@@ -2296,19 +2398,25 @@ mod tests {
     fn longer_keys() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = env.read_txn()?;
+        let db = env
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Bytes>(rtxn, None).map(AbortOrCommit::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut wtxn = env.write_txn()?;
         // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
         let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";
 
-        assert_eq!(db.get(&txn, long_key).unwrap(), None);
+        assert_eq!(db.get(&wtxn, long_key).unwrap(), None);
 
-        db.put(&mut txn, long_key, b"hi").unwrap();
-        assert_eq!(db.get(&txn, long_key).unwrap(), Some(&b"hi"[..]));
+        db.put(&mut wtxn, long_key, b"hi").unwrap();
+        assert_eq!(db.get(&wtxn, long_key).unwrap(), Some(&b"hi"[..]));
 
-        db.put(&mut txn, long_key, b"bye").unwrap();
-        assert_eq!(db.get(&txn, long_key).unwrap(), Some(&b"bye"[..]));
+        db.put(&mut wtxn, long_key, b"bye").unwrap();
+        assert_eq!(db.get(&wtxn, long_key).unwrap(), Some(&b"bye"[..]));
 
         Ok(())
     }

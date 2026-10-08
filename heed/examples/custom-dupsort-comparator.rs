@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use byteorder::BigEndian;
-use heed::{DatabaseFlags, EnvOpenOptions};
+use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
 use heed_traits::Comparator;
 use heed_types::{Str, U128};
 
@@ -29,17 +29,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let rtxn = env.read_txn()?;
     let db = env
-        .database_options()
-        .types::<Str, U128<BigEndian>>()
-        .flags(DatabaseFlags::DUP_SORT)
-        .dup_sort_comparator::<DescendingIntCmp>()
-        .create(&mut wtxn)?;
-    wtxn.commit()?;
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.database_options()
+                .types::<Str, U128<BigEndian>>()
+                .flags(DatabaseFlags::DUP_SORT)
+                .dup_sort_comparator::<DescendingIntCmp>()
+                .open(&rtxn)
+                .map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
     let mut wtxn = env.write_txn()?;
-
     // We fill our database with entries.
     db.put(&mut wtxn, "1", &1)?;
     db.put(&mut wtxn, "1", &2)?;

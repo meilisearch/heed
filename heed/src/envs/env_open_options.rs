@@ -154,7 +154,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -164,9 +164,15 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// // we will open the default unamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, U32<byteorder::NativeEndian>> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// db.put(&mut wtxn, "seven", &7)?;
     /// db.put(&mut wtxn, "zero", &0)?;
@@ -283,7 +289,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
     /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, Database};
+    /// use heed3::{AbortOrCommit, EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -310,8 +316,14 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let val2 = "this is another secret info";
     ///
     /// // We create database and write secret values in it
+    /// let wtxn = env.write_txn()?;
+    /// let db = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
+    ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<Str, Str>(&mut wtxn, Some("first"))?;
     /// db.put(&mut wtxn, key1, val1)?;
     /// db.put(&mut wtxn, key2, val2)?;
     /// wtxn.commit()?;
@@ -333,7 +345,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
     /// use heed3::types::*;
-    /// use heed3::{EnvOpenOptions, EncryptedDatabase;};
+    /// use heed3::{AbortOrCommit, EnvOpenOptions, EncryptedDatabase};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -358,9 +370,12 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let key2 = "second-key";
     ///
     /// // We create the database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: EncryptedDatabase<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
-    /// wtxn.commit()?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: EncryptedDatabase<Str, Str> = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
     /// // Declare the read transaction as mutable because LMDB, when using encryption,
     /// // does not allow keeping keys between reads due to the use of an internal cache.

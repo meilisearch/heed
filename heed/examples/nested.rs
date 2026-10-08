@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{Database, EnvOpenOptions};
+use heed::{AbortOrCommit, Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = tempfile::tempdir()?;
@@ -14,8 +14,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // here the key will be an str and the data will be a slice of u8
+    let rtxn = env.read_txn()?;
+    let db: Database<Str, Bytes> = env
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            let db = dbo.open_database(rtxn, None)?.expect("unnamed db must exists");
+            Ok(AbortOrCommit::Commit(db))
+        })?
+        .unwrap_commit();
+
     let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Bytes> = env.create_database(&mut wtxn, None)?;
 
     // clear db
     db.clear(&mut wtxn)?;

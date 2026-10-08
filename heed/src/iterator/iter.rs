@@ -23,7 +23,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -36,13 +36,20 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo
+    ///             .database_options()
+    ///             .types::<BEI64, BEI64>()
+    ///             .flags(DatabaseFlags::DUP_SORT)
+    ///             .name("dup-sort")
+    ///             .create(wtxn)
+    ///             .map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;
@@ -76,7 +83,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -89,13 +96,20 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo
+    ///             .database_options()
+    ///             .types::<BEI64, BEI64>()
+    ///             .flags(DatabaseFlags::DUP_SORT)
+    ///             .name("dup-sort")
+    ///             .create(wtxn)
+    ///             .map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;

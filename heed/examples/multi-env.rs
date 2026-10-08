@@ -2,7 +2,7 @@ use std::error::Error;
 
 use byteorder::BE;
 use heed::types::*;
-use heed::{Database, EnvOpenOptions};
+use heed::{AbortOrCommit, Database, EnvOpenOptions};
 
 type BEU32 = U32<BE>;
 
@@ -23,16 +23,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env2_path)?
     };
 
-    let mut wtxn1 = env1.write_txn()?;
-    let mut wtxn2 = env2.write_txn()?;
-    let db1: Database<Str, Bytes> = env1.create_database(&mut wtxn1, Some("hello"))?;
-    let db2: Database<BEU32, BEU32> = env2.create_database(&mut wtxn2, Some("hello"))?;
+    let wtxn1 = env1.write_txn()?;
+    let db1: Database<Str, Bytes> = env1
+        .create_databases_and_commit(wtxn1, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("hello")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
+
+    let wtxn2 = env2.write_txn()?;
+    let db2: Database<BEU32, BEU32> = env2
+        .create_databases_and_commit(wtxn2, |dbo, wtxn| {
+            dbo.create_database(wtxn, Some("hello")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
     // clear db
+    let mut wtxn1 = env1.write_txn()?;
     db1.clear(&mut wtxn1)?;
     wtxn1.commit()?;
 
     // clear db
+    let mut wtxn2 = env2.write_txn()?;
     db2.clear(&mut wtxn2)?;
     wtxn2.commit()?;
 

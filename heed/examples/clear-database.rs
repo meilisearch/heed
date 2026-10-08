@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{Database, EnvOpenOptions};
+use heed::{AbortOrCommit, Database, EnvOpenOptions};
 
 // In this test we are checking that we can clear database entries and
 // write just after in the same transaction without loosing the writes.
@@ -15,9 +15,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, Str> = env.create_database(&mut wtxn, Some("first"))?;
+    let wtxn = env.write_txn()?;
+    let db: Database<Str, Str> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("first")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
+    let mut wtxn = env.write_txn()?;
     // We fill the db database with entries.
     db.put(&mut wtxn, "I am here", "to test things")?;
     db.put(&mut wtxn, "I am here too", "for the same purpose")?;

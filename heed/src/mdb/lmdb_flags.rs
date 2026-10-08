@@ -81,7 +81,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -93,13 +93,20 @@ bitflags! {
         /// #     .open(dir.path())?
         /// # };
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<Str, Unit>()
-        ///     .flags(DatabaseFlags::REVERSE_KEY)
-        ///     .name("reverse-key")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<Str, Unit>()
+        ///             .flags(DatabaseFlags::REVERSE_KEY)
+        ///             .name("reverse-key")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &"bonjour", &())?;
         /// db.put(&mut wtxn, &"hello", &())?;
@@ -128,7 +135,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -141,13 +148,20 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<BEI64, BEI64>()
-        ///     .flags(DatabaseFlags::DUP_SORT)
-        ///     .name("dup-sort")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<BEI64, BEI64>()
+        ///             .flags(DatabaseFlags::DUP_SORT)
+        ///             .name("dup-sort")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &120)?;
         /// db.put(&mut wtxn, &68, &121)?;
@@ -194,7 +208,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -207,13 +221,20 @@ bitflags! {
         /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<BEI32, BEI32>()
-        ///     .flags(DatabaseFlags::INTEGER_KEY)
-        ///     .name("integer-key")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<BEI32, BEI32>()
+        ///             .flags(DatabaseFlags::INTEGER_KEY)
+        ///             .name("integer-key")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &120)?;
         /// db.put(&mut wtxn, &92, &32)?;
@@ -240,7 +261,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -253,13 +274,20 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<BEI64, BEI64>()
-        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
-        ///     .name("dup-sort-fixed")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<BEI64, BEI64>()
+        ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
+        ///             .name("dup-sort-fixed")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &120)?;
         /// db.put(&mut wtxn, &68, &121)?;
@@ -300,7 +328,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -313,13 +341,20 @@ bitflags! {
         /// # };
         /// type BEI32 = I32<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<BEI32, BEI32>()
-        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::INTEGER_DUP)
-        ///     .name("dup-sort-integer-dup")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<BEI32, BEI32>()
+        ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
+        ///             .name("dup-sort-fixed")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &120)?;
         /// db.put(&mut wtxn, &68, &121)?;
@@ -361,7 +396,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -374,13 +409,20 @@ bitflags! {
         /// # };
         /// type BEI64 = I64<BigEndian>;
         ///
-        /// let mut wtxn = env.write_txn()?;
-        /// let db = env.database_options()
-        ///     .types::<BEI64, Str>()
-        ///     .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::REVERSE_DUP)
-        ///     .name("dup-sort")
-        ///     .create(&mut wtxn)?;
+        /// let wtxn = env.write_txn()?;
+        /// let db = env
+        ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+        ///         dbo
+        ///             .database_options()
+        ///             .types::<BEI64, Str>()
+        ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::REVERSE_DUP)
+        ///             .name("dup-sort")
+        ///             .create(wtxn)
+        ///             .map(AbortOrCommit::Commit)
+        ///     })?
+        ///     .unwrap_commit();
         ///
+        /// let mut wtxn = env.write_txn()?;
         /// # db.clear(&mut wtxn)?;
         /// db.put(&mut wtxn, &68, &"bonjour")?;
         /// db.put(&mut wtxn, &68, &"hola")?;

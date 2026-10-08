@@ -113,16 +113,18 @@ impl<'e, T> RoTxn<'e, T> {
         unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) }
     }
 
-    /// Commit a read transaction.
+    /// Commit a unique read transaction.
+    ///
+    /// The main effect of the function is to make the dbi obtained from [`DatabaseOptions::Open`] public.
     ///
     /// Synchronizing some [`Env`] metadata with the global handle.
     ///
     /// ## LMDB
     ///
-    /// It's mandatory in a multi-process setup to call [`RoTxn::commit`] upon read-only database opening.
+    /// It's mandatory in a multi-process setup to call [`UniqueRoTxn::commit`] upon read-only database opening.
     /// After the transaction opening, the database is dropped. The next transaction might return
     /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
-    pub fn commit(mut self) -> Result<()> {
+    pub(crate) fn commit(mut self) -> Result<()> {
         // Asserts that the transaction hasn't been already
         // committed/aborter and ensure we cannot use it twice.
         let mut txn = self.inner.txn.take().unwrap();
@@ -332,7 +334,7 @@ impl<'p> RwTxn<'p> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -345,9 +347,14 @@ impl<'p> RwTxn<'p> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///         wdo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;

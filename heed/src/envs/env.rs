@@ -5,7 +5,7 @@ use std::io::Seek;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
@@ -15,17 +15,16 @@ use super::{
     custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
     IntegerComparator, OPENED_ENV,
 };
-use crate::cursor::{MoveOperation, RoCursor};
 use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
-#[allow(unused)] // for cargo auto doc links
-use crate::EnvOpenOptions;
 use crate::{
-    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
-    RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
+    assert_eq_env_txn, CommitToken, CompactionOption, Database, DatabaseOpenOptions, EnvFlags,
+    Error, OnCommit, Result, RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
 };
+#[allow(unused)] // for cargo auto doc links
+use crate::{AbortOrCommit, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
 #[repr(transparent)]
@@ -40,7 +39,15 @@ impl<T> Env<T> {
         path: PathBuf,
         signal_event: Arc<SignalEvent>,
     ) -> Self {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }), _tls_marker: PhantomData }
+        Env {
+            inner: Arc::new(EnvInner {
+                env_ptr,
+                path,
+                signal_event,
+                dbi_open_mutex: Mutex::new(()),
+            }),
+            _tls_marker: PhantomData,
+        }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -197,114 +204,113 @@ impl<T> Env<T> {
         }
     }
 
-    /// Returns the size used by all the databases in the environment without the free pages.
+    /// Open one or multiple databases.
     ///
-    /// It is crucial to configure [`EnvOpenOptions::max_dbs`] with a sufficiently large value
-    /// before invoking this function. All databases within the environment will be opened
-    /// and remain so.
-    pub fn non_free_pages_size(&self) -> Result<u64> {
-        let compute_size = |stat: ffi::MDB_stat| {
-            (stat.ms_leaf_pages + stat.ms_branch_pages + stat.ms_overflow_pages) as u64
-                * stat.ms_psize as u64
+    /// This method let you safely open databases by using a lock to
+    /// make sure a single env is opening databases at once.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
+    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit()
+    ///   .expect("the unnamed database to always exists");
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let length = database.len(&rtxn)?;
+    /// assert_eq!(length, 0);
+    /// # Ok(()) }
+    /// ```
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D>(
+        &'a self,
+        rtxn: RoTxn<'e, T>,
+        f: F,
+    ) -> Result<AbortOrCommit<D::Committed>>
+    where
+        F: FnOnce(&DatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<AbortOrCommit<D>>,
+        D: OnCommit,
+    {
+        let _lock = self.lock();
+        let montruc = DatabaseOpener { env: self };
+        let databases = match f(&montruc, &rtxn)? {
+            AbortOrCommit::Commit(databases) => databases,
+            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
         };
-
-        let mut size = 0;
-
-        let mut stat = mem::MaybeUninit::uninit();
-        unsafe { mdb_result(ffi::mdb_env_stat(self.env_mut_ptr().as_mut(), stat.as_mut_ptr()))? };
-        let stat = unsafe { stat.assume_init() };
-        size += compute_size(stat);
-
-        let rtxn = self.read_txn()?;
-        // Open the main database
-        let dbi = self.raw_open_dbi(rtxn.txn_ptr(), None, 0)?;
-
-        // We're going to iterate on the unnamed database
-        let mut cursor = RoCursor::new(&rtxn, dbi)?;
-
-        while let Some((key, _value)) = cursor.move_on_next(MoveOperation::NoDup)? {
-            if key.contains(&0) {
-                continue;
-            }
-
-            let key = String::from_utf8(key.to_vec()).unwrap();
-            // Calling `ffi::db_stat` on a database instance does not involve key comparison
-            // in LMDB, so it's safe to specify a noop key compare function for it.
-            if let Ok(dbi) = self.raw_open_dbi(rtxn.txn_ptr(), Some(&key), 0) {
-                let mut stat = mem::MaybeUninit::uninit();
-                unsafe {
-                    mdb_result(ffi::mdb_stat(rtxn.txn_ptr().as_mut(), dbi, stat.as_mut_ptr()))?
-                };
-                let stat = unsafe { stat.assume_init() };
-                size += compute_size(stat);
-            }
-        }
-
-        Ok(size)
+        rtxn.commit()?;
+        let commit_token = CommitToken::new(self);
+        let committed = databases.on_commit(&commit_token);
+        Ok(AbortOrCommit::Commit(committed))
     }
 
-    /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(self)
-    }
-
-    /// Opens a typed database that already exists in this environment.
+    /// Create or open one or multiple databases.
     ///
-    /// If the database was previously opened in this program run, types will be checked.
+    /// This method let you safely create or open databases
+    /// by using a lock to make sure a single env is opening
+    /// databases at once.
     ///
-    /// ## Important Information
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
+    /// use heed::types::*;
     ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
     ///
-    /// ## LMDB read-only access of existing database
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
+    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit();
     ///
-    /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
-    /// and the database handles opened and shared with the global [`Env`] handle.
+    /// // We can also open the databases more options
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///      wdo
+    ///         .database_options()
+    ///         .types::<Str, Str>()
+    ///         .name("my-database")
+    ///         .create(wtxn)
+    ///         .map(AbortOrCommit::Commit)
+    ///   })?
+    ///   .unwrap_commit();
     ///
-    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
-    /// known as `EINVAL`.
-    pub fn open_database<KC, DC>(
-        &self,
-        rtxn: &RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC>>>
+    /// # Ok(()) }
+    /// ```
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D>(
+        &'a self,
+        mut wtxn: RwTxn<'e>,
+        f: F,
+    ) -> Result<AbortOrCommit<D::Committed>>
     where
-        KC: 'static,
-        DC: 'static,
+        F: FnOnce(&DatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<AbortOrCommit<D>>,
+        D: OnCommit,
     {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.open(rtxn)
-    }
-
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened during this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
-    pub fn create_database<KC, DC>(
-        &self,
-        wtxn: &mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.create(wtxn)
+        let _lock = self.lock();
+        let montruc = DatabaseOpener { env: self };
+        let databases = match f(&montruc, &mut wtxn)? {
+            AbortOrCommit::Commit(databases) => databases,
+            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+        };
+        wtxn.commit()?;
+        let commit_token = CommitToken::new(self);
+        let committed = databases.on_commit(&commit_token);
+        Ok(AbortOrCommit::Commit(committed))
     }
 
     pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
@@ -457,6 +463,15 @@ impl<T> Env<T> {
         RoTxn::static_read_txn(self)
     }
 
+    pub(crate) fn lock(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.inner.dbi_open_mutex.lock() {
+                Ok(lock) => break lock,
+                Err(_) => self.inner.dbi_open_mutex.clear_poison(),
+            }
+        }
+    }
+
     /// Copy an LMDB environment to the specified path, with options.
     ///
     /// This function may be used to make a backup of an existing environment.
@@ -468,7 +483,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -481,14 +496,16 @@ impl<T> Env<T> {
     /// # };
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
-    ///
-    /// db.put(&mut wtxn, &"hello0", &"world0")?;
-    /// db.put(&mut wtxn, &"hello1", &"world1")?;
-    /// db.put(&mut wtxn, &"hello2", &"world2")?;
-    /// db.put(&mut wtxn, &"hello3", &"world3")?;
-    ///
-    /// wtxn.commit()?;
+    /// env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         let db = dbo.open_database::<Str, Str>(&wtxn, None)?.unwrap();
+    ///         db.put(wtxn, &"hello0", &"world0")?;
+    ///         db.put(wtxn, &"hello1", &"world1")?;
+    ///         db.put(wtxn, &"hello2", &"world2")?;
+    ///         db.put(wtxn, &"hello3", &"world3")?;
+    ///         Ok(AbortOrCommit::Commit(()))
+    ///     })?
+    ///     .unwrap_commit();
     ///
     /// let mut tmp_file = tempfile::tempfile()?;
     /// env.copy_to_file(&mut tmp_file, CompactionOption::Enabled)?;
@@ -521,7 +538,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -533,9 +550,15 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, Str> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
     /// db.put(&mut wtxn, &"hello1", &"world1")?;
     /// db.put(&mut wtxn, &"hello2", &"world2")?;
@@ -671,7 +694,7 @@ impl Env<WithoutTls> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, Database};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -684,9 +707,15 @@ impl Env<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
@@ -731,6 +760,7 @@ pub(crate) struct EnvInner {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
+    dbi_open_mutex: Mutex<()>,
 }
 
 impl EnvInner {
@@ -752,14 +782,84 @@ impl Drop for EnvInner {
     }
 }
 
+/// Used to create or open databases.
+pub struct DatabaseOpener<'e, T> {
+    env: &'e Env<T>,
+}
+
+impl<'e, T> DatabaseOpener<'e, T> {
+    /// Options and flags which can be used to configure how a [`Database`] is opened.
+    pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
+        DatabaseOpenOptions::new(self.env)
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    ///
+    /// ## LMDB read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
+    ///
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<Option<Database<'e, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.open(rtxn)
+    }
+
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened during this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    pub fn create_database<KC, DC>(
+        &self,
+        wtxn: &mut RwTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<Database<'e, KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.create(wtxn)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::ErrorKind;
     use std::time::Duration;
     use std::{fs, thread};
 
     use crate::types::*;
-    use crate::{env_closing_event, EnvOpenOptions, Error};
+    use crate::{env_closing_event, AbortOrCommit, Database, EnvOpenOptions, Error};
 
     #[test]
     fn close_env() {
@@ -779,9 +879,14 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Str, Str>(rtxn, None).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -856,9 +961,14 @@ mod tests {
         unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
         let env = unsafe { envbuilder.open(dir.path()).unwrap() };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
     }
 
     #[test]
@@ -880,13 +990,23 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.abort();
+        let wtxn = env.write_txn().unwrap();
+        let aborted = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(|_| AbortOrCommit::<Database<Str, Str>>::Abort)
+            })
+            .unwrap();
+        assert!(aborted.is_abort());
 
         let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
-        assert!(option.is_none());
+        let no_db = env
+            .open_databases_and_commit(rtxn, |dbo, wtxn| {
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
+        assert!(no_db.is_none());
     }
 
     #[test]
@@ -901,9 +1021,14 @@ mod tests {
         };
 
         // we first create a database
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         // Close the environement and reopen it, databases must not be loaded in memory.
         env.prepare_for_closing().wait();
@@ -916,7 +1041,12 @@ mod tests {
         };
 
         let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        let option = env
+            .open_databases_and_commit(rtxn, |dbo, wtxn| {
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
         assert!(option.is_some());
     }
 
@@ -928,9 +1058,14 @@ mod tests {
             EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(AbortOrCommit::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         let mut wtxn = env.write_txn().unwrap();
         for i in 0..64 {
@@ -975,10 +1110,15 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let mut wtxn = env.write_txn().unwrap();
-            let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
+            let wtxn = env.write_txn().unwrap();
+            let database0 = env
+                .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                    wdo.create_database::<Str, Str>(wtxn, Some("shared0"))
+                        .map(AbortOrCommit::Commit)
+                })
+                .unwrap()
+                .unwrap_commit();
 
-            wtxn.commit().unwrap();
             let mut wtxn = env.write_txn().unwrap();
             database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
             wtxn.commit().unwrap();
@@ -995,61 +1135,20 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let database0 = {
-                let rtxn = env.read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // This commit is mandatory if not committed you might get
-                // Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })
-                rtxn.commit().unwrap();
-                database0
-            };
+            let rtxn = env.read_txn().unwrap();
+            let database0 = env
+                .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                    dbo.open_database::<Str, Str>(rtxn, Some("shared0")).map(AbortOrCommit::Commit)
+                })
+                .unwrap()
+                .unwrap_commit()
+                .unwrap();
 
             {
                 // If we didn't committed the opening it might fail with EINVAL.
                 let rtxn = env.read_txn().unwrap();
                 let value = database0.get(&rtxn, "shared0").unwrap().unwrap();
                 assert_eq!(value, expected_data0);
-            }
-
-            env.prepare_for_closing().wait();
-        }
-
-        // To avoid reintroducing the bug let's try to open again but without the commit
-        {
-            // Open now we do a read-only opening
-            let env = unsafe {
-                EnvOpenOptions::new()
-                    .map_size(10 * 1024 * 1024) // 10MB
-                    .max_dbs(32)
-                    .open(dir.path())
-                    .unwrap()
-            };
-            let database0 = {
-                let rtxn = env.read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // No commit it's important, dropping explicitly
-                drop(rtxn);
-                database0
-            };
-
-            {
-                // We didn't committed the opening we will get EINVAL.
-                let rtxn = env.read_txn().unwrap();
-                // The dbg!() is intentional in case of a change in rust-std or in lmdb related
-                // to the windows error.
-                let err = dbg!(database0.get(&rtxn, "shared0"));
-
-                // The error kind is still ErrorKind Uncategorized on windows.
-                // Behind it's a ERROR_BAD_COMMAND code 22 like EINVAL.
-                if cfg!(windows) {
-                    assert!(err.is_err());
-                } else {
-                    assert!(
-                        matches!(err, Err(Error::Io(ref e)) if e.kind() == ErrorKind::InvalidInput)
-                    );
-                }
             }
 
             env.prepare_for_closing().wait();

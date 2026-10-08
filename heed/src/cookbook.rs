@@ -22,7 +22,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
 //!
 //! pub type StringMap = HashMap<String, String>;
 //!
@@ -35,9 +35,15 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<Str, SerdeJson<StringMap>> = env.create_database(&mut wtxn, None)?;
+//!     let rtxn = env.read_txn()?;
+//!     let db: Database<Str, SerdeJson<StringMap>> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database must always exists");
 //!
+//!     let mut wtxn = env.write_txn()?;
 //!     fill_with_data(&mut wtxn, db)?;
 //!
 //!     // We make sure that iterating over this database will
@@ -86,11 +92,9 @@
 //!
 //! ```
 //! use std::error::Error;
-//! use std::fs;
-//! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let env_path = tempfile::tempdir()?;
@@ -105,28 +109,28 @@
 //!     let rtxn = env.read_txn()?;
 //!     // The database names are mixed with the user entries therefore we prefer
 //!     // ignoring the values and try to open the databases one by one using the keys.
-//!     let unnamed: Database<Str, DecodeIgnore> =
-//!         env.open_database(&rtxn, None)?.expect("the unnamed database always exists");
+//!     env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!         let unnamed: Database<Str, DecodeIgnore> = dbo.open_database(rtxn, None)?.unwrap();
 //!
-//!     // The unnamed (or main) database contains the other
-//!     // database names associated to empty values.
-//!     for result in unnamed.iter(&rtxn)? {
-//!         let (name, ()) = result?;
+//!         // The unnamed (or main) database contains the other
+//!         // database names associated to empty values.
+//!         for result in unnamed.iter(&rtxn)? {
+//!             let (name, ()) = result?;
 //!
-//!         if let Ok(Some(_db)) = env.open_database::<Str, Bytes>(&rtxn, Some(name)) {
-//!             // We succeeded into opening a new database that
-//!             // contains strings associated to raw bytes.
+//!             if let Ok(Some(_db)) = dbo.open_database::<Str, Bytes>(rtxn, Some(name)) {
+//!                 // We succeeded into opening a new database that
+//!                 // contains strings associated to raw bytes.
+//!             }
 //!         }
-//!     }
 //!
-//!     // When opening databases in a read-only transaction
-//!     // you must commit your read transaction to make your
-//!     // freshly opened databases globally available.
-//!     rtxn.commit()?;
+//!         // When opening databases in a read-only transaction
+//!         // you must commit your read transaction to make your
+//!         // freshly opened databases globally available.
 //!
-//!     // If you abort (or drop) your read-only transaction
-//!     // the database handle will be invalid outside
-//!     // the transaction scope.
+//!         // You must implement the OnCommit trait on a data-structure
+//!         // of your choice to be able to use the databases in your program.
+//!         Ok(AbortOrCommit::<()>::Abort)
+//!     })?;
 //!
 //!     Ok(())
 //! }
@@ -151,7 +155,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
+//! use heed::{AbortOrCommit, BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
 //!
 //! #[derive(Debug, PartialEq, Eq)]
 //! pub enum Level {
@@ -241,9 +245,15 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<LogKeyCodec, Str> = env.create_database(&mut wtxn, None)?;
+//!     let rtxn = env.read_txn()?;
+//!     let db: Database<LogKeyCodec, Str> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database to always exists");
 //!
+//!     let mut wtxn = env.write_txn()?;
 //!     db.put(
 //!         &mut wtxn,
 //!         &LogKey { timestamp: 1608326232, level: Level::Debug },
@@ -292,7 +302,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions};
+//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -303,9 +313,15 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!     let rtxn = env.read_txn()?;
+//!     let db: Database<Str, Str> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database to always exists");
 //!
+//!     let mut wtxn = env.write_txn()?;
 //!     // Ho! Crap! We don't have enough space in this environment...
 //!     assert!(matches!(
 //!         fill_with_data(&mut wtxn, db),
@@ -324,9 +340,15 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!     let rtxn = env.read_txn()?;
+//!     let db: Database<Str, Str> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database to always exists");
 //!
+//!     let mut wtxn = env.write_txn()?;
 //!     // We now have enough space in the env to store all of our entries.
 //!     assert!(matches!(fill_with_data(&mut wtxn, db), Ok(())));
 //!
@@ -375,7 +397,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{Database, EnvOpenOptions, RoTxn};
+//! use heed::{AbortOrCommit, Database, EnvOpenOptions, RoTxn};
 //!
 //! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 //!     let path = tempfile::tempdir()?;
@@ -386,9 +408,15 @@
 //!             .open(&path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
-//!     let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+//!     let rtxn = env.read_txn()?;
+//!     let db: Database<Str, Str> = env
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database must always exists");
 //!
+//!     let mut wtxn = env.write_txn()?;
 //!     fill_with_data(&mut wtxn, db)?;
 //!
 //!     let immutable_map = ImmutableMap::from_db(&wtxn, db)?;
@@ -456,7 +484,7 @@
 //! use std::error::Error;
 //! use std::str;
 //!
-//! use heed::EnvOpenOptions;
+//! use heed::{AbortOrCommit, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, Unit};
 //!
@@ -483,13 +511,17 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let rtxn = env.read_txn()?;
 //!     let db = env
-//!         .database_options()
-//!         .types::<Str, Unit>()
-//!         .key_comparator::<StringAsIntCmp>()
-//!         .create(&mut wtxn)?;
-//!     wtxn.commit()?;
+//!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!             dbo.database_options()
+//!                 .types::<Str, Unit>()
+//!                 .key_comparator::<StringAsIntCmp>()
+//!                 .open(rtxn)
+//!                 .map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit()
+//!         .expect("the unnamed database to always exists");
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!
@@ -526,7 +558,7 @@
 //! use std::error::Error;
 //!
 //! use byteorder::BigEndian;
-//! use heed::{DatabaseFlags, EnvOpenOptions};
+//! use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, U128};
 //!
@@ -548,14 +580,17 @@
 //!             .open(path)?
 //!     };
 //!
-//!     let mut wtxn = env.write_txn()?;
+//!     let wtxn = env.write_txn()?;
 //!     let db = env
-//!         .database_options()
-//!         .types::<Str, U128<BigEndian>>()
-//!         .flags(DatabaseFlags::DUP_SORT)
-//!         .dup_sort_comparator::<DescendingIntCmp>()
-//!         .create(&mut wtxn)?;
-//!     wtxn.commit()?;
+//!         .create_databases_and_commit(wtxn, |dbo, wtxn| {
+//!             dbo.database_options()
+//!                 .types::<Str, U128<BigEndian>>()
+//!                 .flags(DatabaseFlags::DUP_SORT)
+//!                 .dup_sort_comparator::<DescendingIntCmp>()
+//!                 .create(wtxn)
+//!                 .map(AbortOrCommit::Commit)
+//!         })?
+//!         .unwrap_commit();
 //!
 //!     let mut wtxn = env.write_txn()?;
 //!
@@ -595,7 +630,7 @@
 //!
 //! use heed::byteorder::NativeEndian;
 //! use heed::types::*;
-//! use heed::EnvOpenOptions;
+//! use heed::{AbortOrCommit, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -607,14 +642,17 @@
 //!             .open(&path)?
 //!     };
 //!
+//!     let wtxn = env.write_txn()?;
+//!     let db = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+//!         wdo
+//!             .database_options()
+//!             .types::<Bytes, U64<NativeEndian>>()
+//!             .name("index")
+//!             .create(wtxn)
+//!             .map(AbortOrCommit::Commit)
+//!     })?.unwrap_commit();
+//!
 //!     let mut wtxn = env.write_txn()?;
-//!
-//!     let db = env
-//!         .database_options()
-//!         .types::<Bytes, U64<NativeEndian>>()
-//!         .name("index")
-//!         .create(&mut wtxn)?;
-//!
 //!     db.put(&mut wtxn, &vec![1, 2, 3, 3], &55555u64)?;
 //!     db.put(&mut wtxn, &vec![1, 2, 3, 4], &66666u64)?;
 //!     db.put(&mut wtxn, &vec![1, 2, 3, 5], &77777u64)?;

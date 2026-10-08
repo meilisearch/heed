@@ -1,7 +1,7 @@
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
 use heed3::types::*;
-use heed3::{EncryptedDatabase, EnvOpenOptions};
+use heed3::{AbortOrCommit, EncryptedDatabase, EnvOpenOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use roaring::RoaringBitmap;
@@ -25,11 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // opening a write transaction
-    let mut wtxn = env.write_txn()?;
+    let wtxn = env.write_txn()?;
     // we will open the default unnamed database
-    let db: EncryptedDatabase<U32<byteorder::BigEndian>, Bytes> =
-        env.create_database(&mut wtxn, None)?;
+    let db: EncryptedDatabase<U32<byteorder::BigEndian>, Bytes> = env
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
+            dbo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
+    let mut wtxn = env.write_txn()?;
     let mut buffer = Vec::new();
     for i in 0..100 {
         let mut rng = StdRng::seed_from_u64(i as u64);

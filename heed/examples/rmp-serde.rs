@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::{SerdeRmp, Str};
-use heed::{Database, EnvOpenOptions};
+use heed::{AbortOrCommit, Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -21,9 +21,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         string: &'a str,
     }
 
-    let mut wtxn = env.write_txn()?;
-    let db: Database<Str, SerdeRmp<Hello>> = env.create_database(&mut wtxn, Some("serde-rmp"))?;
+    let wtxn = env.write_txn()?;
+    let db: Database<Str, SerdeRmp<Hello>> = env
+        .create_databases_and_commit(wtxn, |wdo, wtxn| {
+            wdo.create_database(wtxn, Some("serde-rmp")).map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit();
 
+    let mut wtxn = env.write_txn()?;
     let hello = Hello { string: "hi" };
     db.put(&mut wtxn, "hello", &hello)?;
 

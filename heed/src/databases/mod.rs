@@ -23,3 +23,10 @@ pub struct DatabaseStat {
     /// Number of data items.
     pub entries: usize,
 }
+
+impl DatabaseStat {
+    /// Size used by this database without the free pages.
+    pub fn non_free_page_size(&self) -> usize {
+        (self.leaf_pages + self.branch_pages + self.overflow_pages) * self.page_size as usize
+    }
+}

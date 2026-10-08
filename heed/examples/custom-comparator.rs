@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::error::Error;
 use std::str;
 
-use heed::EnvOpenOptions;
+use heed::{AbortOrCommit, EnvOpenOptions};
 use heed_traits::Comparator;
 use heed_types::{Str, Unit};
 
@@ -29,13 +29,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let mut wtxn = env.write_txn()?;
+    let rtxn = env.read_txn()?;
     let db = env
-        .database_options()
-        .types::<Str, Unit>()
-        .key_comparator::<StringAsIntCmp>()
-        .create(&mut wtxn)?;
-    wtxn.commit()?;
+        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+            dbo.database_options()
+                .types::<Str, Unit>()
+                .key_comparator::<StringAsIntCmp>()
+                .open(&rtxn)
+                .map(AbortOrCommit::Commit)
+        })?
+        .unwrap_commit()
+        .expect("the unnamed database to exists");
 
     let mut wtxn = env.write_txn()?;
 
