@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             dbo.database_options()
                 .types::<Str, Unit>()
                 .key_comparator::<StringAsIntCmp>()
-                .open(&rtxn)
+                .open(rtxn)
                 .map(AbortOrCommit::Commit)
         })?
         .unwrap_commit()

@@ -29,18 +29,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             .open(env_path)?
     };
 
-    let rtxn = env.read_txn()?;
+    let wtxn = env.write_txn()?;
     let db = env
-        .open_databases_and_commit(rtxn, |dbo, rtxn| {
+        .create_databases_and_commit(wtxn, |dbo, wtxn| {
             dbo.database_options()
                 .types::<Str, U128<BigEndian>>()
                 .flags(DatabaseFlags::DUP_SORT)
                 .dup_sort_comparator::<DescendingIntCmp>()
-                .open(&rtxn)
+                .create(wtxn)
                 .map(AbortOrCommit::Commit)
         })?
-        .unwrap_commit()
-        .expect("the unnamed database to exists");
+        .unwrap_commit();
 
     let mut wtxn = env.write_txn()?;
     // We fill our database with entries.
