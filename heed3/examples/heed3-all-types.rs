@@ -2,7 +2,7 @@ use std::error::Error;
 
 use heed3::byteorder::BE;
 use heed3::types::*;
-use heed3::{AbortOrCommit, Database, EnvOpenOptions};
+use heed3::{CommitOrAbort, Database, EnvOpenOptions};
 use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<Str, Bytes> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("kiki")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("kiki")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeBincode<Hello>> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("serde-bincode")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("serde-bincode")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<Str, SerdeJson<Hello>> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("serde-json")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("serde-json")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<Str, Unit> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("ignored-data")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let _db: Database<Str, Unit> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("ignored-data")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("ignored-data")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<BEI64, Unit> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("big-endian-iter")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("big-endian-iter")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 

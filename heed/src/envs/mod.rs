@@ -30,7 +30,7 @@ mod env;
 mod env_open_options;
 mod on_commit;
 
-pub use abort_or_commit::AbortOrCommit;
+pub use abort_or_commit::CommitOrAbort;
 #[cfg(master3)]
 pub use encrypted_env::EncryptedEnv;
 pub use env::Env;

@@ -2,7 +2,7 @@ use std::error::Error;
 
 use byteorder::BE;
 use heed::types::*;
-use heed::{AbortOrCommit, Database, EnvOpenOptions};
+use heed::{CommitOrAbort, Database, EnvOpenOptions};
 
 type BEU32 = U32<BE>;
 
@@ -26,14 +26,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn1 = env1.write_txn()?;
     let db1: Database<Str, Bytes> = env1
         .create_databases_and_commit(wtxn1, |dbo, wtxn| {
-            dbo.create_database(wtxn, Some("hello")).map(AbortOrCommit::Commit)
+            dbo.create_database(wtxn, Some("hello")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
     let wtxn2 = env2.write_txn()?;
     let db2: Database<BEU32, BEU32> = env2
         .create_databases_and_commit(wtxn2, |dbo, wtxn| {
-            dbo.create_database(wtxn, Some("hello")).map(AbortOrCommit::Commit)
+            dbo.create_database(wtxn, Some("hello")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 

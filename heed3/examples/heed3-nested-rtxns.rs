@@ -1,5 +1,5 @@
 use heed3::types::*;
-use heed3::{AbortOrCommit, Database, EnvOpenOptions};
+use heed3::{CommitOrAbort, Database, EnvOpenOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use roaring::RoaringBitmap;
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // we will open the default unnamed database
     let db: Database<U32<byteorder::BigEndian>, Bytes> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+            dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .unwrap();

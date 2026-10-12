@@ -24,7 +24,7 @@ use crate::{
     Error, OnCommit, Result, RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
 };
 #[allow(unused)] // for cargo auto doc links
-use crate::{AbortOrCommit, EnvOpenOptions};
+use crate::{CommitOrAbort, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
 #[repr(transparent)]
@@ -212,7 +212,7 @@ impl<T> Env<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -223,7 +223,7 @@ impl<T> Env<T> {
     /// let rtxn = env.read_txn()?;
     /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
     ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
-    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
     ///   .unwrap_commit()
     ///   .expect("the unnamed database to always exists");
@@ -233,25 +233,25 @@ impl<T> Env<T> {
     /// assert_eq!(length, 0);
     /// # Ok(()) }
     /// ```
-    pub fn open_databases_and_commit<'e, 'a: 'e, F, D>(
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A>(
         &'a self,
         rtxn: RoTxn<'e, T>,
         f: F,
-    ) -> Result<AbortOrCommit<D::Committed>>
+    ) -> Result<CommitOrAbort<D::Committed, A>>
     where
-        F: FnOnce(&DatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<AbortOrCommit<D>>,
+        F: FnOnce(&DatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<CommitOrAbort<D, A>>,
         D: OnCommit,
     {
         let _lock = self.lock();
         let montruc = DatabaseOpener { env: self };
         let databases = match f(&montruc, &rtxn)? {
-            AbortOrCommit::Commit(databases) => databases,
-            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
         rtxn.commit()?;
         let commit_token = CommitToken::new(self);
         let committed = databases.on_commit(&commit_token);
-        Ok(AbortOrCommit::Commit(committed))
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     /// Create or open one or multiple databases.
@@ -263,7 +263,7 @@ impl<T> Env<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -274,7 +274,7 @@ impl<T> Env<T> {
     /// let wtxn = env.write_txn()?;
     /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
     ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
-    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
     ///   .unwrap_commit();
     ///
@@ -286,31 +286,31 @@ impl<T> Env<T> {
     ///         .types::<Str, Str>()
     ///         .name("my-database")
     ///         .create(wtxn)
-    ///         .map(AbortOrCommit::Commit)
+    ///         .map(CommitOrAbort::<_, ()>::Commit)
     ///   })?
     ///   .unwrap_commit();
     ///
     /// # Ok(()) }
     /// ```
-    pub fn create_databases_and_commit<'e, 'a: 'e, F, D>(
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A>(
         &'a self,
         mut wtxn: RwTxn<'e>,
         f: F,
-    ) -> Result<AbortOrCommit<D::Committed>>
+    ) -> Result<CommitOrAbort<D::Committed, A>>
     where
-        F: FnOnce(&DatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<AbortOrCommit<D>>,
+        F: FnOnce(&DatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<CommitOrAbort<D, A>>,
         D: OnCommit,
     {
         let _lock = self.lock();
         let montruc = DatabaseOpener { env: self };
         let databases = match f(&montruc, &mut wtxn)? {
-            AbortOrCommit::Commit(databases) => databases,
-            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
         wtxn.commit()?;
         let commit_token = CommitToken::new(self);
         let committed = databases.on_commit(&commit_token);
-        Ok(AbortOrCommit::Commit(committed))
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
@@ -483,7 +483,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -503,7 +503,7 @@ impl<T> Env<T> {
     ///         db.put(wtxn, &"hello1", &"world1")?;
     ///         db.put(wtxn, &"hello2", &"world2")?;
     ///         db.put(wtxn, &"hello3", &"world3")?;
-    ///         Ok(AbortOrCommit::Commit(()))
+    ///         Ok(CommitOrAbort::<_, ()>::Commit(()))
     ///     })?
     ///     .unwrap_commit();
     ///
@@ -538,7 +538,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -553,7 +553,7 @@ impl<T> Env<T> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, Str> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");
@@ -694,7 +694,7 @@ impl Env<WithoutTls> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{AbortOrCommit, EnvOpenOptions, Database};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -710,7 +710,7 @@ impl Env<WithoutTls> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");
@@ -859,7 +859,7 @@ mod tests {
     use std::{fs, thread};
 
     use crate::types::*;
-    use crate::{env_closing_event, AbortOrCommit, Database, EnvOpenOptions, Error};
+    use crate::{env_closing_event, CommitOrAbort, EnvOpenOptions, Error};
 
     #[test]
     fn close_env() {
@@ -882,7 +882,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Str, Str>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Str, Str>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -965,7 +965,7 @@ mod tests {
         let _db = env
             .create_databases_and_commit(wtxn, |wdo, wtxn| {
                 wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
-                    .map(AbortOrCommit::Commit)
+                    .map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit();
@@ -994,7 +994,7 @@ mod tests {
         let aborted = env
             .create_databases_and_commit(wtxn, |wdo, wtxn| {
                 wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
-                    .map(|_| AbortOrCommit::<Database<Str, Str>>::Abort)
+                    .map(|_| CommitOrAbort::<(), _>::Abort(()))
             })
             .unwrap();
         assert!(aborted.is_abort());
@@ -1002,7 +1002,8 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let no_db = env
             .open_databases_and_commit(rtxn, |dbo, wtxn| {
-                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit();
@@ -1025,7 +1026,7 @@ mod tests {
         let _db = env
             .create_databases_and_commit(wtxn, |wdo, wtxn| {
                 wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
-                    .map(AbortOrCommit::Commit)
+                    .map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit();
@@ -1043,7 +1044,8 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let option = env
             .open_databases_and_commit(rtxn, |dbo, wtxn| {
-                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db")).map(AbortOrCommit::Commit)
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit();
@@ -1062,7 +1064,7 @@ mod tests {
         let db = env
             .create_databases_and_commit(wtxn, |wdo, wtxn| {
                 wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
-                    .map(AbortOrCommit::Commit)
+                    .map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit();
@@ -1114,7 +1116,7 @@ mod tests {
             let database0 = env
                 .create_databases_and_commit(wtxn, |wdo, wtxn| {
                     wdo.create_database::<Str, Str>(wtxn, Some("shared0"))
-                        .map(AbortOrCommit::Commit)
+                        .map(CommitOrAbort::<_, ()>::Commit)
                 })
                 .unwrap()
                 .unwrap_commit();
@@ -1138,7 +1140,8 @@ mod tests {
             let rtxn = env.read_txn().unwrap();
             let database0 = env
                 .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                    dbo.open_database::<Str, Str>(rtxn, Some("shared0")).map(AbortOrCommit::Commit)
+                    dbo.open_database::<Str, Str>(rtxn, Some("shared0"))
+                        .map(CommitOrAbort::<_, ()>::Commit)
                 })
                 .unwrap()
                 .unwrap_commit()

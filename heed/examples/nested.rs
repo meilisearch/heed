@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{AbortOrCommit, Database, EnvOpenOptions};
+use heed::{CommitOrAbort, Database, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = tempfile::tempdir()?;
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db: Database<Str, Bytes> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
             let db = dbo.open_database(rtxn, None)?.expect("unnamed db must exists");
-            Ok(AbortOrCommit::Commit(db))
+            Ok(CommitOrAbort::<_, ()>::Commit(db))
         })?
         .unwrap_commit();
 

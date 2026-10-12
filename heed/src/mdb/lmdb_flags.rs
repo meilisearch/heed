@@ -81,7 +81,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -102,7 +102,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::REVERSE_KEY)
         ///             .name("reverse-key")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///
@@ -135,7 +135,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -157,7 +157,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::DUP_SORT)
         ///             .name("dup-sort")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///
@@ -208,7 +208,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -230,7 +230,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::INTEGER_KEY)
         ///             .name("integer-key")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///
@@ -261,7 +261,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -283,7 +283,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
         ///             .name("dup-sort-fixed")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///
@@ -328,7 +328,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -350,7 +350,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::DUP_FIXED)
         ///             .name("dup-sort-fixed")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///
@@ -396,7 +396,7 @@ bitflags! {
         /// ```
         /// # use std::fs;
         /// # use std::path::Path;
-        /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+        /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
         /// use heed::types::*;
         /// use heed::byteorder::BigEndian;
         ///
@@ -418,7 +418,7 @@ bitflags! {
         ///             .flags(DatabaseFlags::DUP_SORT | DatabaseFlags::REVERSE_DUP)
         ///             .name("dup-sort")
         ///             .create(wtxn)
-        ///             .map(AbortOrCommit::Commit)
+        ///             .map(CommitOrAbort::<_, ()>::Commit)
         ///     })?
         ///     .unwrap_commit();
         ///

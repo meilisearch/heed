@@ -22,7 +22,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
+//! use heed::{CommitOrAbort, Database, EnvOpenOptions};
 //!
 //! pub type StringMap = HashMap<String, String>;
 //!
@@ -38,7 +38,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, SerdeJson<StringMap>> = env
 //!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!             dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database must always exists");
@@ -94,7 +94,7 @@
 //! use std::error::Error;
 //!
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
+//! use heed::{CommitOrAbort, Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let env_path = tempfile::tempdir()?;
@@ -129,7 +129,7 @@
 //!
 //!         // You must implement the OnCommit trait on a data-structure
 //!         // of your choice to be able to use the databases in your program.
-//!         Ok(AbortOrCommit::<()>::Abort)
+//!         Ok(CommitOrAbort::<(), _>::Abort(()))
 //!     })?;
 //!
 //!     Ok(())
@@ -155,7 +155,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
+//! use heed::{CommitOrAbort, BoxedError, BytesDecode, BytesEncode, Database, EnvOpenOptions};
 //!
 //! #[derive(Debug, PartialEq, Eq)]
 //! pub enum Level {
@@ -248,7 +248,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<LogKeyCodec, Str> = env
 //!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!             dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -302,7 +302,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, Database, EnvOpenOptions};
+//! use heed::{CommitOrAbort, Database, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -316,7 +316,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
 //!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!             dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -343,7 +343,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
 //!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!             dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -397,7 +397,7 @@
 //! use std::path::Path;
 //!
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, Database, EnvOpenOptions, RoTxn};
+//! use heed::{CommitOrAbort, Database, EnvOpenOptions, RoTxn};
 //!
 //! fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 //!     let path = tempfile::tempdir()?;
@@ -411,7 +411,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     let db: Database<Str, Str> = env
 //!         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!             dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!             dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database must always exists");
@@ -484,7 +484,7 @@
 //! use std::error::Error;
 //! use std::str;
 //!
-//! use heed::{AbortOrCommit, EnvOpenOptions};
+//! use heed::{CommitOrAbort, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, Unit};
 //!
@@ -518,7 +518,7 @@
 //!                 .types::<Str, Unit>()
 //!                 .key_comparator::<StringAsIntCmp>()
 //!                 .open(rtxn)
-//!                 .map(AbortOrCommit::Commit)
+//!                 .map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit()
 //!         .expect("the unnamed database to always exists");
@@ -558,7 +558,7 @@
 //! use std::error::Error;
 //!
 //! use byteorder::BigEndian;
-//! use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+//! use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
 //! use heed_traits::Comparator;
 //! use heed_types::{Str, U128};
 //!
@@ -588,7 +588,7 @@
 //!                 .flags(DatabaseFlags::DUP_SORT)
 //!                 .dup_sort_comparator::<DescendingIntCmp>()
 //!                 .create(wtxn)
-//!                 .map(AbortOrCommit::Commit)
+//!                 .map(CommitOrAbort::<_, ()>::Commit)
 //!         })?
 //!         .unwrap_commit();
 //!
@@ -630,7 +630,7 @@
 //!
 //! use heed::byteorder::NativeEndian;
 //! use heed::types::*;
-//! use heed::{AbortOrCommit, EnvOpenOptions};
+//! use heed::{CommitOrAbort, EnvOpenOptions};
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
 //!     let path = tempfile::tempdir()?;
@@ -649,7 +649,7 @@
 //!             .types::<Bytes, U64<NativeEndian>>()
 //!             .name("index")
 //!             .create(wtxn)
-//!             .map(AbortOrCommit::Commit)
+//!             .map(CommitOrAbort::<_, ()>::Commit)
 //!     })?.unwrap_commit();
 //!
 //!     let mut wtxn = env.write_txn()?;

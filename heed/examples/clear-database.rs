@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{AbortOrCommit, Database, EnvOpenOptions};
+use heed::{CommitOrAbort, Database, EnvOpenOptions};
 
 // In this test we are checking that we can clear database entries and
 // write just after in the same transaction without loosing the writes.
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db: Database<Str, Str> = env
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
-            wdo.create_database(wtxn, Some("first")).map(AbortOrCommit::Commit)
+            wdo.create_database(wtxn, Some("first")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 

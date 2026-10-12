@@ -1,7 +1,7 @@
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
 use heed3::types::*;
-use heed3::{AbortOrCommit, EncryptedDatabase, EnvOpenOptions};
+use heed3::{CommitOrAbort, EncryptedDatabase, EnvOpenOptions};
 use rand::prelude::*;
 use rayon::prelude::*;
 use roaring::RoaringBitmap;
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // we will open the default unnamed database
     let db: EncryptedDatabase<U32<byteorder::BigEndian>, Bytes> = env
         .create_databases_and_commit(wtxn, |dbo, wtxn| {
-            dbo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+            dbo.create_database(wtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 

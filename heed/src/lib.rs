@@ -38,7 +38,7 @@
 //! ```
 //! use std::fs;
 //! use std::path::Path;
-//! use heed::{EnvOpenOptions, Database, AbortOrCommit};
+//! use heed::{EnvOpenOptions, Database, CommitOrAbort};
 //! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,7 +49,7 @@
 //! // we will open the default unnamed database
 //! let db: Database<Str, U32<byteorder::NativeEndian>> = env
 //!     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-//!         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+//!         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
 //!     })?
 //!     .unwrap_commit()
 //!     .expect("the unnamed database to always exists");
@@ -100,7 +100,7 @@ pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 #[cfg(master3)]
 pub use self::envs::EncryptedEnv;
 pub use self::envs::{
-    env_closing_event, AbortOrCommit, CommitToken, CompactionOption, DefaultComparator, Env,
+    env_closing_event, CommitOrAbort, CommitToken, CompactionOption, DefaultComparator, Env,
     EnvClosingEvent, EnvInfo, EnvOpenOptions, FlagSetMode, IntegerComparator, OnCommit,
 };
 pub use self::iterator::{

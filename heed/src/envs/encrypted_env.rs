@@ -11,7 +11,7 @@ use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::envs::EnvStat;
 use crate::mdb::ffi::{self};
 use crate::{
-    AbortOrCommit, CommitToken, CompactionOption, EnvFlags, OnCommit, Result, RoTxn, RwTxn,
+    CommitOrAbort, CommitToken, CompactionOption, EnvFlags, OnCommit, Result, RoTxn, RwTxn,
     Unspecified, WithTls, WithoutTls,
 };
 #[allow(unused)] // for cargo auto doc links
@@ -110,8 +110,8 @@ impl<T> EncryptedEnv<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
-    /// use heed3::types::*;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();
@@ -121,7 +121,7 @@ impl<T> EncryptedEnv<T> {
     /// let rtxn = env.read_txn()?;
     /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
     ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
-    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
     ///   .unwrap_commit()
     ///   .expect("the unnamed database to always exists");
@@ -131,25 +131,25 @@ impl<T> EncryptedEnv<T> {
     /// assert_eq!(length, 0);
     /// # Ok(()) }
     /// ```
-    pub fn open_databases_and_commit<'e, 'a: 'e, F, D>(
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A>(
         &'a self,
         rtxn: RoTxn<'e, T>,
         f: F,
-    ) -> Result<AbortOrCommit<D::Committed>>
+    ) -> Result<CommitOrAbort<D::Committed, A>>
     where
-        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<AbortOrCommit<D>>,
+        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<CommitOrAbort<D, A>>,
         D: OnCommit,
     {
         let _lock = self.inner.lock();
         let montruc = EncryptedDatabaseOpener { env: self };
         let databases = match f(&montruc, &rtxn)? {
-            AbortOrCommit::Commit(databases) => databases,
-            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
         rtxn.commit()?;
         let commit_token = CommitToken::new(&self.inner);
         let committed = databases.on_commit(&commit_token);
-        Ok(AbortOrCommit::Commit(committed))
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     /// Create or open one or multiple databases.
@@ -161,8 +161,8 @@ impl<T> EncryptedEnv<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, AbortOrCommit};
-    /// use heed3::types::*;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut env_builder = EnvOpenOptions::new();
@@ -172,7 +172,7 @@ impl<T> EncryptedEnv<T> {
     /// let wtxn = env.write_txn()?;
     /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
     ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
-    ///     Ok(AbortOrCommit::Commit(local_database))
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
     ///   .unwrap_commit();
     ///
@@ -184,31 +184,31 @@ impl<T> EncryptedEnv<T> {
     ///         .types::<Str, Str>()
     ///         .name("my-database")
     ///         .create(wtxn)
-    ///         .map(AbortOrCommit::Commit)
+    ///         .map(CommitOrAbort::<_, ()>::Commit)
     ///   })?
     ///   .unwrap_commit();
     ///
     /// # Ok(()) }
     /// ```
-    pub fn create_databases_and_commit<'e, 'a: 'e, F, D>(
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A>(
         &'a self,
         mut wtxn: RwTxn<'e>,
         f: F,
-    ) -> Result<AbortOrCommit<D::Committed>>
+    ) -> Result<CommitOrAbort<D::Committed, A>>
     where
-        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<AbortOrCommit<D>>,
+        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<CommitOrAbort<D, A>>,
         D: OnCommit,
     {
         let _lock = self.inner.lock();
         let montruc = EncryptedDatabaseOpener { env: self };
         let databases = match f(&montruc, &mut wtxn)? {
-            AbortOrCommit::Commit(databases) => databases,
-            AbortOrCommit::Abort => return Ok(AbortOrCommit::Abort),
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
         wtxn.commit()?;
         let commit_token = CommitToken::new(&self.inner);
         let committed = databases.on_commit(&commit_token);
-        Ok(AbortOrCommit::Commit(committed))
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     /// Create a transaction with read and write access for use with the environment.
@@ -305,8 +305,8 @@ impl<T> EncryptedEnv<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed3::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
-    /// use heed3::types::*;
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -320,7 +320,7 @@ impl<T> EncryptedEnv<T> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, Str> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");
@@ -431,7 +431,7 @@ impl EncryptedEnv<WithoutTls> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed::{AbortOrCommit, EnvOpenOptions, EncryptedDatabase};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, EncryptedDatabase};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -464,7 +464,7 @@ impl EncryptedEnv<WithoutTls> {
     /// let wtxn = env.write_txn()?;
     /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
     ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
-    ///         dbo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.create_database(wtxn, None).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?.unwrap_commit();
     ///
     /// let mut wtxn = env.write_txn()?;

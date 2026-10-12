@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed::types::*;
-use heed::{AbortOrCommit, Database, EnvOpenOptions, PutFlags};
+use heed::{CommitOrAbort, Database, EnvOpenOptions, PutFlags};
 
 // In this test we are checking that we can append ordered entries in one
 // database even if there is multiple databases which already contain entries.
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
             let first: Database<Str, Str> = wdo.create_database(wtxn, Some("first"))?;
             let second: Database<Str, Str> = wdo.create_database(wtxn, Some("second"))?;
-            Ok(AbortOrCommit::Commit((first, second)))
+            Ok(CommitOrAbort::<_, ()>::Commit((first, second)))
         })?
         .unwrap_commit();
 

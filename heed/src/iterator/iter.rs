@@ -23,7 +23,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -45,7 +45,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     ///             .flags(DatabaseFlags::DUP_SORT)
     ///             .name("dup-sort")
     ///             .create(wtxn)
-    ///             .map(AbortOrCommit::Commit)
+    ///             .map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///
@@ -83,7 +83,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     /// ```
     /// # use std::fs;
     /// # use std::path::Path;
-    /// # use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+    /// # use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -105,7 +105,7 @@ impl<'txn, KC, DC, IM> RoIter<'txn, KC, DC, IM> {
     ///             .flags(DatabaseFlags::DUP_SORT)
     ///             .name("dup-sort")
     ///             .create(wtxn)
-    ///             .map(AbortOrCommit::Commit)
+    ///             .map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///

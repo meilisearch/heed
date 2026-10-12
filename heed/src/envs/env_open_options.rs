@@ -154,7 +154,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{AbortOrCommit, EnvOpenOptions, Database, EnvFlags};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -167,7 +167,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let rtxn = env.read_txn()?;
     /// let db: Database<Str, U32<byteorder::NativeEndian>> = env
     ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
-    ///         dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit()
     ///     .expect("the unnamed database to always exists");
@@ -288,8 +288,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3::types::*;
-    /// use heed3::{AbortOrCommit, EnvOpenOptions, Database};
+    /// use heed::types::*;
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -319,7 +319,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let wtxn = env.write_txn()?;
     /// let db = env
     ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
-    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///
@@ -344,8 +344,8 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed3::types::*;
-    /// use heed3::{AbortOrCommit, EnvOpenOptions, EncryptedDatabase};
+    /// use heed::types::*;
+    /// use heed::{CommitOrAbort, EnvOpenOptions, EncryptedDatabase};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let env_path = tempfile::tempdir()?;
@@ -373,7 +373,7 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// let wtxn = env.write_txn()?;
     /// let db: EncryptedDatabase<Str, Str> = env
     ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
-    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+    ///         dbo.create_database::<Str, Str>(wtxn, Some("first")).map(CommitOrAbort::<_, ()>::Commit)
     ///     })?
     ///     .unwrap_commit();
     ///

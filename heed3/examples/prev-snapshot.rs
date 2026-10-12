@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use heed3::types::*;
-use heed3::{AbortOrCommit, Database, EnvFlags, EnvOpenOptions};
+use heed3::{CommitOrAbort, Database, EnvFlags, EnvOpenOptions};
 
 // In this test we are checking that we can move to a previous environement snapshot.
 fn main() -> Result<(), Box<dyn Error>> {
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+            dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+            dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+            dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rtxn = env.read_txn()?;
     let db: Database<Str, Str> = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database(rtxn, None).map(AbortOrCommit::Commit)
+            dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");

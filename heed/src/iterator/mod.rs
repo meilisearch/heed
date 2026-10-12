@@ -103,7 +103,7 @@ fn test_txns_are_not_send() {}
 mod tests {
     use std::ops;
 
-    use crate::AbortOrCommit;
+    use crate::envs::CommitOrAbort;
 
     #[test]
     fn prefix_iter_last_with_byte_255() {
@@ -122,7 +122,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Str>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Str>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -211,7 +211,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -286,7 +286,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -383,7 +383,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -438,7 +438,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -520,7 +520,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -602,7 +602,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -681,7 +681,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<BEI32, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<BEI32, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()
@@ -737,7 +737,7 @@ mod tests {
         let rtxn = env.read_txn().unwrap();
         let db = env
             .open_databases_and_commit(rtxn, |dbo, rtxn| {
-                dbo.open_database::<Bytes, Unit>(rtxn, None).map(AbortOrCommit::Commit)
+                dbo.open_database::<Bytes, Unit>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
             })
             .unwrap()
             .unwrap_commit()

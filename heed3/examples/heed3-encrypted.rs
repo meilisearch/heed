@@ -3,7 +3,7 @@ use std::error::Error;
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, Key};
 use heed3::types::*;
-use heed3::{AbortOrCommit, EnvOpenOptions};
+use heed3::{CommitOrAbort, EnvOpenOptions};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_path = tempfile::tempdir()?;
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wtxn = env.write_txn()?;
     let db = env
         .create_databases_and_commit(wtxn, |dbo, wtxn| {
-            dbo.create_database::<Str, Str>(wtxn, Some("first")).map(AbortOrCommit::Commit)
+            dbo.create_database::<Str, Str>(wtxn, Some("first")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rtxn = env.read_txn()?;
     let db = env
         .open_databases_and_commit(rtxn, |dbo, rtxn| {
-            dbo.open_database::<Str, Str>(rtxn, Some("first")).map(AbortOrCommit::Commit)
+            dbo.open_database::<Str, Str>(rtxn, Some("first")).map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .unwrap();

@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::error::Error;
 use std::str;
 
-use heed::{AbortOrCommit, EnvOpenOptions};
+use heed::{CommitOrAbort, EnvOpenOptions};
 use heed_traits::Comparator;
 use heed_types::{Str, Unit};
 
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .types::<Str, Unit>()
                 .key_comparator::<StringAsIntCmp>()
                 .open(rtxn)
-                .map(AbortOrCommit::Commit)
+                .map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit()
         .expect("the unnamed database to exists");

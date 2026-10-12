@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use byteorder::BigEndian;
-use heed::{AbortOrCommit, DatabaseFlags, EnvOpenOptions};
+use heed::{CommitOrAbort, DatabaseFlags, EnvOpenOptions};
 use heed_traits::Comparator;
 use heed_types::{Str, U128};
 
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .flags(DatabaseFlags::DUP_SORT)
                 .dup_sort_comparator::<DescendingIntCmp>()
                 .create(wtxn)
-                .map(AbortOrCommit::Commit)
+                .map(CommitOrAbort::<_, ()>::Commit)
         })?
         .unwrap_commit();
 
