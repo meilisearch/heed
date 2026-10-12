@@ -21,6 +21,7 @@ use crate::*;
 /// # use std::fs;
 /// # use std::path::Path;
 /// # use heed::EnvOpenOptions;
+/// use heed::AbortOrCommit;
 /// use heed::types::*;
 /// use heed::byteorder::BigEndian;
 ///
@@ -36,13 +37,16 @@ use crate::*;
 /// // Imagine you have an optional name
 /// let conditional_name = Some("big-endian-iter");
 ///
-/// let mut wtxn = env.write_txn()?;
-/// let mut options = env.database_options().types::<BEI64, Unit>();
-/// if let Some(name) = conditional_name {
-///    options.name(name);
-/// }
-/// let db = options.create(&mut wtxn)?;
+/// let wtxn = env.write_txn()?;
+/// let db = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+///     let mut options = dbo.database_options().types::<BEI64, Unit>();
+///     if let Some(name) = conditional_name {
+///        options.name(name);
+///     }
+///     options.create(wtxn).map(AbortOrCommit::Commit)
+/// })?.unwrap_commit();
 ///
+/// let mut wtxn = env.write_txn()?;
 /// # db.clear(&mut wtxn)?;
 /// db.put(&mut wtxn, &68, &())?;
 /// db.put(&mut wtxn, &35, &())?;
@@ -361,6 +365,7 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::{DatabaseFlags, EnvOpenOptions};
+    /// use heed::AbortOrCommit;
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -373,13 +378,18 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///     dbo
+    ///         .database_options()
+    ///         .types::<BEI64, BEI64>()
+    ///         .flags(DatabaseFlags::DUP_SORT)
+    ///         .name("dup-sort")
+    ///         .create(wtxn)
+    ///         .map(AbortOrCommit::Commit)
+    /// })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;
@@ -1150,7 +1160,7 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # use std::path::Path;
     /// use std::ops::Bound;
     /// # use heed::EnvOpenOptions;
-    /// use heed::Database;
+    /// use heed::{AbortOrCommit, Database};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1162,9 +1172,13 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Bytes, Unit> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: Database<Bytes, Unit> = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+    ///     })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // make sure to create slices and not ref array
     /// // by using the [..] syntax.
     /// let start = &[0, 0, 0][..];
@@ -1757,7 +1771,7 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # use std::fs;
     /// # use std::path::Path;
     /// # use heed::EnvOpenOptions;
-    /// use heed::{Database, PutFlags, DatabaseFlags, Error, MdbError};
+    /// use heed::{AbortOrCommit, Database, PutFlags, DatabaseFlags, Error, MdbError};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -1770,13 +1784,19 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI32 = I32<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI32, Str>()
-    ///     .name("dup-i32")
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///     dbo
+    ///         .database_options()
+    ///         .types::<BEI32, Str>()
+    ///         .name("dup-i32")
+    ///         .flags(DatabaseFlags::DUP_SORT)
+    ///         .create(wtxn)
+    ///         .map(AbortOrCommit::Commit)
+    /// })?
+    /// .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &42, "i-am-forty-two")?;
     /// db.put(&mut wtxn, &42, "i-am-so-cool")?;
@@ -2132,13 +2152,19 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// # };
     /// type BEI64 = I64<BigEndian>;
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db = env.database_options()
-    ///     .types::<BEI64, BEI64>()
-    ///     .flags(DatabaseFlags::DUP_SORT)
-    ///     .name("dup-sort")
-    ///     .create(&mut wtxn)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo
+    ///             .database_options()
+    ///             .types::<BEI64, BEI64>()
+    ///             .flags(DatabaseFlags::DUP_SORT)
+    ///             .name("dup-sort")
+    ///             .create(wtxn)
+    ///             .map(AbortOrCommit::Commit)
+    ///     })?
+    ///     .unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// db.put(&mut wtxn, &68, &120)?;
     /// db.put(&mut wtxn, &68, &121)?;

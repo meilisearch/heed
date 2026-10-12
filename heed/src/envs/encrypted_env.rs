@@ -431,7 +431,7 @@ impl EncryptedEnv<WithoutTls> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed::{EnvOpenOptions, EncryptedDatabase};
+    /// use heed::{AbortOrCommit, EnvOpenOptions, EncryptedDatabase};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -461,9 +461,13 @@ impl EncryptedEnv<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database(wtxn, None).map(AbortOrCommit::Commit)
+    ///     })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
@@ -508,7 +512,7 @@ impl<'e, T> EncryptedDatabaseOpener<'e, T> {
     pub fn database_options(
         &self,
     ) -> EncryptedDatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
-        EncryptedDatabaseOpenOptions::new(&self.env)
+        EncryptedDatabaseOpenOptions::new(self.env)
     }
 
     /// Opens a typed database that already exists in this environment.
