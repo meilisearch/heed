@@ -32,9 +32,9 @@ mod on_commit;
 
 pub use abort_or_commit::CommitOrAbort;
 #[cfg(master3)]
-pub use encrypted_env::EncryptedEnv;
-pub use env::Env;
+pub use encrypted_env::{EncryptedDatabaseOpener, EncryptedEnv};
 pub(crate) use env::EnvInner;
+pub use env::{DatabaseOpener, Env};
 pub use env_open_options::EnvOpenOptions;
 pub use on_commit::{CommitToken, OnCommit};
 
