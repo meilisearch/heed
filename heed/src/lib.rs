@@ -38,16 +38,23 @@
 //! ```
 //! use std::fs;
 //! use std::path::Path;
-//! use heed::{EnvOpenOptions, Database};
+//! use heed::{EnvOpenOptions, Database, CommitOrAbort};
 //! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let dir = tempfile::tempdir()?;
 //! let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
 //!
+//! let rtxn = env.read_txn()?;
 //! // we will open the default unnamed database
+//! let db: Database<Str, U32<byteorder::NativeEndian>> = env
+//!     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+//!     })?
+//!     .unwrap_commit()
+//!     .expect("the unnamed database to always exists");
+//!
 //! let mut wtxn = env.write_txn()?;
-//! let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
 //! db.put(&mut wtxn, "seven", &7)?;
@@ -90,12 +97,13 @@ use self::cursor::{RoCursor, RwCursor};
 pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
 #[cfg(master3)]
 pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
-#[cfg(master3)]
-pub use self::envs::EncryptedEnv;
 pub use self::envs::{
-    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions, FlagSetMode, IntegerComparator,
+    env_closing_event, CommitOrAbort, CommitToken, CompactionOption, DatabaseOpener,
+    DefaultComparator, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions, FlagSetMode,
+    IntegerComparator, OnCommit,
 };
+#[cfg(master3)]
+pub use self::envs::{EncryptedDatabaseOpener, EncryptedEnv};
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,

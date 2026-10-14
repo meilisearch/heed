@@ -10,8 +10,11 @@ use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
 use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::envs::EnvStat;
 use crate::mdb::ffi::{self};
-use crate::{CompactionOption, EnvFlags, Result, RoTxn, RwTxn, Unspecified, WithTls, WithoutTls};
-#[allow(unused)] // fro cargo auto doc links
+use crate::{
+    CommitOrAbort, CommitToken, CompactionOption, EnvFlags, OnCommit, Result, RoTxn, RwTxn,
+    Unspecified, WithTls, WithoutTls,
+};
+#[allow(unused)] // for cargo auto doc links
 use crate::{Database, EnvOpenOptions};
 
 /// An environment handle constructed by using [`EnvOpenOptions::open_encrypted`].
@@ -99,79 +102,121 @@ impl<T> EncryptedEnv<T> {
         self.inner.stat()
     }
 
-    /// Returns the size used by all the databases in the environment without the free pages.
+    /// Open one or multiple databases.
     ///
-    /// It is crucial to configure [`EnvOpenOptions::max_dbs`] with a sufficiently large value
-    /// before invoking this function. All databases within the environment will be opened
-    /// and remain so.
-    pub fn non_free_pages_size(&self) -> Result<u64> {
-        self.inner.non_free_pages_size()
-    }
-
-    /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(
-        &self,
-    ) -> EncryptedDatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
-        EncryptedDatabaseOpenOptions::new(self)
-    }
-
-    /// Opens a typed database that already exists in this environment.
+    /// This method let you safely open databases by using a lock to
+    /// make sure a single env is opening databases at once.
     ///
-    /// If the database was previously opened in this program run, types will be checked.
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
     ///
-    /// ## Important Information
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
     ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
+    /// let rtxn = env.read_txn()?;
+    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| -> Result<_, Box<dyn std::error::Error>> {
+    ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit()
+    ///   .expect("the unnamed database to always exists");
     ///
-    /// ## LMDB read-only access of existing database
-    ///
-    /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
-    /// and the database handles opened and shared with the global [`Env`] handle.
-    ///
-    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
-    /// known as `EINVAL`.
-    pub fn open_database<KC, DC>(
-        &self,
-        rtxn: &RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<EncryptedDatabase<KC, DC>>>
+    /// let rtxn = env.read_txn()?;
+    /// let length = database.len(&rtxn)?;
+    /// assert_eq!(length, 0);
+    /// # Ok(()) }
+    /// ```
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
+        &'a self,
+        rtxn: RoTxn<'e, T>,
+        f: F,
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        KC: 'static,
-        DC: 'static,
+        F: FnOnce(
+            &EncryptedDatabaseOpener<'e, T>,
+            &RoTxn<'e, T>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
+        D: OnCommit,
+        E: From<crate::Error>,
     {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.open(rtxn)
+        let _lock = self.inner.lock();
+        let montruc = EncryptedDatabaseOpener { env: self };
+        let databases = match f(&montruc, &rtxn)? {
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
+        };
+        rtxn.commit()?;
+        let commit_token = CommitToken::new(&self.inner);
+        let committed = databases.on_commit(&commit_token);
+        Ok(CommitOrAbort::Commit(committed))
     }
 
-    /// Creates a typed database that can already exist in this environment.
+    /// Create or open one or multiple databases.
     ///
-    /// If the database was previously opened during this program run, types will be checked.
+    /// This method let you safely create or open databases
+    /// by using a lock to make sure a single env is opening
+    /// databases at once.
     ///
-    /// ## Important Information
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
     ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
-    pub fn create_database<KC, DC>(
-        &self,
-        wtxn: &mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<EncryptedDatabase<KC, DC>>
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
+    ///
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |dbo, wtxn| -> Result<_, Box<dyn std::error::Error>> {
+    ///     let local_database = dbo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit();
+    ///
+    /// // We can also open the databases more options
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///      dbo
+    ///         .database_options()
+    ///         .types::<Str, Str>()
+    ///         .name("my-database")
+    ///         .create(wtxn)
+    ///         .map(CommitOrAbort::<_, ()>::Commit)
+    ///   })?
+    ///   .unwrap_commit();
+    ///
+    /// # Ok(()) }
+    /// ```
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
+        &'a self,
+        mut wtxn: RwTxn<'e>,
+        f: F,
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        KC: 'static,
-        DC: 'static,
+        F: FnOnce(
+            &EncryptedDatabaseOpener<'e, T>,
+            &mut RwTxn<'e>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
+        D: OnCommit,
+        E: From<crate::Error>,
     {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.create(wtxn)
+        let _lock = self.inner.lock();
+        let montruc = EncryptedDatabaseOpener { env: self };
+        let databases = match f(&montruc, &mut wtxn)? {
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
+        };
+        wtxn.commit()?;
+        let commit_token = CommitToken::new(&self.inner);
+        let committed = databases.on_commit(&commit_token);
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     /// Create a transaction with read and write access for use with the environment.
@@ -268,8 +313,8 @@ impl<T> EncryptedEnv<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
-    /// use heed3::types::*;
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -280,9 +325,15 @@ impl<T> EncryptedEnv<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, Str> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
     /// db.put(&mut wtxn, &"hello1", &"world1")?;
     /// db.put(&mut wtxn, &"hello2", &"world2")?;
@@ -388,7 +439,7 @@ impl EncryptedEnv<WithoutTls> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed::{EnvOpenOptions, EncryptedDatabase};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, EncryptedDatabase};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -418,9 +469,13 @@ impl EncryptedEnv<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database(wtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
@@ -452,6 +507,79 @@ impl<T> fmt::Debug for EncryptedEnv<T> {
         f.debug_struct("EncryptedEnv")
             .field("path", &self.inner.path().display())
             .finish_non_exhaustive()
+    }
+}
+
+/// Used to create or open databases.
+pub struct EncryptedDatabaseOpener<'e, T> {
+    env: &'e EncryptedEnv<T>,
+}
+
+impl<'e, T> EncryptedDatabaseOpener<'e, T> {
+    /// Options and flags which can be used to configure how an [`EncryptedDatabase`] is opened.
+    pub fn database_options(
+        &self,
+    ) -> EncryptedDatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
+        EncryptedDatabaseOpenOptions::new(self.env)
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    ///
+    /// ## LMDB read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
+    ///
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<Option<EncryptedDatabase<'e, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.open(rtxn)
+    }
+
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened during this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    pub fn create_database<KC, DC>(
+        &self,
+        wtxn: &mut RwTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<EncryptedDatabase<'e, KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.create(wtxn)
     }
 }
 
