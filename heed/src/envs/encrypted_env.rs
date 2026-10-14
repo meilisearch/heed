@@ -119,7 +119,7 @@ impl<T> EncryptedEnv<T> {
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// let rtxn = env.read_txn()?;
-    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| -> Result<_, Box<dyn std::error::Error>> {
     ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
     ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
@@ -131,14 +131,18 @@ impl<T> EncryptedEnv<T> {
     /// assert_eq!(length, 0);
     /// # Ok(()) }
     /// ```
-    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A>(
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
         &'a self,
         rtxn: RoTxn<'e, T>,
         f: F,
-    ) -> Result<CommitOrAbort<D::Committed, A>>
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<CommitOrAbort<D, A>>,
+        F: FnOnce(
+            &EncryptedDatabaseOpener<'e, T>,
+            &RoTxn<'e, T>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
         D: OnCommit,
+        E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
         let montruc = EncryptedDatabaseOpener { env: self };
@@ -170,16 +174,16 @@ impl<T> EncryptedEnv<T> {
     /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
     ///
     /// let wtxn = env.write_txn()?;
-    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
-    ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
+    /// let database = env.create_databases_and_commit(wtxn, |dbo, wtxn| -> Result<_, Box<dyn std::error::Error>> {
+    ///     let local_database = dbo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
     ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
     ///   .unwrap_commit();
     ///
     /// // We can also open the databases more options
     /// let wtxn = env.write_txn()?;
-    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
-    ///      wdo
+    /// let database = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///      dbo
     ///         .database_options()
     ///         .types::<Str, Str>()
     ///         .name("my-database")
@@ -190,14 +194,18 @@ impl<T> EncryptedEnv<T> {
     ///
     /// # Ok(()) }
     /// ```
-    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A>(
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
         &'a self,
         mut wtxn: RwTxn<'e>,
         f: F,
-    ) -> Result<CommitOrAbort<D::Committed, A>>
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        F: FnOnce(&EncryptedDatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<CommitOrAbort<D, A>>,
+        F: FnOnce(
+            &EncryptedDatabaseOpener<'e, T>,
+            &mut RwTxn<'e>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
         D: OnCommit,
+        E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
         let montruc = EncryptedDatabaseOpener { env: self };
