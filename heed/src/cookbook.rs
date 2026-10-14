@@ -109,7 +109,7 @@
 //!     let rtxn = env.read_txn()?;
 //!     // The database names are mixed with the user entries therefore we prefer
 //!     // ignoring the values and try to open the databases one by one using the keys.
-//!     env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!     env.open_databases_and_commit(rtxn, |dbo, rtxn| -> Result<_, Box<dyn Error>> {
 //!         let unnamed: Database<Str, DecodeIgnore> = dbo.open_database(rtxn, None)?.unwrap();
 //!
 //!         // The unnamed (or main) database contains the other

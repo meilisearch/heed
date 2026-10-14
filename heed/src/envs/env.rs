@@ -221,7 +221,7 @@ impl<T> Env<T> {
     /// let env = unsafe { env_builder.open(dir.path())? };
     ///
     /// let rtxn = env.read_txn()?;
-    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| {
+    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| -> Result<_, Box<dyn std::error::Error>> {
     ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
     ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
@@ -276,7 +276,7 @@ impl<T> Env<T> {
     /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
     ///
     /// let wtxn = env.write_txn()?;
-    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| -> Result<_, Box<dyn std::error::Error>>  {
     ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
     ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
     ///   })?
@@ -505,7 +505,7 @@ impl<T> Env<T> {
     ///
     /// let mut wtxn = env.write_txn()?;
     /// env
-    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| -> Result<_, Box<dyn std::error::Error>>  {
     ///         let db = dbo.open_database::<Str, Str>(&wtxn, None)?.unwrap();
     ///         db.put(wtxn, &"hello0", &"world0")?;
     ///         db.put(wtxn, &"hello1", &"world1")?;

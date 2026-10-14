@@ -2797,7 +2797,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     #[cfg_attr(not(master3), doc = concat!(
     "fn list_dbs<'a>(env: &'a heed::Env, rtxn: heed::RoTxn<'_, WithTls>) -> heed::Result<Vec<String>> {\n",
     "    let mut names = Vec::new();\n",
-    "    env.open_databases_and_commit(rtxn, |dbo, rtxn| {\n",
+    "    env.open_databases_and_commit(rtxn, |dbo, rtxn| -> heed::Result<_> {\n",
     "    let names_db: Database<Str, DecodeIgnore> = dbo.open_database(rtxn, None)?.unwrap();\n",
     ))]
     #[cfg_attr(master3, doc = concat!(
@@ -2807,7 +2807,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     ") -> Result<Vec<String>, Box<dyn std::error::Error>> {\n",
     "    // mdb-master3 uses null-terminated C strings as DB names\n",
     "    let mut names = Vec::new();\n",
-    "    env.open_databases_and_commit(rtxn, |dbo, rtxn| {\n",
+    "    env.open_databases_and_commit(rtxn, |dbo, rtxn| -> heed::Result<_>  {\n",
     "    let names_db: Database<Bytes, DecodeIgnore> = dbo.open_database(rtxn, None)?.unwrap();\n",
     ))]
     ///         for item in names_db.iter(rtxn)? {
