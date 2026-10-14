@@ -233,14 +233,18 @@ impl<T> Env<T> {
     /// assert_eq!(length, 0);
     /// # Ok(()) }
     /// ```
-    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A>(
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
         &'a self,
         rtxn: RoTxn<'e, T>,
         f: F,
-    ) -> Result<CommitOrAbort<D::Committed, A>>
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        F: FnOnce(&DatabaseOpener<'e, T>, &RoTxn<'e, T>) -> Result<CommitOrAbort<D, A>>,
+        F: FnOnce(
+            &DatabaseOpener<'e, T>,
+            &RoTxn<'e, T>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
         D: OnCommit,
+        E: From<crate::Error>,
     {
         let _lock = self.lock();
         let montruc = DatabaseOpener { env: self };
@@ -292,14 +296,18 @@ impl<T> Env<T> {
     ///
     /// # Ok(()) }
     /// ```
-    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A>(
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
         &'a self,
         mut wtxn: RwTxn<'e>,
         f: F,
-    ) -> Result<CommitOrAbort<D::Committed, A>>
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        F: FnOnce(&DatabaseOpener<'e, T>, &mut RwTxn<'e>) -> Result<CommitOrAbort<D, A>>,
+        F: FnOnce(
+            &DatabaseOpener<'e, T>,
+            &mut RwTxn<'e>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
         D: OnCommit,
+        E: From<crate::Error>,
     {
         let _lock = self.lock();
         let montruc = DatabaseOpener { env: self };

@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .create_databases_and_commit(wtxn, |wdo, wtxn| {
             let first: Database<Str, Str> = wdo.create_database(wtxn, Some("first"))?;
             let second: Database<Str, Str> = wdo.create_database(wtxn, Some("second"))?;
-            Ok(CommitOrAbort::<_, ()>::Commit((first, second)))
+            heed::Result::Ok(CommitOrAbort::<_, ()>::Commit((first, second)))
         })?
         .unwrap_commit();
 
