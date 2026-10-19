@@ -463,6 +463,79 @@ impl<T> fmt::Debug for EncryptedEnv<T> {
     }
 }
 
+/// Used to create or open databases.
+pub struct EncryptedDatabaseOpener<'e, T> {
+    env: &'e EncryptedEnv<T>,
+}
+
+impl<'e, T> EncryptedDatabaseOpener<'e, T> {
+    /// Options and flags which can be used to configure how an [`EncryptedDatabase`] is opened.
+    pub fn database_options(
+        &self,
+    ) -> EncryptedDatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
+        EncryptedDatabaseOpenOptions::new(self.env)
+    }
+
+    /// Opens a typed database that already exists in this environment.
+    ///
+    /// If the database was previously opened in this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    ///
+    /// ## LMDB read-only access of existing database
+    ///
+    /// In the case of accessing a database in a read-only manner from another process
+    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
+    /// and the database handles opened and shared with the global [`Env`] handle.
+    ///
+    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
+    /// known as `EINVAL`.
+    pub fn open_database<KC, DC>(
+        &self,
+        rtxn: &RoTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<Option<EncryptedDatabase<'e, KC, DC>>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.open(rtxn)
+    }
+
+    /// Creates a typed database that can already exist in this environment.
+    ///
+    /// If the database was previously opened during this program run, types will be checked.
+    ///
+    /// ## Important Information
+    ///
+    /// LMDB has an important restriction on the unnamed database when named ones are opened.
+    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
+    /// and these keys can only be read and not written.
+    pub fn create_database<KC, DC>(
+        &self,
+        wtxn: &mut RwTxn<'e>,
+        name: Option<&str>,
+    ) -> Result<EncryptedDatabase<'e, KC, DC>>
+    where
+        KC: 'static,
+        DC: 'static,
+    {
+        let mut options = self.database_options().types::<KC, DC>();
+        if let Some(name) = name {
+            options.name(name);
+        }
+        options.create(wtxn)
+    }
+}
+
 fn encrypt<A: AeadMutInPlace + KeyInit>(
     key: &[u8],
     nonce: &[u8],
