@@ -113,7 +113,9 @@ impl<'e, T> RoTxn<'e, T> {
         unsafe { ffi::mdb_txn_id(self.inner.txn.unwrap().as_ptr()) }
     }
 
-    /// Commit a read transaction.
+    /// Commit a unique read transaction.
+    ///
+    /// The main effect of the function is to make the dbi obtained from [`DatabaseOptions::Open`] public.
     ///
     /// Synchronizing some [`Env`] metadata with the global handle.
     ///
@@ -122,7 +124,7 @@ impl<'e, T> RoTxn<'e, T> {
     /// It's mandatory in a multi-process setup to call [`RoTxn::commit`] upon read-only database opening.
     /// After the transaction opening, the database is dropped. The next transaction might return
     /// `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })` known as `EINVAL`.
-    pub fn commit(mut self) -> Result<()> {
+    pub(crate) fn commit(mut self) -> Result<()> {
         // Asserts that the transaction hasn't been already
         // committed/aborter and ensure we cannot use it twice.
         let mut txn = self.inner.txn.take().unwrap();
