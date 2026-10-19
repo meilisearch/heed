@@ -171,8 +171,8 @@ impl<T> Env<T> {
         }
     }
 
-    /// Returns some statistics about this environment.
-    pub fn stat(&self) -> EnvStat {
+    /// Returns the statistic of the unnamed database.
+    pub fn unnamed_database_stat(&self) -> DatabaseStat {
         let mut raw_stat = mem::MaybeUninit::uninit();
         unsafe { ffi::mdb_env_stat(self.inner.env_ptr.as_ptr(), raw_stat.as_mut_ptr()) };
         // SAFETY: `mdb_env_stat` can only ever return EINVAL, and only if `env` or `stat` are null,
@@ -186,7 +186,7 @@ impl<T> Env<T> {
             ms_entries,
         } = unsafe { raw_stat.assume_init() };
 
-        EnvStat {
+        DatabaseStat {
             page_size: ms_psize,
             depth: ms_depth,
             branch_pages: ms_branch_pages,

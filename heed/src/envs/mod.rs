@@ -66,24 +66,6 @@ pub struct EnvInfo {
     pub number_of_readers: u32,
 }
 
-/// Statistics for an environment.
-#[derive(Debug, Clone, Copy)]
-pub struct EnvStat {
-    /// Size of a database page.
-    /// This is currently the same for all databases.
-    pub page_size: u32,
-    /// Depth (height) of the B-tree.
-    pub depth: u32,
-    /// Number of internal (non-leaf) pages
-    pub branch_pages: usize,
-    /// Number of leaf pages.
-    pub leaf_pages: usize,
-    /// Number of overflow pages.
-    pub overflow_pages: usize,
-    /// Number of data items.
-    pub entries: usize,
-}
-
 /// A structure that can be used to wait for the closing event.
 /// Multiple threads can wait on this event.
 #[derive(Clone)]
