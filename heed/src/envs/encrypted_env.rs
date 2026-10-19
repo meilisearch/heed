@@ -7,8 +7,7 @@ use aead::generic_array::typenum::Unsigned;
 use aead::{AeadMutInPlace, Key, KeyInit, Nonce, Tag};
 
 use super::{Env, EnvClosingEvent, EnvInfo, FlagSetMode};
-use crate::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
-use crate::envs::EnvStat;
+use crate::databases::{DatabaseStat, EncryptedDatabase, EncryptedDatabaseOpenOptions};
 use crate::mdb::ffi::{self};
 use crate::{
     CommitOrAbort, CommitToken, CompactionOption, EnvFlags, OnCommit, Result, RoTxn, RwTxn,
@@ -98,18 +97,14 @@ impl<T> EncryptedEnv<T> {
     }
 
     /// Returns some statistics about this environment.
-    pub fn stat(&self) -> EnvStat {
-        self.inner.stat()
+    pub fn unnamed_database_stat(&self) -> DatabaseStat {
+        self.inner.unnamed_database_stat()
     }
 
-    /// Returns the size used by all the databases in the environment without the free pages.
+    /// Open one or multiple databases.
     ///
-    /// It is crucial to configure [`EnvOpenOptions::max_dbs`] with a sufficiently large value
-    /// before invoking this function. All databases within the environment will be opened
-    /// and remain so.
-    pub fn non_free_pages_size(&self) -> Result<u64> {
-        self.inner.non_free_pages_size()
-    }
+    /// This method let you safely open databases by using a lock to
+    /// make sure a single env is opening databases at once.
 
     /// Options and flags which can be used to configure how a [`Database`] is opened.
     pub fn database_options(
