@@ -39,7 +39,15 @@ impl<T> Env<T> {
         path: PathBuf,
         signal_event: Arc<SignalEvent>,
     ) -> Self {
-        Env { inner: Arc::new(EnvInner { env_ptr, path, signal_event }), _tls_marker: PhantomData }
+        Env {
+            inner: Arc::new(EnvInner {
+                env_ptr,
+                path,
+                signal_event,
+                dbi_open_mutex: Mutex::new(()),
+            }),
+            _tls_marker: PhantomData,
+        }
     }
 
     pub(crate) fn env_mut_ptr(&self) -> NonNull<ffi::MDB_env> {
@@ -197,69 +205,120 @@ impl<T> Env<T> {
     }
 
     /// Open one or multiple databases.
-
-    /// Options and flags which can be used to configure how a [`Database`] is opened.
-    pub fn database_options(&self) -> DatabaseOpenOptions<'_, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(self)
+    ///
+    /// This method let you safely open databases by using a lock to
+    /// make sure a single env is opening databases at once.
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.open(dir.path())? };
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let database = env.open_databases_and_commit(rtxn, |dbo, rtxn| -> Result<_, Box<dyn std::error::Error>> {
+    ///     let local_database = dbo.open_database::<Str, Str>(rtxn, None)?;
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit()
+    ///   .expect("the unnamed database to always exists");
+    ///
+    /// let rtxn = env.read_txn()?;
+    /// let length = database.len(&rtxn)?;
+    /// assert_eq!(length, 0);
+    /// # Ok(()) }
+    /// ```
+    pub fn open_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
+        &'a self,
+        rtxn: RoTxn<'e, T>,
+        f: F,
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
+    where
+        F: FnOnce(
+            &DatabaseOpener<'e, T>,
+            &RoTxn<'e, T>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
+        D: OnCommit,
+        E: From<crate::Error>,
+    {
+        let _lock = self.lock();
+        let montruc = DatabaseOpener { env: self };
+        let databases = match f(&montruc, &rtxn)? {
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
+        };
+        rtxn.commit()?;
+        let commit_token = CommitToken::new(self);
+        let committed = databases.on_commit(&commit_token);
+        Ok(CommitOrAbort::Commit(committed))
     }
 
-    /// Opens a typed database that already exists in this environment.
+    /// Create or open one or multiple databases.
     ///
-    /// If the database was previously opened in this program run, types will be checked.
+    /// This method let you safely create or open databases
+    /// by using a lock to make sure a single env is opening
+    /// databases at once.
     ///
-    /// ## Important Information
+    /// ```
+    /// use std::fs;
+    /// use std::path::Path;
+    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CommitOrAbort};
+    /// use heed::types::*;
     ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut env_builder = EnvOpenOptions::new();
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let env = unsafe { env_builder.max_dbs(2).open(dir.path())? };
     ///
-    /// ## LMDB read-only access of existing database
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| -> Result<_, Box<dyn std::error::Error>>  {
+    ///     let local_database = wdo.create_database::<Str, Str>(wtxn, Some("my-database"))?;
+    ///     Ok(CommitOrAbort::<_, ()>::Commit(local_database))
+    ///   })?
+    ///   .unwrap_commit();
     ///
-    /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
-    /// and the database handles opened and shared with the global [`Env`] handle.
+    /// // We can also open the databases more options
+    /// let wtxn = env.write_txn()?;
+    /// let database = env.create_databases_and_commit(wtxn, |wdo, wtxn| {
+    ///      wdo
+    ///         .database_options()
+    ///         .types::<Str, Str>()
+    ///         .name("my-database")
+    ///         .create(wtxn)
+    ///         .map(CommitOrAbort::<_, ()>::Commit)
+    ///   })?
+    ///   .unwrap_commit();
     ///
-    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
-    /// known as `EINVAL`.
-    pub fn open_database<KC, DC>(
-        &self,
-        rtxn: &RoTxn,
-        name: Option<&str>,
-    ) -> Result<Option<Database<KC, DC>>>
+    /// # Ok(()) }
+    /// ```
+    pub fn create_databases_and_commit<'e, 'a: 'e, F, D, A, E>(
+        &'a self,
+        mut wtxn: RwTxn<'e>,
+        f: F,
+    ) -> std::result::Result<CommitOrAbort<D::Committed, A>, E>
     where
-        KC: 'static,
-        DC: 'static,
+        F: FnOnce(
+            &DatabaseOpener<'e, T>,
+            &mut RwTxn<'e>,
+        ) -> std::result::Result<CommitOrAbort<D, A>, E>,
+        D: OnCommit,
+        E: From<crate::Error>,
     {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.open(rtxn)
-    }
-
-    /// Creates a typed database that can already exist in this environment.
-    ///
-    /// If the database was previously opened during this program run, types will be checked.
-    ///
-    /// ## Important Information
-    ///
-    /// LMDB has an important restriction on the unnamed database when named ones are opened.
-    /// The names of the named databases are stored as keys in the unnamed one and are immutable,
-    /// and these keys can only be read and not written.
-    pub fn create_database<KC, DC>(
-        &self,
-        wtxn: &mut RwTxn,
-        name: Option<&str>,
-    ) -> Result<Database<KC, DC>>
-    where
-        KC: 'static,
-        DC: 'static,
-    {
-        let mut options = self.database_options().types::<KC, DC>();
-        if let Some(name) = name {
-            options.name(name);
-        }
-        options.create(wtxn)
+        let _lock = self.lock();
+        let montruc = DatabaseOpener { env: self };
+        let databases = match f(&montruc, &mut wtxn)? {
+            CommitOrAbort::Commit(databases) => databases,
+            CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
+        };
+        wtxn.commit()?;
+        let commit_token = CommitToken::new(self);
+        let committed = databases.on_commit(&commit_token);
+        Ok(CommitOrAbort::Commit(committed))
     }
 
     pub(crate) fn raw_init_database<C: Comparator + 'static, CDUP: Comparator + 'static>(
@@ -410,6 +469,15 @@ impl<T> Env<T> {
     ///   full
     pub fn static_read_txn(self) -> Result<RoTxn<'static, T>> {
         RoTxn::static_read_txn(self)
+    }
+
+    pub(crate) fn lock(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.inner.dbi_open_mutex.lock() {
+                Ok(lock) => break lock,
+                Err(_) => self.inner.dbi_open_mutex.clear_poison(),
+            }
+        }
     }
 
     /// Copy an LMDB environment to the specified path, with options.
@@ -700,6 +768,7 @@ pub(crate) struct EnvInner {
     env_ptr: NonNull<MDB_env>,
     signal_event: Arc<SignalEvent>,
     pub(crate) path: PathBuf,
+    dbi_open_mutex: Mutex<()>,
 }
 
 impl EnvInner {
