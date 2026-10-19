@@ -268,8 +268,8 @@ impl<T> EncryptedEnv<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed3::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
-    /// use heed3::types::*;
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -280,9 +280,15 @@ impl<T> EncryptedEnv<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, Str> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
     /// db.put(&mut wtxn, &"hello1", &"world1")?;
     /// db.put(&mut wtxn, &"hello2", &"world2")?;
@@ -388,7 +394,7 @@ impl EncryptedEnv<WithoutTls> {
     /// use std::path::Path;
     /// use argon2::Argon2;
     /// use chacha20poly1305::{ChaCha20Poly1305, Key};
-    /// use heed::{EnvOpenOptions, EncryptedDatabase};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, EncryptedDatabase};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -418,9 +424,13 @@ impl EncryptedEnv<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let wtxn = env.write_txn()?;
+    /// let db: EncryptedDatabase<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///         dbo.create_database(wtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?.unwrap_commit();
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;

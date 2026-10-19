@@ -468,7 +468,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -481,14 +481,16 @@ impl<T> Env<T> {
     /// # };
     ///
     /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
-    ///
-    /// db.put(&mut wtxn, &"hello0", &"world0")?;
-    /// db.put(&mut wtxn, &"hello1", &"world1")?;
-    /// db.put(&mut wtxn, &"hello2", &"world2")?;
-    /// db.put(&mut wtxn, &"hello3", &"world3")?;
-    ///
-    /// wtxn.commit()?;
+    /// env
+    ///     .create_databases_and_commit(wtxn, |dbo, wtxn| -> Result<_, Box<dyn std::error::Error>>  {
+    ///         let db = dbo.open_database::<Str, Str>(&wtxn, None)?.unwrap();
+    ///         db.put(wtxn, &"hello0", &"world0")?;
+    ///         db.put(wtxn, &"hello1", &"world1")?;
+    ///         db.put(wtxn, &"hello2", &"world2")?;
+    ///         db.put(wtxn, &"hello3", &"world3")?;
+    ///         Ok(CommitOrAbort::<_, ()>::Commit(()))
+    ///     })?
+    ///     .unwrap_commit();
     ///
     /// let mut tmp_file = tempfile::tempfile()?;
     /// env.copy_to_file(&mut tmp_file, CompactionOption::Enabled)?;
@@ -521,7 +523,7 @@ impl<T> Env<T> {
     /// use std::fs;
     /// use std::io::{Read, Seek, SeekFrom};
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database, EnvFlags, FlagSetMode, CompactionOption};
     /// use heed::types::*;
     /// use memchr::memmem::find_iter;
     ///
@@ -533,9 +535,15 @@ impl<T> Env<T> {
     /// #     .open(dir.path())?
     /// # };
     ///
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<Str, Str> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<Str, Str> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// db.put(&mut wtxn, &"hello0", &"world0")?;
     /// db.put(&mut wtxn, &"hello1", &"world1")?;
     /// db.put(&mut wtxn, &"hello2", &"world2")?;
@@ -671,7 +679,7 @@ impl Env<WithoutTls> {
     /// ```
     /// use std::fs;
     /// use std::path::Path;
-    /// use heed::{EnvOpenOptions, Database};
+    /// use heed::{CommitOrAbort, EnvOpenOptions, Database};
     /// use heed::types::*;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -684,9 +692,15 @@ impl Env<WithoutTls> {
     /// };
     ///
     /// // we will open the default unnamed database
-    /// let mut wtxn = env.write_txn()?;
-    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env.create_database(&mut wtxn, None)?;
+    /// let rtxn = env.read_txn()?;
+    /// let db: Database<U32<byteorder::BigEndian>, U32<byteorder::BigEndian>> = env
+    ///     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+    ///         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+    ///     })?
+    ///     .unwrap_commit()
+    ///     .expect("the unnamed database to always exists");
     ///
+    /// let mut wtxn = env.write_txn()?;
     /// // opening a write transaction
     /// for i in 0..1000 {
     ///     db.put(&mut wtxn, &i, &i)?;
