@@ -2945,9 +2945,15 @@ mod tests {
     fn put_overwrite() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
-        let db = env.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = env.read_txn()?;
+        let db = env
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Bytes>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = env.write_txn()?;
         assert_eq!(db.get(&txn, b"hello").unwrap(), None);
 
         db.put(&mut txn, b"hello", b"hi").unwrap();
@@ -2964,9 +2970,15 @@ mod tests {
     fn longer_keys() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = envs.write_txn()?;
-        let db = envs.create_database::<Bytes, Bytes>(&mut txn, None)?;
+        let rtxn = envs.read_txn()?;
+        let db = env
+            .open_and_commit_databases(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Bytes, Bytes>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = envs.write_txn()?;
         // Try storing a key larger than 511 bytes (the default if MDB_MAXKEYSIZE is not set)
         let long_key = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut pharetra sit amet aliquam. Sit amet nisl purus in mollis nunc. Eget egestas purus viverra accumsan in nisl nisi scelerisque. Duis ultricies lacus sed turpis tincidunt. Sem nulla pharetra diam sit. Leo vel orci porta non pulvinar. Erat pellentesque adipiscing commodo elit at imperdiet dui. Suspendisse ultrices gravida dictum fusce ut placerat orci nulla. Diam donec adipiscing tristique risus nec feugiat. In fermentum et sollicitudin ac orci. Ut sem nulla pharetra diam sit amet. Aliquam purus sit amet luctus venenatis lectus. Erat pellentesque adipiscing commodo elit at imperdiet dui accumsan. Urna duis convallis convallis tellus id interdum velit laoreet id. Ac feugiat sed lectus vestibulum mattis ullamcorper velit sed. Tincidunt arcu non sodales neque. Habitant morbi tristique senectus et netus et malesuada fames.";
 
@@ -2987,13 +2999,19 @@ mod tests {
 
         let dir = tempfile::tempdir()?;
         let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
-        let mut txn = env.write_txn()?;
+        let rtxn = env.read_txn()?;
         let db = env
-            .database_options()
-            .types::<NEU32, NEU32>()
-            .key_comparator::<IntegerComparator>()
-            .create(&mut txn)?;
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.database_options()
+                    .types::<NEU32, NEU32>()
+                    .key_comparator::<IntegerComparator>()
+                    .open(rtxn)
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })?
+            .unwrap_commit()
+            .unwrap();
 
+        let mut txn = env.write_txn()?;
         let range = 1000..2000;
 
         for i in range.clone() {

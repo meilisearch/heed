@@ -767,12 +767,11 @@ impl Drop for EnvInner {
 
 #[cfg(test)]
 mod tests {
-    use std::io::ErrorKind;
     use std::time::Duration;
     use std::{fs, thread};
 
     use crate::types::*;
-    use crate::{env_closing_event, EnvOpenOptions, Error};
+    use crate::{env_closing_event, CommitOrAbort, EnvOpenOptions, Error};
 
     #[test]
     fn close_env() {
@@ -792,9 +791,14 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
         });
 
-        let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, None).unwrap();
-        wtxn.commit().unwrap();
+        let rtxn = env.read_txn().unwrap();
+        let db = env
+            .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                dbo.open_database::<Str, Str>(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit()
+            .unwrap();
 
         // Create an ordered list of keys...
         let mut wtxn = env.write_txn().unwrap();
@@ -869,9 +873,14 @@ mod tests {
         unsafe { envbuilder.flags(crate::EnvFlags::WRITE_MAP) };
         let env = unsafe { envbuilder.open(dir.path()).unwrap() };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
     }
 
     #[test]
@@ -893,13 +902,24 @@ mod tests {
                 .unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.abort();
+        let wtxn = env.write_txn().unwrap();
+        let aborted = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(|_| CommitOrAbort::<(), _>::Abort(()))
+            })
+            .unwrap();
+        assert!(aborted.is_abort());
 
         let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
-        assert!(option.is_none());
+        let no_db = env
+            .open_databases_and_commit(rtxn, |dbo, wtxn| {
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
+        assert!(no_db.is_none());
     }
 
     #[test]
@@ -914,9 +934,14 @@ mod tests {
         };
 
         // we first create a database
-        let mut wtxn = env.write_txn().unwrap();
-        let _db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let _db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         // Close the environement and reopen it, databases must not be loaded in memory.
         env.prepare_for_closing().wait();
@@ -929,7 +954,13 @@ mod tests {
         };
 
         let rtxn = env.read_txn().unwrap();
-        let option = env.open_database::<Str, Str>(&rtxn, Some("my-super-db")).unwrap();
+        let option = env
+            .open_databases_and_commit(rtxn, |dbo, wtxn| {
+                dbo.open_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
         assert!(option.is_some());
     }
 
@@ -941,9 +972,14 @@ mod tests {
             EnvOpenOptions::new().map_size(9 * page_size).max_dbs(1).open(dir.path()).unwrap()
         };
 
-        let mut wtxn = env.write_txn().unwrap();
-        let db = env.create_database::<Str, Str>(&mut wtxn, Some("my-super-db")).unwrap();
-        wtxn.commit().unwrap();
+        let wtxn = env.write_txn().unwrap();
+        let db = env
+            .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                wdo.create_database::<Str, Str>(wtxn, Some("my-super-db"))
+                    .map(CommitOrAbort::<_, ()>::Commit)
+            })
+            .unwrap()
+            .unwrap_commit();
 
         let mut wtxn = env.write_txn().unwrap();
         for i in 0..64 {
@@ -988,10 +1024,15 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let mut wtxn = env.write_txn().unwrap();
-            let database0 = env.create_database::<Str, Str>(&mut wtxn, Some("shared0")).unwrap();
+            let wtxn = env.write_txn().unwrap();
+            let database0 = env
+                .create_databases_and_commit(wtxn, |wdo, wtxn| {
+                    wdo.create_database::<Str, Str>(wtxn, Some("shared0"))
+                        .map(CommitOrAbort::<_, ()>::Commit)
+                })
+                .unwrap()
+                .unwrap_commit();
 
-            wtxn.commit().unwrap();
             let mut wtxn = env.write_txn().unwrap();
             database0.put(&mut wtxn, "shared0", expected_data0).unwrap();
             wtxn.commit().unwrap();
@@ -1008,61 +1049,21 @@ mod tests {
                     .open(dir.path())
                     .unwrap()
             };
-            let database0 = {
-                let rtxn = env.read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // This commit is mandatory if not committed you might get
-                // Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })
-                rtxn.commit().unwrap();
-                database0
-            };
+            let rtxn = env.read_txn().unwrap();
+            let database0 = env
+                .open_databases_and_commit(rtxn, |dbo, rtxn| {
+                    dbo.open_database::<Str, Str>(rtxn, Some("shared0"))
+                        .map(CommitOrAbort::<_, ()>::Commit)
+                })
+                .unwrap()
+                .unwrap_commit()
+                .unwrap();
 
             {
                 // If we didn't committed the opening it might fail with EINVAL.
                 let rtxn = env.read_txn().unwrap();
                 let value = database0.get(&rtxn, "shared0").unwrap().unwrap();
                 assert_eq!(value, expected_data0);
-            }
-
-            env.prepare_for_closing().wait();
-        }
-
-        // To avoid reintroducing the bug let's try to open again but without the commit
-        {
-            // Open now we do a read-only opening
-            let env = unsafe {
-                EnvOpenOptions::new()
-                    .map_size(10 * 1024 * 1024) // 10MB
-                    .max_dbs(32)
-                    .open(dir.path())
-                    .unwrap()
-            };
-            let database0 = {
-                let rtxn = env.read_txn().unwrap();
-                let database0 =
-                    env.open_database::<Str, Str>(&rtxn, Some("shared0")).unwrap().unwrap();
-                // No commit it's important, dropping explicitly
-                drop(rtxn);
-                database0
-            };
-
-            {
-                // We didn't committed the opening we will get EINVAL.
-                let rtxn = env.read_txn().unwrap();
-                // The dbg!() is intentional in case of a change in rust-std or in lmdb related
-                // to the windows error.
-                let err = dbg!(database0.get(&rtxn, "shared0"));
-
-                // The error kind is still ErrorKind Uncategorized on windows.
-                // Behind it's a ERROR_BAD_COMMAND code 22 like EINVAL.
-                if cfg!(windows) {
-                    assert!(err.is_err());
-                } else {
-                    assert!(
-                        matches!(err, Err(Error::Io(ref e)) if e.kind() == ErrorKind::InvalidInput)
-                    );
-                }
             }
 
             env.prepare_for_closing().wait();
