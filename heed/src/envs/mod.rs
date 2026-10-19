@@ -23,14 +23,14 @@ use crate::mdb::ffi;
 #[allow(unused)] // for cargo auto doc links
 use crate::{Database, DatabaseFlags};
 
-mod abort_or_commit;
+mod commit_or_abort;
 #[cfg(master3)]
 mod encrypted_env;
 mod env;
 mod env_open_options;
 mod on_commit;
 
-pub use abort_or_commit::CommitOrAbort;
+pub use commit_or_abort::CommitOrAbort;
 #[cfg(master3)]
 pub use encrypted_env::{EncryptedDatabaseOpener, EncryptedEnv};
 pub(crate) use env::EnvInner;
