@@ -5,7 +5,7 @@ use std::io::Seek;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{fmt, io, mem};
 
 use heed_traits::Comparator;
@@ -15,16 +15,15 @@ use super::{
     custom_key_cmp_wrapper, get_file_fd, DefaultComparator, EnvClosingEvent, EnvInfo, FlagSetMode,
     IntegerComparator, OPENED_ENV,
 };
-use crate::cursor::{MoveOperation, RoCursor};
-use crate::envs::EnvStat;
 use crate::mdb::ffi::{self, MDB_env};
 use crate::mdb::lmdb_error::mdb_result;
 use crate::mdb::lmdb_flags::AllDatabaseFlags;
 #[allow(unused)] // for cargo auto doc links
 use crate::EnvOpenOptions;
 use crate::{
-    assert_eq_env_txn, CompactionOption, Database, DatabaseOpenOptions, EnvFlags, Error, Result,
-    RoTxn, RwTxn, Unspecified, WithTls, WithoutTls,
+    assert_eq_env_txn, CommitOrAbort, CommitToken, CompactionOption, Database, DatabaseOpenOptions,
+    DatabaseStat, EnvFlags, Error, OnCommit, Result, RoTxn, RwTxn, Unspecified, WithTls,
+    WithoutTls,
 };
 
 /// An environment handle constructed by using [`EnvOpenOptions::open`].
