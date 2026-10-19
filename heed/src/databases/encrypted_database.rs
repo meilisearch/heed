@@ -2401,6 +2401,15 @@ impl<KC, DC, C, CDUP> fmt::Debug for EncryptedDatabase<KC, DC, C, CDUP> {
     }
 }
 
+impl<'t, KC, DC, C, CDUP> OnCommit for EncryptedDatabase<'t, KC, DC, C, CDUP> {
+    type Committed = EncryptedDatabase<'static, KC, DC, C, CDUP>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        let EncryptedDatabase { inner } = self;
+        EncryptedDatabase { inner: inner.on_commit(token) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use heed_types::*;

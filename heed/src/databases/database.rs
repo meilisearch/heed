@@ -2933,6 +2933,20 @@ impl<KC, DC, C, CDUP> fmt::Debug for Database<KC, DC, C, CDUP> {
     }
 }
 
+impl<'t, KC, DC, C, CDUP> OnCommit for Database<'t, KC, DC, C, CDUP> {
+    type Committed = Database<'static, KC, DC, C, CDUP>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        let Database { env_ident, dbi, marker: _ } = self;
+        assert_eq!(
+            token.env_ident(),
+            env_ident,
+            "The CommitToken and Database aren't coming from the same environment"
+        );
+        Database { env_ident, dbi, marker: marker::PhantomData }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use byteorder::*;
