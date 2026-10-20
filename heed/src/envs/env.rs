@@ -1167,4 +1167,37 @@ mod tests {
             assert_eq!(maxkeysize, 511);
         }
     }
+
+    #[test]
+    #[should_panic]
+    fn disallow_commit_database_with_another_env_txn() {
+        use crate::types::*;
+        use crate::{CommitOrAbort, EnvOpenOptions};
+
+        let env1 = unsafe {
+            let mut env_builder = EnvOpenOptions::new();
+            let dir = tempfile::tempdir().unwrap();
+            env_builder.max_dbs(2).open(dir.path()).unwrap()
+        };
+
+        let env2 = unsafe {
+            let mut env_builder = EnvOpenOptions::new();
+            let dir = tempfile::tempdir().unwrap();
+            env_builder.max_dbs(2).open(dir.path()).unwrap()
+        };
+
+        let wtxn1 = env1.write_txn().unwrap();
+        let _database = env1
+            .create_databases_and_commit(
+                wtxn1,
+                |wdo, _wtxn| -> Result<_, Box<dyn std::error::Error>> {
+                    let mut wtxn2 = env2.write_txn().unwrap();
+                    let db =
+                        wdo.create_database::<Str, Str>(&mut wtxn2, Some("my-database")).unwrap();
+                    Ok(CommitOrAbort::<_, ()>::Commit(db))
+                },
+            )
+            .unwrap()
+            .unwrap_commit();
+    }
 }
