@@ -44,6 +44,22 @@ impl<A: OnCommit> OnCommit for Option<A> {
     }
 }
 
+impl<T: OnCommit, E> OnCommit for Result<T, E> {
+    type Committed = Result<T::Committed, E>;
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        self.map(|t| t.on_commit(token))
+    }
+}
+
+impl<T: OnCommit, const N: usize> OnCommit for [T; N] {
+    type Committed = [T::Committed; N];
+
+    fn on_commit(self, token: &CommitToken) -> Self::Committed {
+        self.map(|t| t.on_commit(token))
+    }
+}
+
 macro_rules! impl_on_commit_for_tuple {
     ( $( $name:ident )+ ) => {
         impl<$($name: OnCommit),+> OnCommit for ($($name,)+) {
