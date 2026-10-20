@@ -531,15 +531,6 @@ impl<'e, T> EncryptedDatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    ///
-    /// ## LMDB read-only access of existing database
-    ///
-    /// In the case of accessing a database in a read-only manner from another process
-    /// where you wrote, you might need to manually call [`RoTxn::commit`] to get metadata
-    /// and the database handles opened and shared with the global [`Env`] handle.
-    ///
-    /// If not done, you might raise `Io(Os { code: 22, kind: InvalidInput, message: "Invalid argument" })`
-    /// known as `EINVAL`.
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn<'e>,
