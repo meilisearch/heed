@@ -7,7 +7,7 @@ authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Victor Porof <vporof@mozilla.com>",
 ]
-license = "Apache-2.0"
+license = "OpenLDAP Public License"
 description = "Rust bindings for liblmdb on the mdb.master3 branch."
 documentation = "https://docs.rs/lmdb-master3-sys"
 repository = "https://github.com/meilisearch/heed/tree/main/lmdb-master3-sys"
