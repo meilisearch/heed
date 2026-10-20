@@ -96,15 +96,15 @@ impl<T> EncryptedEnv<T> {
         self.inner.info()
     }
 
-    /// Returns some statistics about this environment.
+    /// Returns the statistics of the unnamed database.
     pub fn unnamed_database_stat(&self) -> DatabaseStat {
         self.inner.unnamed_database_stat()
     }
 
     /// Open one or multiple databases.
     ///
-    /// This method let you safely open databases by using a lock to
-    /// make sure a single env is opening databases at once.
+    /// This method lets you safely open databases by using a lock to
+    /// make sure a single transaction is opening databases at once.
     ///
     /// ```
     /// use std::fs;
@@ -157,8 +157,8 @@ impl<T> EncryptedEnv<T> {
 
     /// Create or open one or multiple databases.
     ///
-    /// This method let you safely create or open databases
-    /// by using a lock to make sure a single env is opening
+    /// This method lets you safely create or open databases
+    /// by using a lock to make sure a single transaction is opening
     /// databases at once.
     ///
     /// ```

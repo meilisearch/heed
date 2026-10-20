@@ -179,7 +179,7 @@ impl<T> Env<T> {
         }
     }
 
-    /// Returns the statistic of the unnamed database.
+    /// Returns the statistics of the unnamed database.
     pub fn unnamed_database_stat(&self) -> DatabaseStat {
         let mut raw_stat = mem::MaybeUninit::uninit();
         unsafe { ffi::mdb_env_stat(self.inner.env_ptr.as_ptr(), raw_stat.as_mut_ptr()) };
@@ -206,8 +206,8 @@ impl<T> Env<T> {
 
     /// Open one or multiple databases.
     ///
-    /// This method let you safely open databases by using a lock to
-    /// make sure a single env is opening databases at once.
+    /// This method lets you safely open databases by using a lock to
+    /// make sure a single transaction is opening databases at once.
     ///
     /// ```
     /// use std::fs;
@@ -260,8 +260,8 @@ impl<T> Env<T> {
 
     /// Create or open one or multiple databases.
     ///
-    /// This method let you safely create or open databases
-    /// by using a lock to make sure a single env is opening
+    /// This method lets you safely create or open databases
+    /// by using a lock to make sure a single transaction is opening
     /// databases at once.
     ///
     /// ```
