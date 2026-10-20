@@ -144,8 +144,8 @@ impl<T> EncryptedEnv<T> {
         E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
-        let montruc = EncryptedDatabaseOpener { env: self };
-        let databases = match f(&montruc, &rtxn)? {
+        let db_opener = EncryptedDatabaseOpener { env: self };
+        let databases = match f(&db_opener, &rtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
@@ -207,8 +207,8 @@ impl<T> EncryptedEnv<T> {
         E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
-        let montruc = EncryptedDatabaseOpener { env: self };
-        let databases = match f(&montruc, &mut wtxn)? {
+        let db_opener = EncryptedDatabaseOpener { env: self };
+        let databases = match f(&db_opener, &mut wtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };

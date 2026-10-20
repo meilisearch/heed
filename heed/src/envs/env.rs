@@ -247,8 +247,8 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let montruc = DatabaseOpener { env: self };
-        let databases = match f(&montruc, &rtxn)? {
+        let db_opener = DatabaseOpener { env: self };
+        let databases = match f(&db_opener, &rtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
@@ -310,8 +310,8 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let montruc = DatabaseOpener { env: self };
-        let databases = match f(&montruc, &mut wtxn)? {
+        let db_opener = DatabaseOpener { env: self };
+        let databases = match f(&db_opener, &mut wtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
         };
