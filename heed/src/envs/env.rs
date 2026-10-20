@@ -472,12 +472,7 @@ impl<T> Env<T> {
     }
 
     pub(crate) fn lock(&self) -> MutexGuard<'_, ()> {
-        loop {
-            match self.inner.dbi_open_mutex.lock() {
-                Ok(lock) => break lock,
-                Err(_) => self.inner.dbi_open_mutex.clear_poison(),
-            }
-        }
+        self.inner.dbi_open_mutex.lock().unwrap_or_else(|err| err.into_inner())
     }
 
     /// Copy an LMDB environment to the specified path, with options.
