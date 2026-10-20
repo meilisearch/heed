@@ -229,7 +229,7 @@ pub enum Unspecified {}
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
-            $database.env_ident == unsafe { $txn.env_mut_ptr().as_mut() as *mut _ as usize },
+            $database.env_ident == $txn.env_mut_ptr().addr(),
             "The database environment doesn't match the transaction's environment"
         );
     };

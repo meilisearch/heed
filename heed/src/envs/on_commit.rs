@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use crate::Env;
 
 /// A provided token used to make sure databases
@@ -5,15 +7,15 @@ use crate::Env;
 pub struct CommitToken {
     /// This is the env identifier to make sure that the env
     /// used to commit a database
-    env_ident: usize,
+    env_ident: NonZero<usize>,
 }
 
 impl CommitToken {
     pub(crate) fn new<T>(env: &Env<T>) -> CommitToken {
-        CommitToken { env_ident: env.env_mut_ptr().as_ptr() as _ }
+        CommitToken { env_ident: env.env_mut_ptr().addr() }
     }
 
-    pub(crate) fn env_ident(&self) -> usize {
+    pub(crate) fn env_ident(&self) -> NonZero<usize> {
         self.env_ident
     }
 }

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZero;
 use std::ops::{Bound, RangeBounds};
 use std::{any, fmt, marker, mem, ptr};
 
@@ -159,7 +160,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
         assert_eq_env_txn!(self.env, rtxn);
 
         match self.env.raw_init_database::<C, CDUP>(rtxn.txn_ptr(), self.name, self.flags) {
-            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi))),
+            Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().addr(), dbi))),
             Err(Error::Mdb(e)) if e.not_found() => Ok(None),
             Err(e) => Err(e),
         }
@@ -185,7 +186,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
         match self.env.raw_init_database::<C, CDUP>(wtxn.txn_ptr(), self.name, flags) {
-            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr().as_ptr() as _, dbi)),
+            Ok(dbi) => Ok(Database::new(self.env.env_mut_ptr().addr(), dbi)),
             Err(e) => Err(e),
         }
     }
@@ -318,13 +319,16 @@ impl<T, KC, DC, C, CDUP> Copy for DatabaseOpenOptions<'_, '_, T, KC, DC, C, CDUP
 /// # Ok(()) }
 /// ```
 pub struct Database<'t, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
-    pub(crate) env_ident: usize,
+    pub(crate) env_ident: NonZero<usize>,
     pub(crate) dbi: ffi::MDB_dbi,
     marker: marker::PhantomData<(&'t (), KC, DC, C, CDUP)>,
 }
 
 impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
-    pub(crate) fn new(env_ident: usize, dbi: ffi::MDB_dbi) -> Database<'t, KC, DC, C, CDUP> {
+    pub(crate) fn new(
+        env_ident: NonZero<usize>,
+        dbi: ffi::MDB_dbi,
+    ) -> Database<'t, KC, DC, C, CDUP> {
         Database { env_ident, dbi, marker: std::marker::PhantomData }
     }
 
