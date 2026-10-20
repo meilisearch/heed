@@ -2889,22 +2889,22 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> Database<'t, KC2, DC2, C, CDUP> {
+    pub fn remap_types<KC2, DC2>(self) -> Database<'t, KC2, DC2, C, CDUP> {
         Database::new(self.env_ident, self.dbi)
     }
 
     /// Change the key codec type of this database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> Database<'t, KC2, DC, C, CDUP> {
+    pub fn remap_key_type<KC2>(self) -> Database<'t, KC2, DC, C, CDUP> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> Database<'t, KC, DC2, C, CDUP> {
+    pub fn remap_data_type<DC2>(self) -> Database<'t, KC, DC2, C, CDUP> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> Database<'t, KC, LazyDecode<DC>, C, CDUP> {
+    pub fn lazily_decode_data(self) -> Database<'t, KC, LazyDecode<DC>, C, CDUP> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }

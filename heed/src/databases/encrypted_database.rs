@@ -2353,22 +2353,22 @@ impl<'t, KC, DC, C, CDUP> EncryptedDatabase<'t, KC, DC, C, CDUP> {
     /// wtxn.commit()?;
     /// # Ok(()) }
     /// ```
-    pub fn remap_types<KC2, DC2>(&self) -> EncryptedDatabase<'_, KC2, DC2, C, CDUP> {
+    pub fn remap_types<KC2, DC2>(self) -> EncryptedDatabase<'t, KC2, DC2, C, CDUP> {
         EncryptedDatabase::new(self.inner.remap_types::<KC2, DC2>())
     }
 
     /// Change the key codec type of this database, specifying the new codec.
-    pub fn remap_key_type<KC2>(&self) -> EncryptedDatabase<'_, KC2, DC, C, CDUP> {
+    pub fn remap_key_type<KC2>(self) -> EncryptedDatabase<'t, KC2, DC, C, CDUP> {
         self.remap_types::<KC2, DC>()
     }
 
     /// Change the data codec type of this database, specifying the new codec.
-    pub fn remap_data_type<DC2>(&self) -> EncryptedDatabase<'_, KC, DC2, C, CDUP> {
+    pub fn remap_data_type<DC2>(self) -> EncryptedDatabase<'t, KC, DC2, C, CDUP> {
         self.remap_types::<KC, DC2>()
     }
 
     /// Wrap the data bytes into a lazy decoder.
-    pub fn lazily_decode_data(&self) -> EncryptedDatabase<'_, KC, LazyDecode<DC>, C, CDUP> {
+    pub fn lazily_decode_data(self) -> EncryptedDatabase<'t, KC, LazyDecode<DC>, C, CDUP> {
         self.remap_types::<KC, LazyDecode<DC>>()
     }
 }
