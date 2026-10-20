@@ -124,10 +124,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
-    pub fn open<U>(
-        &self,
-        rtxn: &RoTxn<'_, U>,
-    ) -> Result<Option<EncryptedDatabase<'e, KC, DC, C, CDUP>>>
+    pub fn open(&self, rtxn: &RoTxn<'_>) -> Result<Option<EncryptedDatabase<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
         DC: 'static,
