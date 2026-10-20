@@ -9,7 +9,7 @@ pub enum CommitOrAbort<T, A> {
 }
 
 impl<T, A> CommitOrAbort<T, A> {
-    /// Converts from `CommitOrAbort<T, E>` to `Option<T>`.
+    /// Returns `Some` if the `CommitOrAbort` is a `Commit` value.
     #[inline]
     pub fn commit(self) -> Option<T> {
         match self {
@@ -18,7 +18,7 @@ impl<T, A> CommitOrAbort<T, A> {
         }
     }
 
-    /// Returns `true` if the option is a `Abort` value.
+    /// Returns `Some` if the `CommitOrAbort` is an `Abort` value.
     #[inline]
     pub fn abort(self) -> Option<A> {
         match self {
@@ -34,6 +34,10 @@ impl<T, A> CommitOrAbort<T, A> {
     }
 
     /// Returns the contained `Commit`ted value, consuming the self value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the self value equals `Abort`.
     #[inline]
     #[track_caller]
     pub fn unwrap_commit(self) -> T
@@ -45,6 +49,43 @@ impl<T, A> CommitOrAbort<T, A> {
             CommitOrAbort::Abort(abort) => {
                 panic!("called `CommitOrAbort::unwrap_commit()` on an `Abort` value: {abort:?}")
             }
+        }
+    }
+
+    /// Returns the contained `Abort`ted value, consuming the self value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the self value equals `Commit`.
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_abort(self) -> A
+    where
+        T: fmt::Debug,
+    {
+        match self {
+            CommitOrAbort::Commit(data) => {
+                panic!("called `CommitOrAbort::unwrap_abort()` on a `Commit` value: {data:?}")
+            }
+            CommitOrAbort::Abort(abort) => abort,
+        }
+    }
+}
+
+impl<T, E> From<Result<T, E>> for CommitOrAbort<T, E> {
+    fn from(result: Result<T, E>) -> Self {
+        match result {
+            Ok(data) => CommitOrAbort::Commit(data),
+            Err(error) => CommitOrAbort::Abort(error),
+        }
+    }
+}
+
+impl<T, E> From<CommitOrAbort<T, E>> for Result<T, E> {
+    fn from(coa: CommitOrAbort<T, E>) -> Self {
+        match coa {
+            CommitOrAbort::Commit(data) => Ok(data),
+            CommitOrAbort::Abort(abort) => Err(abort),
         }
     }
 }
