@@ -23,16 +23,20 @@ use crate::mdb::ffi;
 #[allow(unused)] // for cargo auto doc links
 use crate::{Database, DatabaseFlags};
 
+mod commit_or_abort;
 #[cfg(master3)]
 mod encrypted_env;
 mod env;
 mod env_open_options;
+mod on_commit;
 
+pub use commit_or_abort::CommitOrAbort;
 #[cfg(master3)]
-pub use encrypted_env::EncryptedEnv;
-pub use env::Env;
+pub use encrypted_env::{EncryptedDatabaseOpener, EncryptedEnv};
 pub(crate) use env::EnvInner;
+pub use env::{DatabaseOpener, Env};
 pub use env_open_options::EnvOpenOptions;
+pub use on_commit::{CommitToken, OnCommit};
 
 /// Records the current list of opened environments for tracking purposes. The canonical
 /// path of an environment is removed when either an `Env` or `EncryptedEnv` is closed.
@@ -60,24 +64,6 @@ pub struct EnvInfo {
     pub maximum_number_of_readers: u32,
     /// Number of reader slots used in the environment.
     pub number_of_readers: u32,
-}
-
-/// Statistics for an environment.
-#[derive(Debug, Clone, Copy)]
-pub struct EnvStat {
-    /// Size of a database page.
-    /// This is currently the same for all databases.
-    pub page_size: u32,
-    /// Depth (height) of the B-tree.
-    pub depth: u32,
-    /// Number of internal (non-leaf) pages
-    pub branch_pages: usize,
-    /// Number of leaf pages.
-    pub leaf_pages: usize,
-    /// Number of overflow pages.
-    pub overflow_pages: usize,
-    /// Number of data items.
-    pub entries: usize,
 }
 
 /// A structure that can be used to wait for the closing event.
