@@ -38,16 +38,23 @@
 //! ```
 //! use std::fs;
 //! use std::path::Path;
-//! use heed::{EnvOpenOptions, Database};
+//! use heed::{EnvOpenOptions, Database, CommitOrAbort};
 //! use heed::types::*;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let dir = tempfile::tempdir()?;
 //! let env = unsafe { EnvOpenOptions::new().open(dir.path())? };
 //!
+//! let rtxn = env.read_txn()?;
 //! // we will open the default unnamed database
+//! let db: Database<Str, U32<byteorder::NativeEndian>> = env
+//!     .open_databases_and_commit(rtxn, |dbo, rtxn| {
+//!         dbo.open_database(rtxn, None).map(CommitOrAbort::<_, ()>::Commit)
+//!     })?
+//!     .unwrap_commit()
+//!     .expect("the unnamed database to always exists");
+//!
 //! let mut wtxn = env.write_txn()?;
-//! let db: Database<Str, U32<byteorder::NativeEndian>> = env.create_database(&mut wtxn, None)?;
 //!
 //! // opening a write transaction
 //! db.put(&mut wtxn, "seven", &7)?;
@@ -90,12 +97,13 @@ use self::cursor::{RoCursor, RwCursor};
 pub use self::databases::{Database, DatabaseOpenOptions, DatabaseStat};
 #[cfg(master3)]
 pub use self::databases::{EncryptedDatabase, EncryptedDatabaseOpenOptions};
-#[cfg(master3)]
-pub use self::envs::EncryptedEnv;
 pub use self::envs::{
-    env_closing_event, CompactionOption, DefaultComparator, Env, EnvClosingEvent, EnvInfo,
-    EnvOpenOptions, FlagSetMode, IntegerComparator,
+    env_closing_event, CommitOrAbort, CommitToken, CompactionOption, DatabaseOpener,
+    DefaultComparator, Env, EnvClosingEvent, EnvInfo, EnvOpenOptions, FlagSetMode,
+    IntegerComparator, OnCommit,
 };
+#[cfg(master3)]
+pub use self::envs::{EncryptedDatabaseOpener, EncryptedEnv};
 pub use self::iterator::{
     RoIter, RoPrefix, RoRange, RoRevIter, RoRevPrefix, RoRevRange, RwIter, RwPrefix, RwRange,
     RwRevIter, RwRevPrefix, RwRevRange,
@@ -221,7 +229,7 @@ pub enum Unspecified {}
 macro_rules! assert_eq_env_db_txn {
     ($database:ident, $txn:ident) => {
         assert!(
-            $database.env_ident == unsafe { $txn.env_mut_ptr().as_mut() as *mut _ as usize },
+            $database.env_ident == $txn.env_mut_ptr().addr(),
             "The database environment doesn't match the transaction's environment"
         );
     };
@@ -236,8 +244,18 @@ macro_rules! assert_eq_env_txn {
     };
 }
 
+macro_rules! assert_eq_open_create_txn_id {
+    ($txn_id:expr, $txn:ident) => {
+        assert!(
+            $txn_id == $txn.txn_ptr().addr(),
+            "The transaction used to open or create databases is not the expected one"
+        );
+    };
+}
+
 pub(crate) use assert_eq_env_db_txn;
 pub(crate) use assert_eq_env_txn;
+pub(crate) use assert_eq_open_create_txn_id;
 
 #[cfg(test)]
 mod tests {
