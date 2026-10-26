@@ -63,6 +63,9 @@ use crate::*;
 #[derive(Debug)]
 pub struct DatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator, CDUP = DefaultComparator> {
     env: &'e Env<T>,
+    /// Represents the Txn Id that was used to create this opener
+    /// to make sure another transaction is not used to open a database.
+    original_txn_ident: NonZero<usize>,
     types: marker::PhantomData<(KC, DC, C, CDUP)>,
     name: Option<&'n str>,
     flags: AllDatabaseFlags,
@@ -70,9 +73,10 @@ pub struct DatabaseOpenOptions<'e, 'n, T, KC, DC, C = DefaultComparator, CDUP = 
 
 impl<'e, T> DatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
-    pub fn new(env: &'e Env<T>) -> Self {
+    pub fn new(env: &'e Env<T>, original_txn_ident: NonZero<usize>) -> Self {
         DatabaseOpenOptions {
             env,
+            original_txn_ident,
             types: Default::default(),
             name: None,
             flags: AllDatabaseFlags::empty(),
@@ -88,6 +92,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     pub fn types<NKC, NDC>(self) -> DatabaseOpenOptions<'e, 'n, T, NKC, NDC, C, CDUP> {
         DatabaseOpenOptions {
             env: self.env,
+            original_txn_ident: self.original_txn_ident,
             types: Default::default(),
             name: self.name,
             flags: self.flags,
@@ -100,6 +105,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     pub fn key_comparator<NC>(self) -> DatabaseOpenOptions<'e, 'n, T, KC, DC, NC, CDUP> {
         DatabaseOpenOptions {
             env: self.env,
+            original_txn_ident: self.original_txn_ident,
             types: Default::default(),
             name: self.name,
             flags: self.flags,
@@ -112,6 +118,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     pub fn dup_sort_comparator<NCDUP>(self) -> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, NCDUP> {
         DatabaseOpenOptions {
             env: self.env,
+            original_txn_ident: self.original_txn_ident,
             types: Default::default(),
             name: self.name,
             flags: self.flags,
@@ -141,6 +148,12 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::open_databases_and_commit`].
     pub fn open(&self, rtxn: &RoTxn<'_>) -> Result<Option<Database<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
@@ -149,6 +162,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
         CDUP: Comparator + 'static,
     {
         assert_eq_env_txn!(self.env, rtxn);
+        assert_eq_open_create_txn_id!(self.original_txn_ident, rtxn);
 
         match self.env.raw_init_database::<C, CDUP>(rtxn.txn_ptr(), self.name, self.flags) {
             Ok(dbi) => Ok(Some(Database::new(self.env.env_mut_ptr().addr(), dbi))),
@@ -166,6 +180,12 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::create_databases_and_commit`].
     pub fn create(&self, wtxn: &mut RwTxn<'_>) -> Result<Database<'e, KC, DC, C, CDUP>>
     where
         KC: 'static,
@@ -174,6 +194,7 @@ impl<'e, 'n, T, KC, DC, C, CDUP> DatabaseOpenOptions<'e, 'n, T, KC, DC, C, CDUP>
         CDUP: Comparator + 'static,
     {
         assert_eq_env_txn!(self.env, wtxn);
+        assert_eq_open_create_txn_id!(self.original_txn_ident, wtxn);
 
         let flags = self.flags | AllDatabaseFlags::CREATE;
         match self.env.raw_init_database::<C, CDUP>(wtxn.txn_ptr(), self.name, flags) {

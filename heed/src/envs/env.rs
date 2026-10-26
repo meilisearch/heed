@@ -3,6 +3,7 @@ use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Seek;
 use std::marker::PhantomData;
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -247,7 +248,7 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let db_opener = DatabaseOpener { env: self };
+        let db_opener = DatabaseOpener { env: self, original_txn_ident: rtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &rtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -310,7 +311,7 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let db_opener = DatabaseOpener { env: self };
+        let db_opener = DatabaseOpener { env: self, original_txn_ident: wtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &mut wtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -788,12 +789,15 @@ impl Drop for EnvInner {
 /// Used to create or open databases.
 pub struct DatabaseOpener<'e, T> {
     env: &'e Env<T>,
+    /// Represents the Txn Id that was used to create this opener
+    /// to make sure another transaction is not used to open a database.
+    original_txn_ident: NonZero<usize>,
 }
 
 impl<'e, T> DatabaseOpener<'e, T> {
     /// Options and flags which can be used to configure how a [`Database`] is opened.
     pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(self.env)
+        DatabaseOpenOptions::new(self.env, self.original_txn_ident)
     }
 
     /// Opens a typed database that already exists in this environment.
@@ -805,6 +809,12 @@ impl<'e, T> DatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::open_databases_and_commit`].
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn<'e>,
@@ -830,6 +840,12 @@ impl<'e, T> DatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::create_databases_and_commit`].
     pub fn create_database<KC, DC>(
         &self,
         wtxn: &mut RwTxn<'e>,
@@ -1194,6 +1210,34 @@ mod tests {
                     let mut wtxn2 = env2.write_txn().unwrap();
                     let db =
                         wdo.create_database::<Str, Str>(&mut wtxn2, Some("my-database")).unwrap();
+                    Ok(CommitOrAbort::<_, ()>::Commit(db))
+                },
+            )
+            .unwrap()
+            .unwrap_commit();
+    }
+
+    #[test]
+    #[should_panic]
+    fn disallow_open_database_with_another_txn() {
+        use crate::types::*;
+        use crate::{CommitOrAbort, EnvOpenOptions};
+
+        let env = unsafe {
+            // We use without TLS to make sure we can have
+            // multiple read txn on the same thread.
+            let mut env_builder = EnvOpenOptions::new().read_txn_without_tls();
+            let dir = tempfile::tempdir().unwrap();
+            env_builder.max_dbs(2).open(dir.path()).unwrap()
+        };
+
+        let rtxn1 = env.read_txn().unwrap();
+        let rtxn2 = env.read_txn().unwrap();
+        let _database = env
+            .open_databases_and_commit(
+                rtxn1,
+                |wdo, _rtxn1| -> Result<_, Box<dyn std::error::Error>> {
+                    let db = wdo.open_database::<Str, Str>(&rtxn2, None).unwrap();
                     Ok(CommitOrAbort::<_, ()>::Commit(db))
                 },
             )

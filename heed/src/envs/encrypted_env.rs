@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fs::File;
+use std::num::NonZero;
 use std::panic::catch_unwind;
 use std::path::Path;
 
@@ -144,7 +145,8 @@ impl<T> EncryptedEnv<T> {
         E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
-        let db_opener = EncryptedDatabaseOpener { env: self };
+        let db_opener =
+            EncryptedDatabaseOpener { env: self, original_txn_ident: rtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &rtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -207,7 +209,8 @@ impl<T> EncryptedEnv<T> {
         E: From<crate::Error>,
     {
         let _lock = self.inner.lock();
-        let db_opener = EncryptedDatabaseOpener { env: self };
+        let db_opener =
+            EncryptedDatabaseOpener { env: self, original_txn_ident: wtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &mut wtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -512,6 +515,9 @@ impl<T> fmt::Debug for EncryptedEnv<T> {
 /// Used to create or open databases.
 pub struct EncryptedDatabaseOpener<'e, T> {
     env: &'e EncryptedEnv<T>,
+    /// Represents the Txn Id that was used to create this opener
+    /// to make sure another transaction is not used to open a database.
+    original_txn_ident: NonZero<usize>,
 }
 
 impl<'e, T> EncryptedDatabaseOpener<'e, T> {
@@ -519,7 +525,7 @@ impl<'e, T> EncryptedDatabaseOpener<'e, T> {
     pub fn database_options(
         &self,
     ) -> EncryptedDatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
-        EncryptedDatabaseOpenOptions::new(self.env)
+        EncryptedDatabaseOpenOptions::new(self.env, self.original_txn_ident)
     }
 
     /// Opens a typed database that already exists in this environment.
@@ -531,6 +537,12 @@ impl<'e, T> EncryptedDatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`EncryptedEnv::open_databases_and_commit`].
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn<'e>,
@@ -556,6 +568,12 @@ impl<'e, T> EncryptedDatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`EncryptedEnv::create_databases_and_commit`].
     pub fn create_database<KC, DC>(
         &self,
         wtxn: &mut RwTxn<'e>,
