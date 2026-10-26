@@ -127,6 +127,12 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::open_databases_and_commit`].
     pub fn open(&self, rtxn: &RoTxn<'_>) -> Result<Option<EncryptedDatabase<'e, KC, DC, C, CDUP>>>
     where
         KC: 'static,
@@ -146,6 +152,12 @@ impl<'e, 'n, T, KC, DC, C, CDUP> EncryptedDatabaseOpenOptions<'e, 'n, T, KC, DC,
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::create_databases_and_commit`].
     pub fn create(&self, wtxn: &mut RwTxn<'_>) -> Result<EncryptedDatabase<'e, KC, DC, C, CDUP>>
     where
         KC: 'static,

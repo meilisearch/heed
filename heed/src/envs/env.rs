@@ -809,6 +809,12 @@ impl<'e, T> DatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::open_databases_and_commit`].
     pub fn open_database<KC, DC>(
         &self,
         rtxn: &RoTxn<'e>,
@@ -834,6 +840,12 @@ impl<'e, T> DatabaseOpener<'e, T> {
     /// LMDB has an important restriction on the unnamed database when named ones are opened.
     /// The names of the named databases are stored as keys in the unnamed one and are immutable,
     /// and these keys can only be read and not written.
+    ///
+    /// # Panics
+    ///
+    /// Calling this method will panic if used with a transaction:
+    /// - Coming from another environment.
+    /// - Which is not the one that was passed to [`Env::create_databases_and_commit`].
     pub fn create_database<KC, DC>(
         &self,
         wtxn: &mut RwTxn<'e>,
