@@ -1,3 +1,4 @@
+use std::num::NonZero;
 use std::ops::RangeBounds;
 use std::{any, fmt};
 
@@ -71,8 +72,10 @@ pub struct EncryptedDatabaseOpenOptions<
 
 impl<'e, T> EncryptedDatabaseOpenOptions<'e, 'static, T, Unspecified, Unspecified> {
     /// Create an options struct to open/create a database with specific flags.
-    pub fn new(env: &'e EncryptedEnv<T>) -> Self {
-        EncryptedDatabaseOpenOptions { inner: DatabaseOpenOptions::new(&env.inner) }
+    pub fn new(env: &'e EncryptedEnv<T>, original_txn_ident: NonZero<usize>) -> Self {
+        EncryptedDatabaseOpenOptions {
+            inner: DatabaseOpenOptions::new(&env.inner, original_txn_ident),
+        }
     }
 }
 

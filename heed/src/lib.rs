@@ -244,8 +244,18 @@ macro_rules! assert_eq_env_txn {
     };
 }
 
+macro_rules! assert_eq_open_create_txn_id {
+    ($txn_id:expr, $txn:ident) => {
+        assert!(
+            $txn_id == $txn.txn_ptr().addr(),
+            "The transaction used to open or create databases is not the expected one"
+        );
+    };
+}
+
 pub(crate) use assert_eq_env_db_txn;
 pub(crate) use assert_eq_env_txn;
+pub(crate) use assert_eq_open_create_txn_id;
 
 #[cfg(test)]
 mod tests {

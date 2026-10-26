@@ -3,6 +3,7 @@ use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Seek;
 use std::marker::PhantomData;
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
 use std::ptr::{self, NonNull};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -247,7 +248,7 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let db_opener = DatabaseOpener { env: self };
+        let db_opener = DatabaseOpener { env: self, original_txn_ident: rtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &rtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -310,7 +311,7 @@ impl<T> Env<T> {
         E: From<crate::Error>,
     {
         let _lock = self.lock();
-        let db_opener = DatabaseOpener { env: self };
+        let db_opener = DatabaseOpener { env: self, original_txn_ident: wtxn.txn_ptr().addr() };
         let databases = match f(&db_opener, &mut wtxn)? {
             CommitOrAbort::Commit(databases) => databases,
             CommitOrAbort::Abort(aborted) => return Ok(CommitOrAbort::Abort(aborted)),
@@ -788,12 +789,15 @@ impl Drop for EnvInner {
 /// Used to create or open databases.
 pub struct DatabaseOpener<'e, T> {
     env: &'e Env<T>,
+    /// Represents the Txn Id that was used to create this opener
+    /// to make sure another transaction is not used to open a database.
+    original_txn_ident: NonZero<usize>,
 }
 
 impl<'e, T> DatabaseOpener<'e, T> {
     /// Options and flags which can be used to configure how a [`Database`] is opened.
     pub fn database_options(&self) -> DatabaseOpenOptions<'e, '_, T, Unspecified, Unspecified> {
-        DatabaseOpenOptions::new(self.env)
+        DatabaseOpenOptions::new(self.env, self.original_txn_ident)
     }
 
     /// Opens a typed database that already exists in this environment.
