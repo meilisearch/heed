@@ -2207,7 +2207,7 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// ```
     /// # use heed::EnvOpenOptions;
     /// use std::io::Write;
-    /// use heed::{Database, PutFlags};
+    /// use heed::{Database, PutFlags, CommitOrAbort};
     /// use heed::types::*;
     /// use heed::byteorder::BigEndian;
     ///
@@ -2216,7 +2216,11 @@ impl<'t, KC, DC, C, CDUP> Database<'t, KC, DC, C, CDUP> {
     /// # let env = unsafe { EnvOpenOptions::new().map_size(10 * 1024 * 1024).max_dbs(3000).open(dir.path())? };
     /// type BEI32 = I32<BigEndian>;
     /// let mut wtxn = env.write_txn()?;
-    /// let db = env.create_database::<BEI32, Str>(&mut wtxn, Some("number-string"))?;
+    /// let db = env.create_databases_and_commit(wtxn, |dbo, wtxn| {
+    ///     dbo.create_database::<BEI32, Str>(wtxn, Some("number-string")).map(CommitOrAbort::<_, ()>::Commit)
+    /// })?.unwrap_commit();
+    ///
+    /// let mut wtxn = env.write_txn()?;
     /// # db.clear(&mut wtxn)?;
     /// let value = "I am a long long long value";
     /// db.put_reserved_with_flags(&mut wtxn, PutFlags::APPEND, &42, value.len(), |reserved| {
