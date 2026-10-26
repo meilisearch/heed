@@ -1216,4 +1216,32 @@ mod tests {
             .unwrap()
             .unwrap_commit();
     }
+
+    #[test]
+    #[should_panic]
+    fn disallow_open_database_with_another_txn() {
+        use crate::types::*;
+        use crate::{CommitOrAbort, EnvOpenOptions};
+
+        let env = unsafe {
+            // We use without TLS to make sure we can have
+            // multiple read txn on the same thread.
+            let mut env_builder = EnvOpenOptions::new().read_txn_without_tls();
+            let dir = tempfile::tempdir().unwrap();
+            env_builder.max_dbs(2).open(dir.path()).unwrap()
+        };
+
+        let rtxn1 = env.read_txn().unwrap();
+        let rtxn2 = env.read_txn().unwrap();
+        let _database = env
+            .open_databases_and_commit(
+                rtxn1,
+                |wdo, _rtxn1| -> Result<_, Box<dyn std::error::Error>> {
+                    let db = wdo.open_database::<Str, Str>(&rtxn2, None).unwrap();
+                    Ok(CommitOrAbort::<_, ()>::Commit(db))
+                },
+            )
+            .unwrap()
+            .unwrap_commit();
+    }
 }
