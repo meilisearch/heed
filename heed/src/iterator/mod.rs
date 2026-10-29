@@ -239,7 +239,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((2, ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((3, ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((4, ())));
-        assert_eq!(iter.last().transpose().unwrap(), None);
+        assert_eq!(iter.last().transpose().unwrap(), Some((4, ())));
 
         let mut iter = db.iter(&wtxn).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((1, ())));
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(iter.next().transpose().unwrap(), Some((3, ())));
         assert_eq!(iter.next().transpose().unwrap(), Some((4, ())));
         assert_eq!(iter.next().transpose().unwrap(), None);
-        assert_eq!(iter.last().transpose().unwrap(), None);
+        assert_eq!(iter.last().transpose().unwrap(), Some((4, ())));
 
         wtxn.abort();
 
@@ -261,7 +261,7 @@ mod tests {
 
         let mut iter = db.iter(&wtxn).unwrap();
         assert_eq!(iter.next().transpose().unwrap(), Some((1, ())));
-        assert_eq!(iter.last().transpose().unwrap(), None);
+        assert_eq!(iter.last().transpose().unwrap(), Some((1, ())));
 
         wtxn.abort();
     }

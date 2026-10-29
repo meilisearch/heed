@@ -192,18 +192,11 @@ where
         }
     }
 
+    /// Returns the last entry in this iterater's range.
+    ///
+    /// If a last entry exists this will always return it, even if it has already been given with `next`.
     fn last(mut self) -> Option<Self::Item> {
-        let result = if self.move_on_first {
-            self.cursor.move_on_last(IM::MOVE_OPERATION)
-        } else {
-            match (self.cursor.current(), self.cursor.move_on_last(IM::MOVE_OPERATION)) {
-                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
-                    Ok(Some((key, data)))
-                }
-                (Ok(_), Ok(_)) => Ok(None),
-                (Err(e), _) | (_, Err(e)) => Err(e),
-            }
-        };
+        let result = self.cursor.move_on_last(IM::MOVE_OPERATION);
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
@@ -421,18 +414,11 @@ where
         }
     }
 
+    /// Returns the last entry in this iterater's range.
+    ///
+    /// If a last entry exists this will always return it, even if it has already been given with `next`.
     fn last(mut self) -> Option<Self::Item> {
-        let result = if self.move_on_first {
-            self.cursor.move_on_last(IM::MOVE_OPERATION)
-        } else {
-            match (self.cursor.current(), self.cursor.move_on_last(IM::MOVE_OPERATION)) {
-                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
-                    Ok(Some((key, data)))
-                }
-                (Ok(_), Ok(_)) => Ok(None),
-                (Err(e), _) | (_, Err(e)) => Err(e),
-            }
-        };
+        let result = self.cursor.move_on_last(IM::MOVE_OPERATION);
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
@@ -538,18 +524,11 @@ where
         }
     }
 
+    /// Returns the last entry in this iterater's range.
+    ///
+    /// If a last entry exists this will always return it, even if it has already been given with `next`.
     fn last(mut self) -> Option<Self::Item> {
-        let result = if self.move_on_last {
-            self.cursor.move_on_first(IM::MOVE_OPERATION)
-        } else {
-            match (self.cursor.current(), self.cursor.move_on_first(IM::MOVE_OPERATION)) {
-                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
-                    Ok(Some((key, data)))
-                }
-                (Ok(_), Ok(_)) => Ok(None),
-                (Err(e), _) | (_, Err(e)) => Err(e),
-            }
-        };
+        let result = self.cursor.move_on_first(IM::MOVE_OPERATION);
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
@@ -769,18 +748,11 @@ where
         }
     }
 
+    /// Returns the last entry in this iterater's range.
+    ///
+    /// If a last entry exists this will always return it, even if it has already been given with `next`.
     fn last(mut self) -> Option<Self::Item> {
-        let result = if self.move_on_last {
-            self.cursor.move_on_first(IM::MOVE_OPERATION)
-        } else {
-            match (self.cursor.current(), self.cursor.move_on_first(IM::MOVE_OPERATION)) {
-                (Ok(Some((ckey, _))), Ok(Some((key, data)))) if ckey != key => {
-                    Ok(Some((key, data)))
-                }
-                (Ok(_), Ok(_)) => Ok(None),
-                (Err(e), _) | (_, Err(e)) => Err(e),
-            }
-        };
+        let result = self.cursor.move_on_first(IM::MOVE_OPERATION);
 
         match result {
             Ok(Some((key, data))) => match (KC::bytes_decode(key), DC::bytes_decode(data)) {
